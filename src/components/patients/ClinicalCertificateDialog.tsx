@@ -10,7 +10,7 @@ interface ClinicalCertificateDialogProps {
   patient: {
     nombre_completo: string;
     rut?: string;
-  } | null;
+  };
   citasAsistidas?: Array<{
     fecha: string;
     estado: string;
@@ -21,6 +21,9 @@ interface ClinicalCertificateDialogProps {
   }>;
 }
 
+const LOGO_URL = "https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:logo.png";
+const TIMBRE_URL = "https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:timbre.png";
+
 export function ClinicalCertificateDialog({
   isOpen,
   open,
@@ -30,23 +33,24 @@ export function ClinicalCertificateDialog({
   citasAsistidas,
   citas,
 }: ClinicalCertificateDialogProps) {
-  const isModalOpen = isOpen ?? open ?? false;
+  const isDialogOpen = isOpen ?? open ?? false;
+
   const handleClose = () => {
     if (onClose) onClose();
     if (onOpenChange) onOpenChange(false);
   };
 
-  const rawCitas = citasAsistidas || citas || [];
-
   const [diagnostico, setDiagnostico] = useState('Tratamiento Kinésico Integral y Terapia Manual Ortopédica (TMO)');
   const [codigoPrestacion, setCodigoPrestacion] = useState('Código Fonasa 06-01-105 (Kinesiterapia)');
   const [observacion, setObservacion] = useState('Paciente completa plan terapéutico con adecuada respuesta clínica y tolerancia funcional.');
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  if (!isModalOpen || !patient) return null;
+  if (!isDialogOpen) return null;
 
-  // Filtrar solo fechas con estado 'Asistió' y formatear a DD/MM/AAAA
-  const fechas = rawCitas
-    .filter((c) => c.estado === 'Asistió')
+  const citasList = citasAsistidas || citas || [];
+
+  const fechas = citasList
+    .filter((c) => c.estado === 'Asistió' || (c.estado as string) === 'Atendido')
     .map((c) => {
       const parts = c.fecha.split('-');
       if (parts.length === 3) {
@@ -62,9 +66,27 @@ export function ClinicalCertificateDialog({
     year: 'numeric',
   });
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    setIsGenerating(true);
+
+    // Pre-cargar imágenes en memoria antes de abrir la ventana de impresión
+    const preloadImage = (url: string) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(url);
+        img.onerror = () => resolve(url); // Continúa aunque falle
+        img.src = url;
+      });
+    };
+
+    await Promise.all([preloadImage(LOGO_URL), preloadImage(TIMBRE_URL)]);
+
     const printWindow = window.open('', '_blank', 'width=800,height=900');
-    if (!printWindow) return;
+    if (!printWindow) {
+      setIsGenerating(false);
+      return;
+    }
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -75,24 +97,33 @@ export function ClinicalCertificateDialog({
         <style>
           @page {
             size: letter portrait;
-            margin: 18mm 18mm 18mm 18mm;
+            margin: 18mm 20mm 18mm 20mm;
           }
           * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           body {
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
             color: #1e293b;
             line-height: 1.5;
             background: #fff;
+            padding: 0;
           }
           .header {
             text-align: center;
             border-bottom: 2px solid #0284c7;
             padding-bottom: 10px;
             margin-bottom: 20px;
+          }
+          .logo-img {
+            max-height: 55px;
+            width: auto;
+            margin: 0 auto 8px auto;
+            display: block;
           }
           .clinic-name {
             font-size: 20px;
@@ -104,7 +135,7 @@ export function ClinicalCertificateDialog({
           .clinic-sub {
             font-size: 11.5px;
             color: #475569;
-            margin-top: 3px;
+            margin-top: 2px;
             font-weight: 600;
           }
           .clinic-contact {
@@ -133,8 +164,8 @@ export function ClinicalCertificateDialog({
           .content {
             font-size: 13px;
             text-align: justify;
-            margin-bottom: 14px;
-            line-height: 1.6;
+            margin-bottom: 16px;
+            line-height: 1.7;
           }
           .dates-title {
             font-size: 11.5px;
@@ -147,7 +178,7 @@ export function ClinicalCertificateDialog({
             display: flex;
             flex-wrap: wrap;
             gap: 5px;
-            margin-bottom: 14px;
+            margin-bottom: 16px;
           }
           .date-badge {
             background: #f1f5f9;
@@ -162,11 +193,20 @@ export function ClinicalCertificateDialog({
             text-align: right;
             font-size: 11.5px;
             color: #64748b;
-            margin-top: 18px;
+            margin-top: 20px;
           }
           .signature-section {
-            margin-top: 35px;
+            margin-top: 40px;
             text-align: center;
+            position: relative;
+          }
+          .timbre-img {
+            max-height: 80px;
+            width: auto;
+            margin: 0 auto -20px auto;
+            display: block;
+            position: relative;
+            z-index: 10;
           }
           .sig-line {
             width: 250px;
@@ -190,11 +230,7 @@ export function ClinicalCertificateDialog({
       </head>
       <body>
         <div class="header">
-          <img 
-            src="https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:logo.png" 
-            alt="Kiromov Logo" 
-            style="max-height: 55px; margin: 0 auto 10px auto; display: block;" 
-          />
+          <img src="${LOGO_URL}" alt="Kiromov Logo" class="logo-img" />
           <div class="clinic-name">KIROMOV CENTRO CLÍNICO</div>
           <div class="clinic-sub">Kinesiología Especializada & Terapia Manual Ortopédica</div>
           <div class="clinic-contact">Bulnes 470, Oficina 75 (7° Piso, Edificio Aranjuez), Chillán | Tel / WhatsApp: +56 9 3949 9906</div>
@@ -215,7 +251,7 @@ export function ClinicalCertificateDialog({
 
         <div class="dates-title">Fechas de Atenciones Registradas (${totalSesiones}):</div>
         <div class="dates-grid">
-          ${fechas.map(f => `<span class="date-badge">${f}</span>`).join('')}
+          ${fechas.map((f) => `<span class="date-badge">${f}</span>`).join('')}
         </div>
 
         ${observacion ? `<div class="content"><strong>Observaciones Clínicas:</strong> ${observacion}</div>` : ''}
@@ -225,11 +261,7 @@ export function ClinicalCertificateDialog({
         </div>
 
         <div class="signature-section">
-          <img 
-            src="https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:timbre.png" 
-            alt="Timbre Profesional Klgo. Ignacio Cuevas" 
-            style="max-height: 85px; margin: 0 auto -25px auto; display: block; position: relative; z-index: 10;" 
-          />
+          <img src="${TIMBRE_URL}" alt="Timbre Profesional" class="timbre-img" />
           <div class="sig-line"></div>
           <div class="sig-name">Klgo. Ignacio Cuevas Silva</div>
           <div class="sig-title">Kinesiólogo — Magíster en Terapia Manual Ortopédica (UNAB)</div>
@@ -238,8 +270,10 @@ export function ClinicalCertificateDialog({
 
         <script>
           window.onload = function() {
-            window.print();
-            window.onafterprint = function() { window.close(); };
+            setTimeout(function() {
+              window.print();
+              window.onafterprint = function() { window.close(); };
+            }, 300);
           };
         </script>
       </body>
@@ -249,6 +283,7 @@ export function ClinicalCertificateDialog({
     printWindow.document.open();
     printWindow.document.write(htmlContent);
     printWindow.document.close();
+    setIsGenerating(false);
   };
 
   return (
@@ -320,11 +355,11 @@ export function ClinicalCertificateDialog({
           <button
             type="button"
             onClick={handlePrint}
-            disabled={totalSesiones === 0}
+            disabled={totalSesiones === 0 || isGenerating}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-lg text-sm font-medium shadow-sm transition-colors flex items-center gap-2"
           >
             <span>🖨️</span>
-            <span>Imprimir / Guardar PDF (1 pág)</span>
+            <span>{isGenerating ? 'Preparando...' : 'Imprimir / Guardar PDF (1 pág)'}</span>
           </button>
         </div>
       </div>
