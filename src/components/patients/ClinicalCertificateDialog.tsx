@@ -69,20 +69,19 @@ export function ClinicalCertificateDialog({
   const handlePrint = async () => {
     setIsGenerating(true);
 
-    // Pre-cargar imágenes en memoria antes de abrir la ventana de impresión
     const preloadImage = (url: string) => {
       return new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => resolve(url);
-        img.onerror = () => resolve(url); // Continúa aunque falle
+        img.onerror = () => resolve(url);
         img.src = url;
       });
     };
 
     await Promise.all([preloadImage(LOGO_URL), preloadImage(TIMBRE_URL)]);
 
-    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    const printWindow = window.open('', '_blank', 'width=850,height=950');
     if (!printWindow) {
       setIsGenerating(false);
       return;
@@ -97,7 +96,7 @@ export function ClinicalCertificateDialog({
         <style>
           @page {
             size: letter portrait;
-            margin: 18mm 20mm 18mm 20mm;
+            margin: 15mm 18mm 15mm 18mm;
           }
           * {
             box-sizing: border-box;
@@ -113,63 +112,73 @@ export function ClinicalCertificateDialog({
             background: #fff;
             padding: 0;
           }
-          .header {
-            text-align: center;
-            border-bottom: 2px solid #0284c7;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
+          /* MEMBRETE A 2 COLUMNAS */
+          .header-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2.5px solid #0284c7;
+            padding-bottom: 12px;
+            margin-bottom: 22px;
+          }
+          .logo-box {
+            display: flex;
+            align-items: center;
           }
           .logo-img {
-            max-height: 55px;
+            max-height: 72px;
             width: auto;
-            margin: 0 auto 8px auto;
-            display: block;
+            object-fit: contain;
+          }
+          .clinic-info {
+            text-align: right;
           }
           .clinic-name {
-            font-size: 20px;
-            font-weight: 800;
+            font-size: 17px;
+            font-weight: 900;
             color: #0369a1;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             text-transform: uppercase;
           }
           .clinic-sub {
-            font-size: 11.5px;
+            font-size: 11px;
             color: #475569;
-            margin-top: 2px;
-            font-weight: 600;
+            font-weight: 700;
+            margin-top: 1px;
           }
           .clinic-contact {
-            font-size: 10.5px;
+            font-size: 10px;
             color: #64748b;
-            margin-top: 3px;
+            margin-top: 2px;
+            line-height: 1.3;
           }
           .doc-title {
             text-align: center;
             font-size: 15px;
-            font-weight: 800;
+            font-weight: 900;
             color: #0f172a;
             margin-bottom: 18px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
           }
           .patient-box {
             background: #f8fafc;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #cbd5e1;
             border-radius: 8px;
-            padding: 10px 14px;
+            padding: 12px 16px;
             margin-bottom: 16px;
             font-size: 12.5px;
-            line-height: 1.6;
+            line-height: 1.7;
           }
           .content {
             font-size: 13px;
             text-align: justify;
             margin-bottom: 16px;
-            line-height: 1.7;
+            line-height: 1.75;
           }
           .dates-title {
             font-size: 11.5px;
-            font-weight: 700;
+            font-weight: 800;
             color: #334155;
             margin-bottom: 6px;
             text-transform: uppercase;
@@ -183,44 +192,61 @@ export function ClinicalCertificateDialog({
           .date-badge {
             background: #f1f5f9;
             border: 1px solid #cbd5e1;
-            padding: 2px 7px;
+            padding: 2.5px 8px;
             border-radius: 4px;
             font-size: 11px;
-            font-weight: 600;
+            font-weight: 700;
             color: #334155;
           }
           .date-location {
             text-align: right;
-            font-size: 11.5px;
-            color: #64748b;
-            margin-top: 20px;
+            font-size: 12px;
+            color: #475569;
+            font-weight: 600;
+            margin-top: 15px;
           }
-          .signature-section {
-            margin-top: 40px;
+          /* FIRMA Y TIMBRE */
+          .signature-wrapper {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 25px;
+          }
+          .signature-box {
             text-align: center;
+            width: 290px;
             position: relative;
+          }
+          .timbre-container {
+            height: 75px;
+            position: relative;
+            margin-bottom: -15px;
           }
           .timbre-img {
-            max-height: 80px;
+            max-height: 90px;
             width: auto;
-            margin: 0 auto -20px auto;
-            display: block;
-            position: relative;
+            position: absolute;
+            left: 50%;
+            top: -10px;
+            transform: translateX(-50%);
             z-index: 10;
+            object-fit: contain;
           }
           .sig-line {
-            width: 250px;
+            width: 100%;
             border-top: 1.5px solid #0f172a;
-            margin: 0 auto 6px auto;
+            margin-bottom: 6px;
+            position: relative;
+            z-index: 5;
           }
           .sig-name {
             font-size: 13px;
-            font-weight: 700;
+            font-weight: 800;
             color: #0f172a;
           }
           .sig-title {
             font-size: 11px;
             color: #475569;
+            font-weight: 600;
           }
           .sig-reg {
             font-size: 10.5px;
@@ -229,11 +255,18 @@ export function ClinicalCertificateDialog({
         </style>
       </head>
       <body>
-        <div class="header">
-          <img src="${LOGO_URL}" alt="Kiromov Logo" class="logo-img" />
-          <div class="clinic-name">KIROMOV CENTRO CLÍNICO</div>
-          <div class="clinic-sub">Kinesiología Especializada & Terapia Manual Ortopédica</div>
-          <div class="clinic-contact">Bulnes 470, Oficina 75 (7° Piso, Edificio Aranjuez), Chillán | Tel / WhatsApp: +56 9 3949 9906</div>
+        <div class="header-container">
+          <div class="logo-box">
+            <img src="${LOGO_URL}" alt="Kiromov Logo" class="logo-img" />
+          </div>
+          <div class="clinic-info">
+            <div class="clinic-name">KIROMOV CENTRO CLÍNICO</div>
+            <div class="clinic-sub">Kinesiología & Terapia Manual Ortopédica</div>
+            <div class="clinic-contact">
+              Bulnes 470, Of. 75 (7° Piso, Edif. Aranjuez), Chillán<br>
+              Tel / WhatsApp: +56 9 3949 9906 • contacto@kiromov.cl
+            </div>
+          </div>
         </div>
 
         <div class="doc-title">CERTIFICADO DE ASISTENCIA Y TRATAMIENTO KINÉSICO</div>
@@ -260,12 +293,16 @@ export function ClinicalCertificateDialog({
           Chillán, ${fechaHoy}
         </div>
 
-        <div class="signature-section">
-          <img src="${TIMBRE_URL}" alt="Timbre Profesional" class="timbre-img" />
-          <div class="sig-line"></div>
-          <div class="sig-name">Klgo. Ignacio Cuevas Silva</div>
-          <div class="sig-title">Kinesiólogo — Magíster en Terapia Manual Ortopédica (UNAB)</div>
-          <div class="sig-reg">Registro Superintendencia de Salud (SIS) N° 396889</div>
+        <div class="signature-wrapper">
+          <div class="signature-box">
+            <div class="timbre-container">
+              <img src="${TIMBRE_URL}" alt="Timbre Profesional" class="timbre-img" />
+            </div>
+            <div class="sig-line"></div>
+            <div class="sig-name">Klgo. Ignacio Cuevas Silva</div>
+            <div class="sig-title">Kinesiólogo — Magíster en Terapia Manual Ortopédica (UNAB)</div>
+            <div class="sig-reg">Registro Superintendencia de Salud (SIS) N° 396889</div>
+          </div>
         </div>
 
         <script>
