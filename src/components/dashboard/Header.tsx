@@ -43,23 +43,16 @@ export function Header({
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
         {/* Brand / Logo + Navigation Links */}
         <div className="flex items-center justify-between sm:justify-start gap-3 lg:gap-4">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-clinic-600 to-teal-800 text-white shadow-md shadow-clinic-600/20 group-hover:scale-105 transition-transform">
-              <Activity className="h-6 w-6 stroke-[2.2]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-lg tracking-tight text-slate-900">
-                  KIROMOV
-                </span>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-clinic-700 bg-clinic-50 border border-clinic-200 px-1.5 py-0.5 rounded">
-                  Core
-                </span>
-              </div>
-              <p className="text-[11px] font-medium text-slate-400">
-                Centro Clínico & Kinesiología
-              </p>
-            </div>
+          <Link href="/" className="flex items-center gap-3 font-bold text-lg text-slate-800 group">
+            <img
+              src="https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:logo.png"
+              alt="Kiromov Centro Clínico"
+              className="h-8 w-auto object-contain transition-transform group-hover:scale-105"
+            />
+            <span className="text-blue-700 tracking-tight flex items-center gap-1.5">
+              <span>KIROMOV</span>
+              <span className="text-slate-400 font-normal text-xs bg-slate-100 px-2 py-0.5 rounded-md">Core</span>
+            </span>
           </Link>
 
           {/* Navigation Links Desktop */}

@@ -304,9 +304,16 @@ export default function AgendaPage() {
       {/* Header Global */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2 text-blue-700 font-bold text-lg tracking-tight">
-            <span>KIROMOV</span>
-            <span className="text-slate-400 font-normal text-sm">Core</span>
+          <Link href="/" className="flex items-center gap-3 font-bold text-lg text-slate-800 group">
+            <img 
+              src="https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:logo.png" 
+              alt="Kiromov Centro Clínico" 
+              className="h-8 w-auto object-contain transition-transform group-hover:scale-105" 
+            />
+            <span className="text-blue-700 tracking-tight flex items-center gap-1.5">
+              <span>KIROMOV</span>
+              <span className="text-slate-400 font-normal text-xs bg-slate-100 px-2 py-0.5 rounded-md">Core</span>
+            </span>
           </Link>
           <nav className="flex items-center gap-2">
             <Link href="/" className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">

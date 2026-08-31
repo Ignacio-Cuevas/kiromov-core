@@ -190,6 +190,11 @@ export function ClinicalCertificateDialog({
       </head>
       <body>
         <div class="header">
+          <img 
+            src="https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:logo.png" 
+            alt="Kiromov Logo" 
+            style="max-height: 55px; margin: 0 auto 10px auto; display: block;" 
+          />
           <div class="clinic-name">KIROMOV CENTRO CLÍNICO</div>
           <div class="clinic-sub">Kinesiología Especializada & Terapia Manual Ortopédica</div>
           <div class="clinic-contact">Bulnes 470, Oficina 75 (7° Piso, Edificio Aranjuez), Chillán | Tel / WhatsApp: +56 9 3949 9906</div>
@@ -220,6 +225,11 @@ export function ClinicalCertificateDialog({
         </div>
 
         <div class="signature-section">
+          <img 
+            src="https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:timbre.png" 
+            alt="Timbre Profesional Klgo. Ignacio Cuevas" 
+            style="max-height: 85px; margin: 0 auto -25px auto; display: block; position: relative; z-index: 10;" 
+          />
           <div class="sig-line"></div>
           <div class="sig-name">Klgo. Ignacio Cuevas Silva</div>
           <div class="sig-title">Kinesiólogo — Magíster en Terapia Manual Ortopédica (UNAB)</div>
