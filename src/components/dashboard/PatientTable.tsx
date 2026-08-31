@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Table,
   TableHeader,
@@ -26,6 +27,8 @@ import {
   FolderOpen,
   Eye,
   FileText,
+  ShoppingCart,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +40,7 @@ interface PatientTableProps {
     patientName: string,
     e: React.MouseEvent
   ) => void;
+  onOpenSale?: (patient: VistaResumenPaciente) => void;
   isLoading?: boolean;
 }
 
@@ -44,6 +48,7 @@ export function PatientTable({
   patients,
   onSelectPatient,
   onRegisterQuickAttendance,
+  onOpenSale,
   isLoading = false,
 }: PatientTableProps) {
   if (isLoading) {
@@ -54,7 +59,7 @@ export function PatientTable({
           Cargando datos clínicos de pacientes...
         </p>
         <p className="text-xs text-slate-400 mt-1">
-          Consultando vista_resumen_pacientes
+          Consultando registros de pacientes en Supabase
         </p>
       </div>
     );
@@ -70,7 +75,7 @@ export function PatientTable({
           No se encontraron pacientes
         </h4>
         <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-          Intenta con otro término de búsqueda o cambia los filtros de estado aplicados.
+          Intenta con otro término de búsqueda o registra un nuevo paciente con el botón superior.
         </p>
       </div>
     );
@@ -81,13 +86,14 @@ export function PatientTable({
       <Table>
         <TableHeader>
           <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
-            <TableHead className="w-[110px]">Código</TableHead>
+            <TableHead className="w-[100px]">Código</TableHead>
             <TableHead>Paciente</TableHead>
             <TableHead className="hidden md:table-cell">RUT</TableHead>
-            <TableHead className="w-[200px]">Progreso Sesiones</TableHead>
+            <TableHead className="hidden sm:table-cell">Previsión</TableHead>
+            <TableHead className="w-[180px]">Saldo Sesiones</TableHead>
             <TableHead className="hidden lg:table-cell">Última Atención</TableHead>
             <TableHead>Estado del Plan</TableHead>
-            <TableHead className="text-right w-[200px]">Acciones</TableHead>
+            <TableHead className="text-right w-[240px]">Acciones Rápidas</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -124,9 +130,16 @@ export function PatientTable({
                     <span className="font-bold text-slate-900 group-hover:text-clinic-700 transition-colors block text-sm">
                       {patient.nombre_completo}
                     </span>
-                    <span className="md:hidden text-xs text-slate-400 block font-mono">
-                      {formatRut(patient.rut)}
-                    </span>
+                    <div className="flex items-center gap-2 md:hidden">
+                      <span className="text-xs text-slate-400 font-mono">
+                        {formatRut(patient.rut)}
+                      </span>
+                      {patient.prevision_salud && (
+                        <span className="text-[10px] bg-slate-100 px-1.5 py-0.2 rounded font-semibold text-slate-600">
+                          {patient.prevision_salud}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </TableCell>
 
@@ -135,13 +148,31 @@ export function PatientTable({
                   {formatRut(patient.rut)}
                 </TableCell>
 
+                {/* Previsión */}
+                <TableCell className="hidden sm:table-cell">
+                  <span
+                    className={cn(
+                      "text-xs px-2 py-0.5 rounded-md font-semibold inline-block",
+                      patient.prevision_salud === "Fonasa"
+                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                        : patient.prevision_salud === "Isapre"
+                        ? "bg-blue-50 text-blue-800 border border-blue-200"
+                        : patient.prevision_salud === "Convenio"
+                        ? "bg-purple-50 text-purple-800 border border-purple-200"
+                        : "bg-slate-100 text-slate-700 border border-slate-200"
+                    )}
+                  >
+                    {patient.prevision_salud || "Particular"}
+                  </span>
+                </TableCell>
+
                 {/* Progreso de Sesiones */}
                 <TableCell>
                   <div className="space-y-1.5 pr-2">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700">
                         {patient.sesiones_consumidas} / {patient.total_sesiones}{" "}
-                        <span className="text-slate-400 font-normal">sesiones</span>
+                        <span className="text-slate-400 font-normal">ses.</span>
                       </span>
                       <span
                         className={cn(
@@ -194,9 +225,37 @@ export function PatientTable({
                   <EstadoPlanBadge estado={patient.estado_plan} />
                 </TableCell>
 
-                {/* Acciones: [ + Asistencia ] y [ Ver Ficha ] */}
+                {/* Acciones Rápidas: [ + Venta ], [ 📅 Agendar ], [ + Asistencia ], [ Ver Ficha ] */}
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1.5">
+                    {/* Botón Nueva Venta */}
+                    {onOpenSale && (
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenSale(patient);
+                        }}
+                        className="h-8 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-600 font-semibold text-xs transition-all shadow-2xs hover:shadow-xs flex items-center gap-1"
+                        title="Registrar nueva venta o recarga de plan"
+                      >
+                        <ShoppingCart className="h-3 w-3" />
+                        <span className="hidden xl:inline">Venta</span>
+                      </Button>
+                    )}
+
+                    {/* Botón Agendar */}
+                    <Link
+                      href={`/agenda?pacienteId=${patient.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-8 px-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200 hover:border-blue-600 font-semibold text-xs transition-all shadow-2xs hover:shadow-xs flex items-center gap-1"
+                      title="Agendar cita en calendario"
+                    >
+                      <CalendarDays className="h-3 w-3" />
+                      <span className="hidden xl:inline">Agendar</span>
+                    </Link>
+
+                    {/* Botón Asistencia Rápida */}
                     <Button
                       size="sm"
                       onClick={(e) =>
@@ -207,12 +266,13 @@ export function PatientTable({
                         )
                       }
                       className="h-8 rounded-lg bg-clinic-50 text-clinic-700 hover:bg-clinic-600 hover:text-white border border-clinic-200 hover:border-clinic-600 font-semibold text-xs transition-all shadow-2xs hover:shadow-xs flex items-center gap-1"
-                      title="Registrar asistencia hoy"
+                      title="Registrar asistencia de hoy"
                     >
                       <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-                      <span className="hidden sm:inline">Asistencia</span>
+                      <span className="hidden sm:inline">Asist.</span>
                     </Button>
 
+                    {/* Botón Ver Ficha */}
                     <Button
                       size="sm"
                       variant="outline"
@@ -224,7 +284,7 @@ export function PatientTable({
                       title="Abrir ficha clínica completa"
                     >
                       <Eye className="h-3.5 w-3.5 text-clinic-600" />
-                      <span>Ver Ficha</span>
+                      <span>Ficha</span>
                     </Button>
                   </div>
                 </TableCell>

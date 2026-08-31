@@ -4,6 +4,9 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import { fetchHistorialVentas, fetchEgresosCaja, crearEgresoCaja } from '@/lib/supabase';
+import { RegisterSaleDialog } from '@/components/finanzas/RegisterSaleDialog';
+import { formatCLP } from '@/lib/utils';
+import { ShoppingCart, Plus, ArrowDownRight, ArrowUpRight, Wallet } from 'lucide-react';
 
 type PeriodoFiltro = 'mes' | 'semestre' | 'ano' | 'todo';
 
@@ -23,6 +26,9 @@ export default function FinanzasPage() {
   const [monto, setMonto] = useState('');
   const [formaPago, setFormaPago] = useState('Débito');
   const [saving, setSaving] = useState(false);
+
+  // Modal nueva venta
+  const [isRegisterSaleOpen, setIsRegisterSaleOpen] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -64,111 +70,123 @@ export default function FinanzasPage() {
     loadData();
   }, []);
 
-  // Filtrado reactivo en memoria por período
-  const { comprasFiltradas, egresosFiltrados, totalIngresos, totalEgresos, flujoNeto, etiquetaPeriodo } = useMemo(() => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth(); // 0-11
+  // Función para determinar si una fecha está dentro del período seleccionado
+  function estaEnPeriodo(fechaStr: string) {
+    if (!fechaStr) return false;
+    if (periodo === 'todo') return true;
 
-    let cFiltradas = compras;
-    let eFiltradas = egresos;
-    let etiqueta = 'Histórico Total';
+    const fecha = new Date(fechaStr);
+    const hoy = new Date();
 
     if (periodo === 'mes') {
-      etiqueta = now.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
-      cFiltradas = compras.filter((c) => {
-        const d = new Date(c.fecha_compra);
-        return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-      });
-      eFiltradas = egresos.filter((e) => {
-        const d = new Date(e.fecha + 'T12:00:00');
-        return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-      });
-    } else if (periodo === 'semestre') {
-      const semestre = currentMonth < 6 ? '1er Semestre' : '2do Semestre';
-      etiqueta = `${semestre} ${currentYear}`;
-      const inicioMes = currentMonth < 6 ? 0 : 6;
-      const finMes = currentMonth < 6 ? 5 : 11;
-
-      cFiltradas = compras.filter((c) => {
-        const d = new Date(c.fecha_compra);
-        return d.getFullYear() === currentYear && d.getMonth() >= inicioMes && d.getMonth() <= finMes;
-      });
-      eFiltradas = egresos.filter((e) => {
-        const d = new Date(e.fecha + 'T12:00:00');
-        return d.getFullYear() === currentYear && d.getMonth() >= inicioMes && d.getMonth() <= finMes;
-      });
-    } else if (periodo === 'ano') {
-      etiqueta = `Año ${currentYear}`;
-      cFiltradas = compras.filter((c) => new Date(c.fecha_compra).getFullYear() === currentYear);
-      eFiltradas = egresos.filter((e) => new Date(e.fecha + 'T12:00:00').getFullYear() === currentYear);
+      return (
+        fecha.getFullYear() === hoy.getFullYear() &&
+        fecha.getMonth() === hoy.getMonth()
+      );
     }
 
-    const sumIngresos = cFiltradas.reduce((acc, item) => acc + (Number(item.total_final_clp) || Number(item.valor_total) || 0), 0);
-    const sumEgresos = eFiltradas.reduce((acc, item) => acc + (Number(item.monto_clp) || 0), 0);
+    if (periodo === 'semestre') {
+      const mesActual = hoy.getMonth();
+      const esPrimerSemestre = mesActual < 6;
+      const mesFecha = fecha.getMonth();
+      const fechaPrimerSemestre = mesFecha < 6;
 
-    return {
-      comprasFiltradas: cFiltradas,
-      egresosFiltrados: eFiltradas,
-      totalIngresos: sumIngresos,
-      totalEgresos: sumEgresos,
-      flujoNeto: sumIngresos - sumEgresos,
-      etiquetaPeriodo: etiqueta,
-    };
-  }, [compras, egresos, periodo]);
+      return (
+        fecha.getFullYear() === hoy.getFullYear() &&
+        esPrimerSemestre === fechaPrimerSemestre
+      );
+    }
 
-  async function handleCreateEgreso(e: React.FormEvent) {
+    if (periodo === 'ano') {
+      return fecha.getFullYear() === hoy.getFullYear();
+    }
+
+    return true;
+  }
+
+  // Filtrar compras y egresos según el período
+  const comprasFiltradas = useMemo(() => {
+    return compras.filter((c) => estaEnPeriodo(c.fecha_compra));
+  }, [compras, periodo]);
+
+  const egresosFiltrados = useMemo(() => {
+    return egresos.filter((e) => estaEnPeriodo(e.fecha));
+  }, [egresos, periodo]);
+
+  // Cálculos dinámicos
+  const totalIngresos = useMemo(() => {
+    return comprasFiltradas.reduce((acc, curr) => {
+      const val = curr.total_final_clp ?? curr.valor_total ?? 0;
+      return acc + (Number(val) || 0);
+    }, 0);
+  }, [comprasFiltradas]);
+
+  const totalEgresos = useMemo(() => {
+    return egresosFiltrados.reduce((acc, curr) => acc + (Number(curr.monto_clp) || 0), 0);
+  }, [egresosFiltrados]);
+
+  const flujoNeto = totalIngresos - totalEgresos;
+
+  // Cuentas por cobrar (compras en estado 'Pendiente de Pago')
+  const cuentasPorCobrar = useMemo(() => {
+    return comprasFiltradas
+      .filter((c) => c.estado_pago === 'Pendiente de Pago')
+      .reduce((acc, curr) => acc + (Number(curr.total_final_clp ?? curr.valor_total) || 0), 0);
+  }, [comprasFiltradas]);
+
+  // Etiqueta del período
+  const etiquetaPeriodo = useMemo(() => {
+    const hoy = new Date();
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    
+    if (periodo === 'mes') {
+      return `${meses[hoy.getMonth()]} ${hoy.getFullYear()}`;
+    }
+    if (periodo === 'semestre') {
+      const sem = hoy.getMonth() < 6 ? '1° Semestre' : '2° Semestre';
+      return `${sem} ${hoy.getFullYear()}`;
+    }
+    if (periodo === 'ano') {
+      return `Año ${hoy.getFullYear()}`;
+    }
+    return 'Historial Completo';
+  }, [periodo]);
+
+  async function handleAddEgreso(e: React.FormEvent) {
     e.preventDefault();
     if (!concepto || !monto) return;
     setSaving(true);
 
-    const montoNum = parseInt(monto, 10);
-    const today = new Date().toISOString().split('T')[0];
+    const nuevoEgreso = {
+      concepto,
+      categoria: categoria as any,
+      monto_clp: parseInt(monto, 10),
+      medio_pago: (formaPago === 'Débito' ? 'Débito / Transbank' : 'Transferencia') as any,
+      fecha: new Date().toISOString().split('T')[0],
+      responsable: 'Klgo. Ignacio Cuevas Silva',
+    };
 
     if (supabase) {
       try {
-        const { error } = await supabase.from('egresos_caja').insert({
-          concepto,
-          categoria,
-          monto_clp: montoNum,
-          forma_pago: formaPago,
-          medio_pago: formaPago,
-          fecha: today,
-        });
-
-        if (!error) {
-          setConcepto('');
-          setMonto('');
-          setShowModal(false);
-          await loadData();
-          setSaving(false);
-          return;
-        }
+        await supabase.from('egresos_caja').insert([nuevoEgreso]);
       } catch (err) {
-        console.warn('Supabase error inserting expense:', err);
+        console.warn('Error guardando egreso en Supabase:', err);
       }
+    } else {
+      await crearEgresoCaja(nuevoEgreso);
     }
 
-    // Fallback local
-    await crearEgresoCaja({
-      concepto,
-      categoria: categoria as any,
-      monto_clp: montoNum,
-      medio_pago: formaPago as any,
-      fecha: today,
-    });
-
+    setShowModal(false);
     setConcepto('');
     setMonto('');
-    setShowModal(false);
-    await loadData();
     setSaving(false);
+    loadData();
   }
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between shadow-sm">
+      {/* Header Global */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-3 font-bold text-lg text-slate-800 group">
             <img 
@@ -225,13 +243,13 @@ export default function FinanzasPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Segmented Control de Períodos */}
             <div className="bg-slate-200/80 p-1 rounded-xl flex items-center gap-1 text-xs font-medium">
               <button
                 onClick={() => setPeriodo('mes')}
                 className={`px-3 py-1.5 rounded-lg transition-all ${
-                  periodo === 'mes' ? 'bg-white text-blue-700 font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  periodo === 'mes' ? 'bg-white text-blue-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Este Mes
@@ -239,7 +257,7 @@ export default function FinanzasPage() {
               <button
                 onClick={() => setPeriodo('semestre')}
                 className={`px-3 py-1.5 rounded-lg transition-all ${
-                  periodo === 'semestre' ? 'bg-white text-blue-700 font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  periodo === 'semestre' ? 'bg-white text-blue-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Semestre
@@ -247,7 +265,7 @@ export default function FinanzasPage() {
               <button
                 onClick={() => setPeriodo('ano')}
                 className={`px-3 py-1.5 rounded-lg transition-all ${
-                  periodo === 'ano' ? 'bg-white text-blue-700 font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  periodo === 'ano' ? 'bg-white text-blue-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Este Año
@@ -255,16 +273,26 @@ export default function FinanzasPage() {
               <button
                 onClick={() => setPeriodo('todo')}
                 className={`px-3 py-1.5 rounded-lg transition-all ${
-                  periodo === 'todo' ? 'bg-white text-blue-700 font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  periodo === 'todo' ? 'bg-white text-blue-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Histórico
               </button>
             </div>
 
+            {/* Botón Nueva Venta */}
+            <button
+              onClick={() => setIsRegisterSaleOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+            >
+              <ShoppingCart className="h-4 w-4" />
+              <span>+ Registrar Venta</span>
+            </button>
+
+            {/* Botón Registrar Gasto */}
             <button
               onClick={() => setShowModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-xl shadow-sm transition-colors flex items-center gap-1.5"
+              className="bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold px-4 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
             >
               <span>+</span>
               <span>Registrar Gasto</span>
@@ -273,187 +301,240 @@ export default function FinanzasPage() {
         </div>
 
         {/* KPIs Dinámicos */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Ingresos ({periodo.toUpperCase()})</span>
-            <div className="text-2xl font-bold text-slate-800 mt-1">
-              ${totalIngresos.toLocaleString('es-CL')} <span className="text-xs font-normal text-slate-400">CLP</span>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Ingresos Totales</span>
+            <div className="text-2xl font-extrabold text-slate-800 mt-1">
+              {formatCLP(totalIngresos)}
             </div>
-            <span className="text-xs text-slate-500 mt-1 block font-medium">{comprasFiltradas.length} compras en este período</span>
+            <span className="text-xs text-slate-500 mt-1 block font-medium">{comprasFiltradas.length} ventas en período</span>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Egresos ({periodo.toUpperCase()})</span>
-            <div className="text-2xl font-bold text-rose-600 mt-1">
-              ${totalEgresos.toLocaleString('es-CL')} <span className="text-xs font-normal text-slate-400">CLP</span>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Egresos / Gastos</span>
+            <div className="text-2xl font-extrabold text-rose-600 mt-1">
+              {formatCLP(totalEgresos)}
             </div>
             <span className="text-xs text-slate-500 mt-1 block font-medium">{egresosFiltrados.length} gastos registrados</span>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Flujo Neto ({periodo.toUpperCase()})</span>
-            <div className={`text-2xl font-bold mt-1 ${flujoNeto >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-              ${flujoNeto.toLocaleString('es-CL')} <span className="text-xs font-normal text-slate-400">CLP</span>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Flujo Neto</span>
+            <div className={`text-2xl font-extrabold mt-1 ${flujoNeto >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {formatCLP(flujoNeto)}
             </div>
-            <span className={`text-xs font-semibold mt-1 inline-block px-2 py-0.5 rounded ${flujoNeto >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+            <span className={`text-xs font-bold mt-1 inline-block px-2 py-0.5 rounded ${flujoNeto >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
               {flujoNeto >= 0 ? '✓ Superávit Operacional' : '⚠️ Déficit en Período'}
             </span>
           </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Cuentas por Cobrar</span>
+            <div className="text-2xl font-extrabold text-amber-600 mt-1">
+              {formatCLP(cuentasPorCobrar)}
+            </div>
+            <span className="text-xs text-slate-500 mt-1 block font-medium">Saldos pendientes de pago</span>
+          </div>
         </div>
 
-        {/* Tablas Filtradas */}
+        {/* Tablas de Ingresos y Egresos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Tabla de Ventas Filtradas */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="px-5 py-4 border-b border-slate-100 font-bold text-slate-800 flex items-center justify-between">
-              <span>Ventas de Planes ({comprasFiltradas.length})</span>
-              <span className="text-xs font-normal text-slate-500 capitalize">{etiquetaPeriodo}</span>
+          {/* Listado de Ventas / Ingresos */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                <ArrowUpRight className="h-5 w-5 text-emerald-600" />
+                Ventas y Planes ({comprasFiltradas.length})
+              </h3>
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
+                {formatCLP(totalIngresos)}
+              </span>
             </div>
-            <div className="overflow-x-auto max-h-96 flex-1">
-              {comprasFiltradas.length === 0 ? (
-                <div className="p-8 text-center text-sm text-slate-400">Sin ventas registradas en este período.</div>
-              ) : (
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 text-xs font-semibold border-b">
+
+            {loading ? (
+              <p className="text-xs text-slate-400 py-6 text-center">Cargando ventas...</p>
+            ) : comprasFiltradas.length === 0 ? (
+              <p className="text-xs text-slate-400 py-6 text-center">No hay ventas registradas en este período.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 border-b">
                     <tr>
-                      <th className="px-4 py-3">Fecha</th>
-                      <th className="px-4 py-3">Paciente</th>
-                      <th className="px-4 py-3">Plan</th>
-                      <th className="px-4 py-3 text-right">Monto</th>
+                      <th className="py-2.5 px-3">Fecha</th>
+                      <th className="py-2.5 px-3">Paciente / Detalle</th>
+                      <th className="py-2.5 px-3">Medio</th>
+                      <th className="py-2.5 px-3 text-right">Monto</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {comprasFiltradas.map((c) => (
-                      <tr key={c.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 text-slate-500 text-xs">{c.fecha_compra ? new Date(c.fecha_compra).toLocaleDateString('es-CL') : '—'}</td>
-                        <td className="px-4 py-3 font-medium text-slate-800">{c.pacientes?.nombre_completo || c.paciente_nombre || 'Paciente'}</td>
-                        <td className="px-4 py-3 text-slate-600 text-xs">{c.plan_nombre || c.nombre_plan || 'Plan'} ({c.total_sesiones || 0} ses)</td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-800">${(Number(c.total_final_clp) || Number(c.valor_total) || 0).toLocaleString('es-CL')}</td>
+                    {comprasFiltradas.map((c: any) => (
+                      <tr key={c.id} className="hover:bg-slate-50/70">
+                        <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">{c.fecha_compra}</td>
+                        <td className="py-2.5 px-3">
+                          <div className="font-bold text-slate-800">
+                            {c.pacientes?.nombre_completo || c.paciente_nombre || 'Paciente'}
+                          </div>
+                          <div className="text-[11px] text-slate-500">{c.nombre_plan} ({c.total_sesiones} ses.)</div>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-semibold">
+                            {c.medio_pago || 'Transferencia'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-extrabold text-emerald-700">
+                          {formatCLP(c.total_final_clp ?? c.valor_total)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
-          {/* Tabla de Egresos Filtrados */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="px-5 py-4 border-b border-slate-100 font-bold text-slate-800 flex items-center justify-between">
-              <span>Gastos y Egresos ({egresosFiltrados.length})</span>
-              <span className="text-xs font-normal text-slate-500 capitalize">{etiquetaPeriodo}</span>
+          {/* Listado de Egresos / Gastos */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                <ArrowDownRight className="h-5 w-5 text-rose-600" />
+                Egresos y Gastos ({egresosFiltrados.length})
+              </h3>
+              <span className="text-xs font-semibold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full">
+                {formatCLP(totalEgresos)}
+              </span>
             </div>
-            <div className="overflow-x-auto max-h-96 flex-1">
-              {egresosFiltrados.length === 0 ? (
-                <div className="p-8 text-center text-sm text-slate-400">Sin egresos registrados en este período.</div>
-              ) : (
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 text-xs font-semibold border-b">
+
+            {loading ? (
+              <p className="text-xs text-slate-400 py-6 text-center">Cargando egresos...</p>
+            ) : egresosFiltrados.length === 0 ? (
+              <p className="text-xs text-slate-400 py-6 text-center">No hay egresos registrados en este período.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 border-b">
                     <tr>
-                      <th className="px-4 py-3">Fecha</th>
-                      <th className="px-4 py-3">Concepto</th>
-                      <th className="px-4 py-3">Categoría</th>
-                      <th className="px-4 py-3 text-right">Monto</th>
+                      <th className="py-2.5 px-3">Fecha</th>
+                      <th className="py-2.5 px-3">Concepto / Categoría</th>
+                      <th className="py-2.5 px-3">Medio</th>
+                      <th className="py-2.5 px-3 text-right">Monto</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {egresosFiltrados.map((e) => (
-                      <tr key={e.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 text-slate-500 text-xs">{e.fecha}</td>
-                        <td className="px-4 py-3 font-medium text-slate-800">{e.concepto}</td>
-                        <td className="px-4 py-3 text-slate-500 text-xs">
-                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-medium">{e.categoria}</span>
+                    {egresosFiltrados.map((e: any) => (
+                      <tr key={e.id} className="hover:bg-slate-50/70">
+                        <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">{e.fecha}</td>
+                        <td className="py-2.5 px-3">
+                          <div className="font-bold text-slate-800">{e.concepto}</div>
+                          <div className="text-[11px] text-slate-500">{e.categoria}</div>
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold text-rose-600">-${Number(e.monto_clp).toLocaleString('es-CL')}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-semibold">
+                            {e.medio_pago || 'Débito'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-extrabold text-rose-700">
+                          {formatCLP(e.monto_clp)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
 
-      {/* Modal Registrar Egreso */}
+      {/* Modal Registrar Gasto */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-lg text-slate-800">Registrar Nuevo Gasto / Egreso</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
-            </div>
-            <form onSubmit={handleCreateEgreso} className="space-y-4 text-sm">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in-50 zoom-in-95">
+            <h3 className="text-lg font-bold text-slate-800">Registrar Nuevo Gasto de Caja</h3>
+            <form onSubmit={handleAddEgreso} className="space-y-3.5">
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Concepto</label>
+                <label className="text-xs font-bold text-slate-700 uppercase">Concepto / Descripción</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej: Insumos clínicos, Estacionamiento..."
+                  placeholder="Ej: Insumos de punción seca, cinta kinesiotape..."
                   value={concepto}
                   onChange={(e) => setConcepto(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-medium text-slate-700 mb-1">Categoría</label>
+                  <label className="text-xs font-bold text-slate-700 uppercase">Categoría</label>
                   <select
                     value={categoria}
                     onChange={(e) => setCategoria(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white"
                   >
-                    <option value="Insumos">Insumos Clínicos</option>
-                    <option value="Traslado">Traslado / Estacionamiento</option>
-                    <option value="Arriendo">Arriendo / Gastos Comunes</option>
-                    <option value="Servicios">Servicios Básicos</option>
+                    <option value="Insumos Clínicos">Insumos Clínicos</option>
+                    <option value="Servicios Básicos">Servicios Básicos</option>
+                    <option value="Arriendo">Arriendo</option>
+                    <option value="Marketing">Marketing / Publicidad</option>
+                    <option value="Equipamiento">Equipamiento</option>
                     <option value="Otros">Otros</option>
                   </select>
                 </div>
+
                 <div>
-                  <label className="block font-medium text-slate-700 mb-1">Monto ($ CLP)</label>
+                  <label className="text-xs font-bold text-slate-700 uppercase">Monto CLP</label>
                   <input
                     type="number"
                     required
-                    placeholder="Ej: 15000"
+                    min="100"
+                    step="1000"
+                    placeholder="Ej: 25000"
                     value={monto}
                     onChange={(e) => setMonto(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white font-bold"
                   />
                 </div>
               </div>
+
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Forma de Pago</label>
+                <label className="text-xs font-bold text-slate-700 uppercase">Medio de Pago</label>
                 <select
                   value={formaPago}
                   onChange={(e) => setFormaPago(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white"
                 >
                   <option value="Débito">Débito / Transbank</option>
-                  <option value="Transferencia">Transferencia</option>
+                  <option value="Transferencia">Transferencia Bancaria</option>
                   <option value="Efectivo">Efectivo</option>
                 </select>
               </div>
-              <div className="flex items-center justify-end gap-3 pt-3 border-t">
+
+              <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm transition-colors"
+                  className="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm disabled:bg-slate-300"
                 >
-                  {saving ? 'Guardando...' : 'Guardar Egreso'}
+                  {saving ? 'Guardando...' : 'Guardar Gasto'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Modal Registrar Venta */}
+      <RegisterSaleDialog
+        open={isRegisterSaleOpen}
+        onOpenChange={setIsRegisterSaleOpen}
+        onSaleRegistered={loadData}
+      />
     </div>
   );
 }

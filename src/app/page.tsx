@@ -5,7 +5,9 @@ import { Header } from "@/components/dashboard/Header";
 import { KpiCards } from "@/components/dashboard/KpiCards";
 import { PatientTable } from "@/components/dashboard/PatientTable";
 import { PatientDrawer } from "@/components/patients/PatientDrawer";
-import { VistaResumenPaciente } from "@/types/database";
+import { CreatePatientDialog } from "@/components/patients/CreatePatientDialog";
+import { RegisterSaleDialog } from "@/components/finanzas/RegisterSaleDialog";
+import { VistaResumenPaciente, Paciente, CompraPlan } from "@/types/database";
 import {
   fetchVistaResumenPacientes,
   registrarAsistenciaHoy,
@@ -23,6 +25,8 @@ import {
   Layers,
   Search,
   X,
+  UserPlus,
+  ShoppingCart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -35,6 +39,12 @@ export default function DashboardPage() {
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+
+  // Dialogs
+  const [isCreatePatientOpen, setIsCreatePatientOpen] = React.useState(false);
+  const [isRegisterSaleOpen, setIsRegisterSaleOpen] = React.useState(false);
+  const [salePatientTarget, setSalePatientTarget] =
+    React.useState<VistaResumenPaciente | null>(null);
 
   // Load patients data from Supabase / vista_resumen_pacientes
   const loadPatients = React.useCallback(async (showToast = false) => {
@@ -62,6 +72,12 @@ export default function DashboardPage() {
   const handleSelectPatient = (patient: VistaResumenPaciente) => {
     setSelectedPatient(patient);
     setIsDrawerOpen(true);
+  };
+
+  // Open sale registration for specific patient
+  const handleOpenSaleForPatient = (patient: VistaResumenPaciente) => {
+    setSalePatientTarget(patient);
+    setIsRegisterSaleOpen(true);
   };
 
   // Direct quick attendance button from table row
@@ -96,6 +112,14 @@ export default function DashboardPage() {
 
   // Callback when attendance is registered from inside the drawer
   const handleAttendanceRegisteredFromDrawer = async () => {
+    await loadPatients();
+  };
+
+  const handlePatientCreated = async (newPatient: Paciente) => {
+    await loadPatients();
+  };
+
+  const handleSaleRegistered = async (newSale: CompraPlan) => {
     await loadPatients();
   };
 
@@ -166,11 +190,11 @@ export default function DashboardPage() {
               </span>
             </h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Control de sesiones activas, atenciones del día y registro de notas SOAP.
+              Control de sesiones activas, directorio de pacientes y emisión de ventas.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -181,7 +205,28 @@ export default function DashboardPage() {
               <RefreshCw
                 className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin text-clinic-600" : ""}`}
               />
-              <span>{isRefreshing ? "Actualizando..." : "Actualizar"}</span>
+              <span>Actualizar</span>
+            </Button>
+
+            <Button
+              size="sm"
+              onClick={() => {
+                setSalePatientTarget(null);
+                setIsRegisterSaleOpen(true);
+              }}
+              className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs"
+            >
+              <ShoppingCart className="h-4 w-4" />
+              <span>+ Registrar Venta</span>
+            </Button>
+
+            <Button
+              size="sm"
+              onClick={() => setIsCreatePatientOpen(true)}
+              className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>+ Nuevo Paciente</span>
             </Button>
           </div>
         </div>
@@ -200,7 +245,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2">
               <Users2 className="h-5 w-5 text-slate-700" />
               <h2 className="text-lg font-bold text-slate-900">
-                Lista de Pacientes ({filteredPatients.length})
+                Directorio de Pacientes ({filteredPatients.length})
               </h2>
               {selectedFilter && (
                 <span className="text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md font-semibold ml-2">
@@ -235,6 +280,7 @@ export default function DashboardPage() {
             patients={filteredPatients}
             onSelectPatient={handleSelectPatient}
             onRegisterQuickAttendance={handleRegisterQuickAttendance}
+            onOpenSale={handleOpenSaleForPatient}
             isLoading={isLoading}
           />
         </div>
@@ -246,6 +292,21 @@ export default function DashboardPage() {
         open={isDrawerOpen}
         onOpenChange={setIsDrawerOpen}
         onAttendanceRegistered={handleAttendanceRegisteredFromDrawer}
+      />
+
+      {/* Create Patient Dialog */}
+      <CreatePatientDialog
+        open={isCreatePatientOpen}
+        onOpenChange={setIsCreatePatientOpen}
+        onPatientCreated={handlePatientCreated}
+      />
+
+      {/* Register Sale Dialog */}
+      <RegisterSaleDialog
+        open={isRegisterSaleOpen}
+        onOpenChange={setIsRegisterSaleOpen}
+        selectedPatient={salePatientTarget}
+        onSaleRegistered={handleSaleRegistered}
       />
 
       {/* Modern Footer */}

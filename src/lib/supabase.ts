@@ -463,13 +463,24 @@ export async function fetchVistaResumenPacientes(): Promise<VistaResumenPaciente
         .from("vista_resumen_pacientes")
         .select("*");
 
-      if (error) {
-        console.warn(
-          "Aviso vista_resumen_pacientes (fallback local):",
-          error.message
-        );
-      } else if (data && data.length > 0) {
+      if (!error && data && data.length > 0) {
         return data as VistaResumenPaciente[];
+      }
+
+      // Si la vista no existe o está vacía, consultar tabla pacientes directamente
+      const { data: pData, error: pError } = await supabase
+        .from("pacientes")
+        .select("*")
+        .order("nombre_completo", { ascending: true });
+
+      if (!pError && pData && pData.length > 0) {
+        const { data: allPlanes } = await supabase.from("compras_planes").select("*");
+        const { data: allCitas } = await supabase.from("citas_atenciones").select("*");
+        return computeMockVistaResumen(
+          pData as Paciente[],
+          (allPlanes as CompraPlan[]) || [],
+          (allCitas as CitaAtencion[]) || []
+        );
       }
     } catch (err) {
       console.warn("Error de conexión Supabase, usando respaldo local:", err);
@@ -493,6 +504,96 @@ export async function fetchPacienteById(id: string): Promise<Paciente | null> {
     }
   }
   return localPacientes.find((p) => p.id === id) || null;
+}
+
+export async function crearNuevoPaciente(
+  paciente: Omit<Paciente, "id" | "created_at" | "updated_at">
+): Promise<{ success: boolean; data?: Paciente; error?: string }> {
+  const nextCode = paciente.codigo_paciente || `KIR-${Math.floor(1000 + Math.random() * 9000)}`;
+  const cleanPayload: Omit<Paciente, "id" | "created_at" | "updated_at"> = {
+    ...paciente,
+    codigo_paciente: nextCode,
+    nombre_completo: paciente.nombre_completo.trim().toUpperCase(),
+    rut: paciente.rut.trim(),
+    telefono: paciente.telefono?.trim() || "",
+    email: paciente.email?.trim().toLowerCase() || null,
+    fecha_nacimiento: paciente.fecha_nacimiento || null,
+    prevision_salud: paciente.prevision_salud || "Particular",
+    motivo_consulta: paciente.motivo_consulta?.trim() || null,
+    diagnostico_medico: paciente.diagnostico_medico?.trim() || null,
+    diagnostico_principal:
+      paciente.diagnostico_medico?.trim() || paciente.diagnostico_principal?.trim() || null,
+    antecedentes_medicos: paciente.antecedentes_medicos?.trim() || null,
+    banderas_rojas: paciente.banderas_rojas?.trim() || null,
+    estado: paciente.estado || "active",
+  };
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("pacientes")
+        .insert([cleanPayload])
+        .select()
+        .single();
+
+      if (!error && data) {
+        return { success: true, data: data as Paciente };
+      }
+      if (error) {
+        console.warn("Supabase error creating paciente:", error.message);
+        return { success: false, error: error.message };
+      }
+    } catch (err: any) {
+      console.warn("Supabase exception creating paciente:", err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  // Local fallback
+  const newPac: Paciente = {
+    ...cleanPayload,
+    id: "pac-" + Date.now(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  localPacientes.unshift(newPac);
+  return { success: true, data: newPac };
+}
+
+export async function actualizarPaciente(
+  id: string,
+  updates: Partial<Paciente>
+): Promise<{ success: boolean; data?: Paciente; error?: string }> {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("pacientes")
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (!error && data) {
+        return { success: true, data: data as Paciente };
+      }
+      if (error) {
+        console.warn("Supabase error updating paciente:", error.message);
+      }
+    } catch (err: any) {
+      console.warn("Supabase exception updating paciente:", err);
+    }
+  }
+
+  const idx = localPacientes.findIndex((p) => p.id === id);
+  if (idx !== -1) {
+    localPacientes[idx] = {
+      ...localPacientes[idx],
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+    return { success: true, data: localPacientes[idx] };
+  }
+  return { success: false, error: "Paciente no encontrado" };
 }
 
 // ==========================================

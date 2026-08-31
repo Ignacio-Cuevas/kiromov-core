@@ -17,6 +17,12 @@ export type EstadoAtencion =
 
 export type CategoriaPlan = "General" | "Convenio" | "Promoción" | "Personalizado";
 
+export type TipoPlan = "single_session" | "evaluation" | "plan";
+
+export type PrevisionSalud = "Fonasa" | "Isapre" | "Particular" | "Convenio";
+
+export type EstadoPago = "Pagado" | "Pendiente de Pago" | "Parcial / Cuotas";
+
 export type TipoDescuentoCupon = "monto_fijo" | "porcentaje";
 
 export type CategoriaEgreso =
@@ -35,12 +41,14 @@ export type MedioPago =
   | "Transferencia"
   | "Efectivo"
   | "Tarjeta Débito/Crédito"
+  | "Convenio"
   | "Cheque";
 
 export interface PlanCatalogo {
   id: string;
   nombre_plan: string;
   categoria: CategoriaPlan;
+  tipo?: TipoPlan;
   total_sesiones: number;
   precio_clp: number;
   activo: boolean;
@@ -90,10 +98,13 @@ export interface VistaResumenPaciente {
   dias_sin_atencion: number | null;
   estado_plan: EstadoPlan;
   fecha_nacimiento?: string | null;
+  prevision_salud?: PrevisionSalud | string | null;
+  motivo_consulta?: string | null;
   diagnostico_medico?: string | null;
   diagnostico_principal?: string | null;
   antecedentes_medicos?: string | null;
   banderas_rojas?: string | null;
+  estado_paciente?: "active" | "discharged" | "inactive" | string;
 }
 
 export interface Paciente {
@@ -104,10 +115,13 @@ export interface Paciente {
   telefono: string;
   email?: string | null;
   fecha_nacimiento?: string | null;
+  prevision_salud?: PrevisionSalud | string | null;
+  motivo_consulta?: string | null;
   diagnostico_medico?: string | null;
   diagnostico_principal?: string | null;
   antecedentes_medicos?: string | null;
   banderas_rojas?: string | null;
+  estado?: "active" | "discharged" | "inactive" | string;
   created_at?: string;
   updated_at?: string;
 }
@@ -123,8 +137,11 @@ export interface CompraPlan {
   codigo_cupon?: string | null;
   valor_total: number;
   total_final_clp?: number;
+  medio_pago?: MedioPago;
+  estado_pago?: EstadoPago;
   fecha_compra: string;
   estado: "activo" | "finalizado" | "cancelado";
+  notas?: string | null;
   created_at?: string;
 }
 
@@ -140,6 +157,7 @@ export interface ResumenFinanciero {
   flujoNetoCLP: number;
   totalVentasMes: number;
   totalEgresosMes: number;
+  cuentasPorCobrarCLP?: number;
 }
 
 export interface CitaAtencion {
