@@ -16,14 +16,17 @@ const supabase =
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { nombre_completo, email, telefono, fecha, hora, motivo, google_event_id } = body;
+    let { nombre_completo, email, telefono, fecha, hora, motivo, google_event_id } = body;
 
     if (!nombre_completo || !fecha || !hora) {
-      return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 });
+      return NextResponse.json({ error: 'Faltan campos' }, { status: 400 });
     }
 
+    // Limpiar nombre
+    const cleanName = nombre_completo.replace(/CITA\s+KIROMOV\s*/gi, '').trim().toUpperCase();
+    const horaNormalizada = hora.length === 5 ? hora + ':00' : hora;
+
     if (!supabase) {
-      // Mock response for offline/local development without active Supabase credentials
       return NextResponse.json({
         success: true,
         message: 'Mock webhook sync (Supabase offline/unconfigured)',
@@ -31,7 +34,7 @@ export async function POST(req: NextRequest) {
           id: 'cita-mock-' + Date.now(),
           paciente_id: 'paciente-mock',
           fecha,
-          hora: hora.length === 5 ? hora + ':00' : hora,
+          hora: horaNormalizada,
           profesional: 'Klgo. Ignacio Cuevas Silva',
           estado: 'Pendiente',
           motivo_consulta: motivo || 'Agendamiento Online (kiromov.cl)',
@@ -40,7 +43,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 1. Buscar si el paciente ya existe por email o teléfono
+    // 1. Buscar si el paciente ya existe (por Email, Teléfono o Nombre Completo)
     let pacienteId: string | null = null;
 
     if (email) {
@@ -53,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!pacienteId && telefono) {
-      const cleanPhone = telefono.replace(/\D/g, '');
+      const cleanPhone = telefono.replace(/\D/g, '').slice(-8); // últimos 8 dígitos
       const { data: pTel } = await supabase
         .from('pacientes')
         .select('id')
@@ -62,47 +65,65 @@ export async function POST(req: NextRequest) {
       if (pTel) pacienteId = pTel.id;
     }
 
-    // 2. Si no existe, crear el nuevo paciente automáticamente
+    if (!pacienteId) {
+      const { data: pName } = await supabase
+        .from('pacientes')
+        .select('id')
+        .ilike('nombre_completo', `%${cleanName}%`)
+        .maybeSingle();
+      if (pName) pacienteId = pName.id;
+    }
+
+    // 2. Si no existe, crearlo
     if (!pacienteId) {
       const { data: newPatient, error: pErr } = await supabase
         .from('pacientes')
         .insert({
-          nombre_completo: nombre_completo.toUpperCase().trim(),
+          nombre_completo: cleanName,
           email: email?.trim().toLowerCase() || null,
           telefono: telefono?.trim() || null,
         })
         .select('id')
         .single();
-
       if (pErr) throw pErr;
       pacienteId = newPatient.id;
     }
 
-    // 3. Insertar o actualizar la cita vinculada al google_event_id
-    const upsertPayload: Record<string, any> = {
-      paciente_id: pacienteId,
-      fecha,
-      hora: hora.length === 5 ? hora + ':00' : hora,
-      profesional: 'Klgo. Ignacio Cuevas Silva',
-      estado: 'Pendiente',
-      motivo_consulta: motivo || 'Agendamiento Online (kiromov.cl)',
-      google_event_id: google_event_id || null,
-    };
-
-    const { data: cita, error: cErr } = await supabase
+    // 3. Evitar duplicar cita si ya existe para ese paciente en esa fecha y hora
+    const { data: existingCita } = await supabase
       .from('citas_atenciones')
-      .upsert(
-        upsertPayload,
-        google_event_id ? { onConflict: 'google_event_id' } : undefined
-      )
+      .select('id')
+      .eq('paciente_id', pacienteId)
+      .eq('fecha', fecha)
+      .eq('hora', horaNormalizada)
+      .maybeSingle();
+
+    if (existingCita) {
+      await supabase
+        .from('citas_atenciones')
+        .update({ google_event_id: google_event_id || null, motivo_consulta: motivo })
+        .eq('id', existingCita.id);
+      return NextResponse.json({ success: true, message: 'Cita vinculada y actualizada' });
+    }
+
+    // Si no existe, insertar nueva cita
+    const { data: nuevaCita, error: cErr } = await supabase
+      .from('citas_atenciones')
+      .insert({
+        paciente_id: pacienteId,
+        fecha,
+        hora: horaNormalizada,
+        profesional: 'Klgo. Ignacio Cuevas Silva',
+        estado: 'Pendiente',
+        motivo_consulta: motivo,
+        google_event_id: google_event_id || null,
+      })
       .select()
       .single();
 
     if (cErr) throw cErr;
-
-    return NextResponse.json({ success: true, cita });
+    return NextResponse.json({ success: true, cita: nuevaCita });
   } catch (error: any) {
-    console.error('Error sincronizando cita de Google Calendar:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
