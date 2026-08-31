@@ -7,6 +7,16 @@ const supabaseKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const updateSession = async (request: NextRequest) => {
+  const pathname = request.nextUrl.pathname;
+
+  // Rutas públicas que no requieren autenticación
+  const isPublicRoute =
+    pathname === "/login" ||
+    pathname.startsWith("/api/webhooks") ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/static") ||
+    pathname === "/favicon.ico";
+
   try {
     let supabaseResponse = NextResponse.next({
       request: {
@@ -15,6 +25,7 @@ export const updateSession = async (request: NextRequest) => {
     });
 
     if (!supabaseUrl || !supabaseKey || supabaseUrl.includes("tu_supabase_url")) {
+      // En modo local sin credenciales configuradas, permitir navegación
       return supabaseResponse;
     }
 
@@ -50,9 +61,29 @@ export const updateSession = async (request: NextRequest) => {
       },
     });
 
+    let user = null;
     try {
-      await supabase.auth.getUser();
-    } catch {}
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
+      user = currentUser;
+    } catch {
+      user = null;
+    }
+
+    // 1. Si no está autenticado y trata de acceder a una ruta protegida -> redirigir a /login
+    if (!user && !isPublicRoute) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // 2. Si ya está autenticado y va a /login -> redirigir al panel /
+    if (user && pathname === "/login") {
+      const homeUrl = request.nextUrl.clone();
+      homeUrl.pathname = "/";
+      return NextResponse.redirect(homeUrl);
+    }
 
     return supabaseResponse;
   } catch {

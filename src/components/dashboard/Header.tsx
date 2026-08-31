@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Search,
   Activity,
@@ -17,8 +17,11 @@ import {
   Settings,
   ClipboardList,
   Calendar,
+  LogOut,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { createClient } from "@/utils/supabase/client";
+import { toast } from "sonner";
 
 interface HeaderProps {
   searchQuery: string;
@@ -32,11 +35,26 @@ export function Header({
   isSupabaseOnline = false,
 }: HeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
 
   const isPacientesActive = pathname === "/";
   const isAgendaActive = pathname === "/agenda" || pathname.startsWith("/agenda");
   const isFinanzasActive = pathname === "/finanzas" || pathname.startsWith("/finanzas");
   const isPlanesActive = pathname === "/planes" || pathname.startsWith("/planes");
+
+  const handleLogout = async () => {
+    try {
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+      toast.info("Sesión cerrada correctamente");
+    } catch (err) {
+      console.warn("Error al cerrar sesión:", err);
+    }
+    router.push("/login");
+    router.refresh();
+  };
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/90 backdrop-blur-md">
@@ -138,8 +156,8 @@ export function Header({
           </div>
         </div>
 
-        {/* User Info & Mobile Nav Links */}
-        <div className="flex items-center justify-between sm:justify-end gap-3">
+        {/* User Info & Actions */}
+        <div className="flex items-center justify-between sm:justify-end gap-2.5">
           {/* Mobile Nav Links */}
           <div className="flex md:hidden items-center gap-1">
             <Link
@@ -185,7 +203,7 @@ export function Header({
           </div>
 
           {/* User badge */}
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 shadow-2xs">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 shadow-2xs">
             <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-clinic-600 text-white font-bold text-xs shadow-xs">
               IC
             </div>
@@ -201,6 +219,17 @@ export function Header({
               </span>
             </div>
           </div>
+
+          {/* Logout Button */}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-rose-700 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-2.5 py-2 rounded-xl transition-all shadow-2xs"
+            title="Cerrar sesión en Kiromov Core"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            <span className="hidden lg:inline">Cerrar Sesión</span>
+          </button>
         </div>
       </div>
     </header>

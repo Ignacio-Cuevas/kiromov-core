@@ -196,8 +196,21 @@ export default function FinanzasPage() {
             </Link>
           </nav>
         </div>
-        <div className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
-          Klgo. Ignacio Cuevas
+        <div className="flex items-center gap-2">
+          <div className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
+            Klgo. Ignacio Cuevas
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              if (supabase) await supabase.auth.signOut();
+              window.location.href = '/login';
+            }}
+            className="text-xs font-bold text-slate-500 hover:text-rose-700 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-2.5 py-1.5 rounded-full transition-colors"
+            title="Cerrar sesión"
+          >
+            🚪 Salir
+          </button>
         </div>
       </header>
 
