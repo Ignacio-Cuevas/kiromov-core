@@ -89,6 +89,11 @@ export interface VistaResumenPaciente {
   ultima_atencion: string | null;
   dias_sin_atencion: number | null;
   estado_plan: EstadoPlan;
+  fecha_nacimiento?: string | null;
+  diagnostico_medico?: string | null;
+  diagnostico_principal?: string | null;
+  antecedentes_medicos?: string | null;
+  banderas_rojas?: string | null;
 }
 
 export interface Paciente {
@@ -99,7 +104,10 @@ export interface Paciente {
   telefono: string;
   email?: string | null;
   fecha_nacimiento?: string | null;
+  diagnostico_medico?: string | null;
   diagnostico_principal?: string | null;
+  antecedentes_medicos?: string | null;
+  banderas_rojas?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -144,6 +152,7 @@ export interface CitaAtencion {
   estado: EstadoAtencion;
   notas?: string | null;
   motivo_consulta?: string | null;
+  google_event_id?: string | null;
   pacientes?: Paciente;
   created_at?: string;
 }

@@ -40,10 +40,21 @@ export function ClinicalCertificateDialog({
     if (onOpenChange) onOpenChange(false);
   };
 
-  const [diagnostico, setDiagnostico] = useState('Tratamiento Kinésico Integral y Terapia Manual Ortopédica (TMO)');
+  const initialDiagnostico =
+    (patient as any)?.diagnostico_medico ||
+    (patient as any)?.diagnostico_principal ||
+    'Tratamiento Kinésico Integral y Terapia Manual Ortopédica (TMO)';
+
+  const [diagnostico, setDiagnostico] = useState(initialDiagnostico);
   const [codigoPrestacion, setCodigoPrestacion] = useState('Código Fonasa 06-01-105 (Kinesiterapia)');
   const [observacion, setObservacion] = useState('Paciente completa plan terapéutico con adecuada respuesta clínica y tolerancia funcional.');
   const [isGenerating, setIsGenerating] = useState(false);
+
+  React.useEffect(() => {
+    if ((patient as any)?.diagnostico_medico || (patient as any)?.diagnostico_principal) {
+      setDiagnostico((patient as any).diagnostico_medico || (patient as any).diagnostico_principal);
+    }
+  }, [patient]);
 
   if (!isDialogOpen) return null;
 
