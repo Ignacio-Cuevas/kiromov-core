@@ -679,6 +679,11 @@ export async function guardarEvolucionSOAP(
   const a = evolucion.a_analisis || evolucion.analisis || evolucion.a || "";
   const p = evolucion.p_plan || evolucion.plan || evolucion.p || "";
   const ena = evolucion.nivel_dolor_ena ?? evolucion.ena_dolor ?? evolucion.ena ?? 0;
+  const mapaDolor = evolucion.mapa_dolor_svg || null;
+  const hallazgos = evolucion.hallazgos_frecuentes || [];
+  const cuestionario = evolucion.cuestionario_funcional || null;
+  const discapacidadPct = evolucion.discapacidad_funcional_pct ?? null;
+  const pronostico = evolucion.pronostico_sesiones_estimadas || null;
 
   if (supabase) {
     try {
@@ -694,6 +699,11 @@ export async function guardarEvolucionSOAP(
             a_analisis: a,
             p_plan: p,
             nivel_dolor_ena: ena,
+            mapa_dolor_svg: mapaDolor,
+            hallazgos_frecuentes: hallazgos,
+            cuestionario_funcional: cuestionario,
+            discapacidad_funcional_pct: discapacidadPct,
+            pronostico_sesiones_estimadas: pronostico,
           },
         ])
         .select()
@@ -717,6 +727,11 @@ export async function guardarEvolucionSOAP(
             analisis: a,
             plan: p,
             ena_dolor: ena,
+            mapa_dolor_svg: mapaDolor,
+            hallazgos_frecuentes: hallazgos,
+            cuestionario_funcional: cuestionario,
+            discapacidad_funcional_pct: discapacidadPct,
+            pronostico_sesiones_estimadas: pronostico,
           },
         ])
         .select()
@@ -748,6 +763,11 @@ export async function guardarEvolucionSOAP(
     plan: p,
     nivel_dolor_ena: ena,
     ena_dolor: ena,
+    mapa_dolor_svg: mapaDolor,
+    hallazgos_frecuentes: hallazgos,
+    cuestionario_funcional: cuestionario,
+    discapacidad_funcional_pct: discapacidadPct,
+    pronostico_sesiones_estimadas: pronostico,
     created_at: new Date().toISOString(),
   };
 

@@ -10,6 +10,10 @@ import {
   User,
   FileText,
   FileEdit,
+  Activity,
+  CheckCircle2,
+  FileCheck2,
+  Sparkles,
 } from "lucide-react";
 
 interface SoapTimelineAccordionProps {
@@ -63,7 +67,7 @@ export function SoapTimelineAccordion({
           Sin notas clínicas previas. Registra la primera evolución arriba.
         </p>
         <p className="text-xs text-slate-400">
-          Cada nota guardada se organizará automáticamente en formato SOAP cronológico.
+          Cada nota guardada se organizará automáticamente en formato SOAP cronológico con mapa de dolor y pronóstico.
         </p>
       </div>
     );
@@ -73,7 +77,7 @@ export function SoapTimelineAccordion({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-          <FileText className="h-4 w-4 text-clinic-600" />
+          <FileText className="h-4 w-4 text-blue-600" />
           Historial de Evoluciones SOAP ({evoluciones.length})
         </h4>
         <button
@@ -88,7 +92,7 @@ export function SoapTimelineAccordion({
             });
             setExpandedIds(newMap);
           }}
-          className="text-xs text-clinic-600 hover:text-clinic-800 font-semibold"
+          className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
         >
           {evoluciones.every((e, idx) => expandedIds[e.id || `evo-${idx}`])
             ? "Colapsar todas"
@@ -101,7 +105,7 @@ export function SoapTimelineAccordion({
           const key = evolucion.id || `evo-${index}`;
           const isExpanded = !!expandedIds[key];
 
-          // Normalized mappings as requested
+          // Normalized mappings
           const s_subjetivo =
             evolucion.s_subjetivo || evolucion.subjetivo || evolucion.s || "";
           const o_objetivo =
@@ -116,27 +120,33 @@ export function SoapTimelineAccordion({
             evolucion.ena ??
             null;
 
+          const mapa_dolor = evolucion.mapa_dolor_svg;
+          const hallazgos = evolucion.hallazgos_frecuentes || [];
+          const cuestionario = evolucion.cuestionario_funcional;
+          const discapacidadPct = evolucion.discapacidad_funcional_pct;
+          const pronostico = evolucion.pronostico_sesiones_estimadas;
+
           return (
             <div key={key} className="relative">
               {/* Timeline marker */}
-              <div className="absolute -left-5 sm:-left-6 top-3 flex h-4 w-4 items-center justify-center rounded-full border-2 border-clinic-500 bg-white">
-                <div className="h-1.5 w-1.5 rounded-full bg-clinic-600" />
+              <div className="absolute -left-5 sm:-left-6 top-3 flex h-4 w-4 items-center justify-center rounded-full border-2 border-blue-500 bg-white">
+                <div className="h-1.5 w-1.5 rounded-full bg-blue-600" />
               </div>
 
-              {/* Accordion Card with strict layout & whitespace-pre-wrap */}
-              <div className="space-y-3 p-4 bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-all hover:border-slate-300">
+              {/* Accordion Card */}
+              <div className="space-y-3 p-4 bg-slate-50/80 border border-slate-200 rounded-2xl shadow-xs transition-all hover:border-slate-300">
                 {/* Header (Clickable) */}
                 <div
                   onClick={() => toggleExpand(key)}
-                  className="flex items-center justify-between border-b border-slate-200 pb-2 cursor-pointer select-none"
+                  className="flex items-center justify-between border-b border-slate-200/80 pb-2.5 cursor-pointer select-none"
                 >
-                  <div className="flex items-center gap-2">
-                    <CalendarCheck className="h-4 w-4 text-clinic-600 shrink-0" />
-                    <span className="font-semibold text-slate-700">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CalendarCheck className="h-4 w-4 text-blue-600 shrink-0" />
+                    <span className="font-bold text-slate-800 text-sm">
                       {formatDateLongChile(evolucion.fecha) || evolucion.fecha}
                     </span>
                     {evolucion.profesional && (
-                      <span className="hidden sm:inline-flex items-center gap-1 text-xs text-slate-400 ml-2">
+                      <span className="hidden sm:inline-flex items-center gap-1 text-xs text-slate-400 ml-1">
                         <User className="h-3 w-3" />
                         {evolucion.profesional}
                       </span>
@@ -145,8 +155,13 @@ export function SoapTimelineAccordion({
 
                   <div className="flex items-center gap-2">
                     {nivel_dolor_ena !== null && (
-                      <span className="bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 rounded font-medium">
+                      <span className="bg-rose-50 text-rose-700 border border-rose-200 text-xs px-2.5 py-0.5 rounded-full font-bold">
                         ENA: {nivel_dolor_ena}/10
+                      </span>
+                    )}
+                    {pronostico && (
+                      <span className="hidden md:inline-flex bg-blue-50 text-blue-700 border border-blue-200 text-[11px] px-2 py-0.5 rounded-full font-bold">
+                        🎯 {pronostico}
                       </span>
                     )}
                     {isExpanded ? (
@@ -159,7 +174,73 @@ export function SoapTimelineAccordion({
 
                 {/* S, O, A, P Sections */}
                 {isExpanded && (
-                  <div className="space-y-3 pt-1 animate-in fade-in-50 duration-150">
+                  <div className="space-y-3.5 pt-1 animate-in fade-in-50 duration-150">
+                    {/* Mapa de Dolor y Hallazgos Visuales */}
+                    {(mapa_dolor || hallazgos.length > 0 || cuestionario || pronostico) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-white rounded-xl border border-slate-200">
+                        {/* Mapa de dolor */}
+                        {mapa_dolor && (
+                          <div className="space-y-1">
+                            <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider flex items-center gap-1">
+                              <Activity className="h-3.5 w-3.5" />
+                              Mapa Anatómico de Dolor
+                            </span>
+                            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white max-w-[280px]">
+                              <img
+                                src={mapa_dolor}
+                                alt="Mapa de Dolor"
+                                className="w-full h-auto object-contain"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Hallazgos y Cuestionario */}
+                        <div className="space-y-2.5">
+                          {hallazgos.length > 0 && (
+                            <div className="space-y-1">
+                              <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">
+                                Hallazgos TMO Detectados:
+                              </span>
+                              <div className="flex flex-wrap gap-1">
+                                {hallazgos.map((h, i) => (
+                                  <span
+                                    key={i}
+                                    className="inline-flex items-center gap-1 text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md font-semibold"
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                                    {h}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {(cuestionario || pronostico) && (
+                            <div className="space-y-1 text-xs">
+                              <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider block">
+                                Evaluación Funcional:
+                              </span>
+                              {cuestionario && (
+                                <p className="text-slate-700">
+                                  <strong>Cuestionario:</strong> {cuestionario}{" "}
+                                  {discapacidadPct !== null && discapacidadPct !== undefined && (
+                                    <span className="font-bold text-blue-700">({discapacidadPct}% de discapacidad)</span>
+                                  )}
+                                </p>
+                              )}
+                              {pronostico && (
+                                <p className="text-slate-700">
+                                  <strong>Pronóstico de Alta:</strong>{" "}
+                                  <span className="font-bold text-slate-900">{pronostico}</span>
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {s_subjetivo && (
                       <div>
                         <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">
@@ -184,7 +265,7 @@ export function SoapTimelineAccordion({
 
                     {a_analisis && (
                       <div>
-                        <span className="text-xs font-bold text-purple-700 uppercase tracking-wide">
+                        <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">
                           A - Análisis
                         </span>
                         <p className="text-sm text-slate-600 whitespace-pre-wrap mt-0.5">
@@ -195,7 +276,7 @@ export function SoapTimelineAccordion({
 
                     {p_plan && (
                       <div>
-                        <span className="text-xs font-bold text-rose-700 uppercase tracking-wide">
+                        <span className="text-xs font-bold text-purple-700 uppercase tracking-wide">
                           P - Plan
                         </span>
                         <p className="text-sm text-slate-600 whitespace-pre-wrap mt-0.5">
@@ -213,3 +294,5 @@ export function SoapTimelineAccordion({
     </div>
   );
 }
+
+export default SoapTimelineAccordion;

@@ -189,5 +189,12 @@ export interface EvolucionSOAP {
   ena_dolor?: number | null;
   ena?: number | null;
 
+  // Nuevos campos clínicos avanzados
+  mapa_dolor_svg?: string | null;
+  hallazgos_frecuentes?: string[] | null;
+  cuestionario_funcional?: string | null;
+  discapacidad_funcional_pct?: number | null;
+  pronostico_sesiones_estimadas?: string | null;
+
   created_at?: string;
 }
