@@ -14,6 +14,8 @@ import {
   CheckCircle2,
   FileCheck2,
   Sparkles,
+  Maximize2,
+  X,
 } from "lucide-react";
 
 interface SoapTimelineAccordionProps {
@@ -27,6 +29,7 @@ export function SoapTimelineAccordion({
 }: SoapTimelineAccordionProps) {
   // Store set of expanded item IDs. By default, open the first/latest one.
   const [expandedIds, setExpandedIds] = React.useState<Record<string, boolean>>({});
+  const [previewImage, setPreviewImage] = React.useState<string | null>(null);
 
   // Auto expand the first evolution on mount or when data changes
   React.useEffect(() => {
@@ -181,16 +184,30 @@ export function SoapTimelineAccordion({
                         {/* Mapa de dolor */}
                         {mapa_dolor && (
                           <div className="space-y-1">
-                            <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider flex items-center gap-1">
-                              <Activity className="h-3.5 w-3.5" />
-                              Mapa Anatómico de Dolor
+                            <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider flex items-center justify-between">
+                              <span className="flex items-center gap-1">
+                                <Activity className="h-3.5 w-3.5" />
+                                Mapa Anatómico de Dolor
+                              </span>
+                              <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                                <Maximize2 className="h-2.5 w-2.5" /> Clic para ampliar
+                              </span>
                             </span>
-                            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white max-w-[280px]">
+                            <div
+                              onClick={() => setPreviewImage(mapa_dolor)}
+                              className="group relative border border-slate-200 rounded-lg overflow-hidden bg-white max-w-[280px] cursor-pointer hover:border-blue-400 transition-all shadow-2xs"
+                              title="Hacer clic para ampliar mapa de dolor"
+                            >
                               <img
                                 src={mapa_dolor}
                                 alt="Mapa de Dolor"
-                                className="w-full h-auto object-contain"
+                                className="w-full h-auto object-contain transition-transform group-hover:scale-105"
                               />
+                              <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/10 transition-colors flex items-center justify-center">
+                                <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-slate-800 font-bold text-[10px] px-2 py-1 rounded-md shadow-xs flex items-center gap-1">
+                                  <Maximize2 className="h-3 w-3" /> Ampliar HD
+                                </span>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -291,6 +308,49 @@ export function SoapTimelineAccordion({
           );
         })}
       </div>
+
+      {/* Modal / Lightbox de Ampliación HD del Mapa de Dolor */}
+      {previewImage && (
+        <div
+          onClick={() => setPreviewImage(null)}
+          className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-2xl w-full p-5 shadow-2xl border border-slate-200 space-y-3 animate-in zoom-in-95 duration-150"
+          >
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
+                <Activity className="h-5 w-5 text-rose-600" />
+                Mapa de Dolor Anatómico Registrado
+              </h3>
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-lg p-1"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex items-center justify-center bg-slate-50 rounded-xl p-3 border border-slate-200">
+              <img
+                src={previewImage}
+                alt="Mapa de Dolor en Alta Resolución"
+                className="max-h-[70vh] w-auto object-contain rounded-lg shadow-sm"
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors"
+              >
+                Cerrar Vista
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
