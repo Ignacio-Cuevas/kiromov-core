@@ -21,6 +21,8 @@ import {
   Sparkles,
   Users2,
   Layers,
+  Search,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -39,7 +41,7 @@ export default function DashboardPage() {
     try {
       if (showToast) setIsRefreshing(true);
       const data = await fetchVistaResumenPacientes();
-      setPatients(data);
+      setPatients(data || []);
       if (showToast) {
         toast.success("Datos actualizados correctamente");
       }
@@ -97,37 +99,50 @@ export default function DashboardPage() {
     await loadPatients();
   };
 
-  // Filter patients by search query (Name or RUT) and by selected status
+  // Filter patients with strict null-safety (Name, RUT, Phone, Code)
   const filteredPatients = React.useMemo(() => {
-    return patients.filter((patient) => {
-      // 1. Search Query Filter
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim();
-        const cleanRutQuery = query.replace(/[^0-9kK]/g, "");
-        const cleanPatientRut = patient.rut.toLowerCase().replace(/[^0-9kK]/g, "");
+    const query = (searchQuery || "").trim().toLowerCase();
+    const queryDigits = query.replace(/[^0-9kK]/g, "");
 
-        const matchesName = patient.nombre_completo.toLowerCase().includes(query);
-        const matchesCode = patient.codigo_paciente.toLowerCase().includes(query);
-        const matchesRut =
-          cleanRutQuery.length > 0 && cleanPatientRut.includes(cleanRutQuery);
-
-        if (!matchesName && !matchesCode && !matchesRut) {
+    return (patients || []).filter((p) => {
+      // 1. Filtro por estado del plan
+      if (selectedFilter) {
+        if (selectedFilter === "Vigentes" && p?.estado_plan !== "Plan Vigente") return false;
+        if (selectedFilter === "Por Renovar" && !p?.estado_plan?.includes("Por Renovar")) return false;
+        if (selectedFilter === "Finalizados" && p?.estado_plan !== "Plan Finalizado") return false;
+        if (
+          selectedFilter !== "Vigentes" &&
+          selectedFilter !== "Por Renovar" &&
+          selectedFilter !== "Finalizados" &&
+          p?.estado_plan !== selectedFilter
+        ) {
           return false;
         }
       }
 
-      // 2. Status Filter
-      if (selectedFilter && patient.estado_plan !== selectedFilter) {
-        return false;
-      }
+      // 2. Si no hay texto de búsqueda, pasa el filtro
+      if (!query) return true;
 
-      return true;
+      // 3. Extracción segura de campos (evitando null/undefined)
+      const nombre = (p?.nombre_completo || "").toLowerCase();
+      const rutRaw = (p?.rut || "").toLowerCase();
+      const rutDigits = rutRaw.replace(/[^0-9kK]/g, "");
+      const codigo = (p?.codigo_paciente || "").toLowerCase();
+      const telefono = (p?.telefono || "").replace(/\D/g, "");
+
+      return (
+        nombre.includes(query) ||
+        rutRaw.includes(query) ||
+        (queryDigits.length >= 2 && rutDigits.includes(queryDigits)) ||
+        codigo.includes(query) ||
+        (queryDigits.length >= 3 && telefono.includes(queryDigits))
+      );
     });
   }, [patients, searchQuery, selectedFilter]);
 
   // Compute today's attendances count (patients whose last attention was today)
   const todayAttendanceCount = React.useMemo(() => {
-    return patients.filter((p) => p.dias_sin_atencion === 0).length;
+    return (patients || []).filter((p) => p?.dias_sin_atencion === 0).length;
   }, [patients]);
 
   return (
@@ -181,18 +196,39 @@ export default function DashboardPage() {
 
         {/* Data Table Section */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
             <div className="flex items-center gap-2">
               <Users2 className="h-5 w-5 text-slate-700" />
               <h2 className="text-lg font-bold text-slate-900">
                 Lista de Pacientes ({filteredPatients.length})
               </h2>
+              {selectedFilter && (
+                <span className="text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md font-semibold ml-2">
+                  Filtro: {selectedFilter}
+                </span>
+              )}
             </div>
-            {selectedFilter && (
-              <span className="text-xs text-slate-500 font-medium">
-                Filtrado por: <strong className="text-slate-800">{selectedFilter}</strong>
-              </span>
-            )}
+
+            {/* Quick Search Input */}
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar por Nombre, RUT o Teléfono..."
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           <PatientTable
