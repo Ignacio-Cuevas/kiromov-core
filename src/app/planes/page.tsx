@@ -5,15 +5,10 @@ import Link from "next/link";
 import { Header } from "@/components/dashboard/Header";
 import { PlanEditDialog } from "@/components/plans/PlanEditDialog";
 import { PlanCatalogo, CategoriaPlan } from "@/types/database";
-import {
-  fetchCatalogoPlanes,
-  toggleActivoPlanCatalogo,
-  isSupabaseConfigured,
-} from "@/lib/supabase";
+import { getPlans, togglePlanStatus } from "@/actions/plans";
 import { formatCLP } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import {
   Layers,
@@ -45,9 +40,21 @@ export default function PlanesPage() {
   const loadPlanes = useCallback(async (showToast = false) => {
     try {
       if (showToast) setIsRefreshing(true);
-      const data = await fetchCatalogoPlanes(false);
-      setPlanes(data);
-      if (showToast) toast.success("Catálogo de tarifas actualizado");
+      const data = await getPlans();
+      const mapped: PlanCatalogo[] = data.map((p) => ({
+        id: p.id,
+        nombre_plan: p.name,
+        categoria: (p.type === "evaluation" ? "Promoción" : "General") as CategoriaPlan,
+        tipo: p.type,
+        total_sesiones: p.sessions_count,
+        precio_clp: p.price_clp,
+        activo: p.is_active,
+        descripcion: p.description,
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+      }));
+      setPlanes(mapped);
+      if (showToast) toast.success("Catálogo de tarifas actualizado desde Supabase");
     } catch (err) {
       console.error("Error loading catalog:", err);
       toast.error("Error al cargar el catálogo de planes");
@@ -64,15 +71,15 @@ export default function PlanesPage() {
   const handleToggleActivo = async (plan: PlanCatalogo) => {
     const nextState = !plan.activo;
     try {
-      const result = await toggleActivoPlanCatalogo(plan.id, nextState);
+      const result = await togglePlanStatus(plan.id, nextState);
       if (result.success) {
         setPlanes((prev) =>
           prev.map((p) => (p.id === plan.id ? { ...p, activo: nextState } : p))
         );
         toast.success(
           nextState
-            ? `Plan "${plan.nombre_plan}" activado para la venta`
-            : `Plan "${plan.nombre_plan}" desactivado (oculto en selector)`
+            ? `Tarifa "${plan.nombre_plan}" activada para la venta`
+            : `Tarifa "${plan.nombre_plan}" desactivada (oculta en selector)`
         );
       } else {
         toast.error("No se pudo cambiar el estado del plan");
@@ -90,6 +97,7 @@ export default function PlanesPage() {
       }
       return [savedPlan, ...prev];
     });
+    loadPlanes();
   };
 
   const handleOpenCreate = () => {
@@ -117,7 +125,6 @@ export default function PlanesPage() {
     return true;
   });
 
-  // Calculate statistics
   const totalCount = planes.length;
   const activeCount = planes.filter((p) => p.activo).length;
   const categoriesList = ["General", "Convenio", "Promoción", "Personalizado"] as const;
@@ -135,13 +142,36 @@ export default function PlanesPage() {
     }
   };
 
+  const getTypeBadge = (tipo?: string) => {
+    switch (tipo) {
+      case "evaluation":
+        return (
+          <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md">
+            🩺 Evaluación
+          </span>
+        );
+      case "single_session":
+        return (
+          <span className="text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-md">
+            ⚡ Sesión Unitaria
+          </span>
+        );
+      default:
+        return (
+          <span className="text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md">
+            📦 Pack de Sesiones
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       {/* Top Header */}
       <Header
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        isSupabaseOnline={isSupabaseConfigured}
+        isSupabaseOnline={true}
       />
 
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
@@ -150,21 +180,21 @@ export default function PlanesPage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Link
-                href="/"
+                href="/pacientes"
                 className="text-xs font-semibold text-clinic-600 hover:text-clinic-800 flex items-center gap-1"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
-                Volver a Pacientes
+                Ir a Directorio de Pacientes
               </Link>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-              <span>Catálogo de Planes y Tarifas</span>
-              <span className="text-xs font-semibold text-clinic-700 bg-clinic-100/70 border border-clinic-300/60 px-2.5 py-0.5 rounded-full">
-                {activeCount} Activos
+              <span>Catálogo Maestro de Tarifas y Planes</span>
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-100/70 border border-emerald-300/60 px-2.5 py-0.5 rounded-full">
+                {activeCount} Activos para Venta
               </span>
             </h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Administra las tarifas base, convenios y promociones disponibles en el selector de ventas.
+              Administra las tarifas base, packs de sesiones y precios en Pesos Chilenos (CLP) conectados a Supabase.
             </p>
           </div>
 
@@ -184,7 +214,7 @@ export default function PlanesPage() {
 
             <Button
               onClick={handleOpenCreate}
-              className="bg-clinic-600 hover:bg-clinic-700 text-white font-bold gap-2 shadow-sm"
+              className="bg-clinic-600 hover:bg-clinic-700 text-white font-bold gap-2 shadow-xs"
             >
               <Plus className="h-4 w-4" />
               <span>+ Nuevo Plan / Tarifa</span>
@@ -247,7 +277,7 @@ export default function PlanesPage() {
           <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-3 border-clinic-600 border-t-transparent mb-3" />
             <p className="text-sm font-semibold text-slate-700">
-              Cargando catálogo de tarifas...
+              Cargando catálogo de tarifas desde Supabase...
             </p>
           </div>
         ) : filteredPlanes.length === 0 ? (
@@ -259,13 +289,13 @@ export default function PlanesPage() {
               <h4 className="text-base font-bold text-slate-800">
                 No se encontraron planes
               </h4>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-                Intenta con otro término de búsqueda o crea una nueva tarifa.
+              <p className="text-xs text-slate-500 mt-1">
+                Crea tu primera tarifa o plan para habilitarlo en el módulo de ventas.
               </p>
             </div>
             <Button
               onClick={handleOpenCreate}
-              className="bg-clinic-600 hover:bg-clinic-700 text-white font-bold gap-2 text-xs"
+              className="bg-clinic-600 hover:bg-clinic-700 text-white font-bold gap-2"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Crear Primer Plan</span>
@@ -291,7 +321,10 @@ export default function PlanesPage() {
                   <div className="space-y-3">
                     {/* Header: Category & Active status */}
                     <div className="flex items-center justify-between gap-2">
-                      {getCategoryBadge(plan.categoria)}
+                      <div className="flex items-center gap-1.5">
+                        {getCategoryBadge(plan.categoria)}
+                        {getTypeBadge(plan.tipo)}
+                      </div>
 
                       <button
                         type="button"
@@ -312,7 +345,7 @@ export default function PlanesPage() {
                             plan.activo ? "bg-emerald-500" : "bg-slate-400"
                           }`}
                         />
-                        <span>{plan.activo ? "En Venta" : "Desactivado"}</span>
+                        <span>{plan.activo ? "En Venta" : "Inactivo"}</span>
                       </button>
                     </div>
 
@@ -367,7 +400,7 @@ export default function PlanesPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => handleOpenEdit(plan)}
-                      className="h-8 gap-1.5 text-xs font-semibold border-slate-200 hover:bg-slate-50"
+                      className="h-8 gap-1.5 text-xs font-semibold border-slate-200 hover:bg-slate-50 rounded-xl"
                     >
                       <Edit2 className="h-3 w-3 text-slate-500" />
                       <span>Editar</span>

@@ -38,7 +38,7 @@ export function Header({
   const router = useRouter();
   const supabase = createClient();
 
-  const isPacientesActive = pathname === "/";
+  const isPacientesActive = pathname === "/" || pathname.startsWith("/pacientes");
   const isAgendaActive = pathname === "/agenda" || pathname.startsWith("/agenda");
   const isFinanzasActive = pathname === "/finanzas" || pathname.startsWith("/finanzas");
   const isPlanesActive = pathname === "/planes" || pathname.startsWith("/planes");
