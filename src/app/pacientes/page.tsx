@@ -70,23 +70,7 @@ function getPlanCategory(
   return 'sin_plan';
 }
 
-const getPatientPlanInfo = (p: any) => {
-  const totales = Number(p.sesiones_totales ?? p.total_sessions ?? p.sesiones_compradas ?? 0);
-  const usadas = Number(p.sesiones_usadas ?? p.used_sessions ?? 0);
-  const restantes = Number(p.sesiones_restantes ?? p.remaining_sessions ?? Math.max(0, totales - usadas));
-  
-  const estadoRaw = (p.estado_plan || p.plan_status || p.estado || '').toLowerCase();
-  const tienePlanActivo = restantes > 0 || totales > 0 || ['vigente', 'activo', 'por_renovar'].includes(estadoRaw);
 
-  let estadoFinal: 'vigente' | 'por_renovar' | 'finalizado' | 'sin_plan' = 'sin_plan';
-  if (tienePlanActivo) {
-    if (restantes <= 0 && totales > 0) estadoFinal = 'finalizado';
-    else if (restantes === 1) estadoFinal = 'por_renovar';
-    else estadoFinal = 'vigente';
-  }
-
-  return { totales, usadas, restantes, estadoFinal, tienePlanActivo };
-};
 
 export default function PatientsPage() {
   const supabase = createClient();
@@ -340,24 +324,16 @@ export default function PatientsPage() {
 
   // Conteos dinámicos para pestañas y métricas
   const { vigentesCount, porRenovarCount, finalizadosCount, sinPlanCount } = useMemo(() => {
-    let vig = 0;
-    let ren = 0;
-    let fin = 0;
-    let sin = 0;
-
-    pacientes.forEach((p) => {
-      const { estadoFinal } = getPatientPlanInfo(p);
-      if (estadoFinal === 'vigente') vig++;
-      else if (estadoFinal === 'por_renovar') ren++;
-      else if (estadoFinal === 'finalizado') fin++;
-      else sin++;
-    });
+    const planesVigentes = pacientes.filter(p => p.estado_plan === 'vigente').length;
+    const porRenovar = pacientes.filter(p => p.estado_plan === 'por_renovar').length;
+    const finalizados = pacientes.filter(p => p.estado_plan === 'finalizado').length;
+    const sinPlan = pacientes.filter(p => !p.estado_plan || p.estado_plan === 'sin_plan').length;
 
     return {
-      vigentesCount: vig,
-      porRenovarCount: ren,
-      finalizadosCount: fin,
-      sinPlanCount: sin,
+      vigentesCount: planesVigentes,
+      porRenovarCount: porRenovar,
+      finalizadosCount: finalizados,
+      sinPlanCount: sinPlan,
     };
   }, [pacientes]);
 
@@ -365,15 +341,15 @@ export default function PatientsPage() {
   const filteredPatients = useMemo(() => {
     return pacientes.filter((p) => {
       // 1. Filtro por Pestaña
-      const { estadoFinal } = getPatientPlanInfo(p);
+      const estado = p.estado_plan || 'sin_plan';
       if (activeFilterTab === 'vigentes') {
-        if (estadoFinal !== 'vigente' && estadoFinal !== 'por_renovar') return false;
+        if (estado !== 'vigente' && estado !== 'por_renovar') return false;
       } else if (activeFilterTab === 'por_renovar') {
-        if (estadoFinal !== 'por_renovar') return false;
+        if (estado !== 'por_renovar') return false;
       } else if (activeFilterTab === 'finalizados') {
-        if (estadoFinal !== 'finalizado') return false;
+        if (estado !== 'finalizado') return false;
       } else if (activeFilterTab === 'sin_plan') {
-        if (estadoFinal !== 'sin_plan') return false;
+        if (estado !== 'sin_plan') return false;
       }
 
       // 2. Filtro por Búsqueda (Nombre, RUT, Teléfono)
@@ -684,9 +660,6 @@ export default function PatientsPage() {
               </TableHeader>
               <TableBody>
                 {filteredPatients.map((p) => {
-                  const { totales, usadas, restantes, estadoFinal, tienePlanActivo } = getPatientPlanInfo(p);
-                  const percent = totales > 0 ? Math.min(100, Math.round((usadas / totales) * 100)) : 0;
-
                   return (
                     <TableRow key={p.id} className="hover:bg-slate-50/60 transition-colors text-xs">
                       {/* Paciente */}
@@ -726,47 +699,43 @@ export default function PatientsPage() {
 
                       {/* Saldo de Sesiones */}
                       <TableCell className="min-w-[170px]">
-                        {(!tienePlanActivo || totales === 0) ? (
-                          <span className="text-slate-400 text-xs italic">Sin plan activo</span>
-                        ) : (
+                        {p.estado_plan !== 'sin_plan' && p.sesiones_totales > 0 ? (
                           <div className="space-y-1">
-                            <div className="flex items-center gap-1.5 font-medium text-xs text-slate-700">
-                              <span className="font-semibold text-slate-900">
-                                {usadas}/{totales} ses.
-                              </span>
-                              <span className="text-slate-400 font-mono">
-                                ({restantes} rest.)
-                              </span>
+                            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                              <span>{p.sesiones_usadas ?? 0}/{p.sesiones_totales} ses.</span>
+                              <span className="text-slate-400 font-normal">({p.sesiones_restantes ?? 0} rest.)</span>
                             </div>
                             <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                               <div 
-                                className="h-full bg-emerald-500 rounded-full transition-all" 
-                                style={{ width: `${percent}%` }}
+                                className="h-full bg-emerald-500 rounded-full" 
+                                style={{ width: `${Math.min(100, (((p.sesiones_usadas ?? 0) / p.sesiones_totales) * 100))}%` }}
                               />
                             </div>
                           </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs italic">Sin plan activo</span>
                         )}
                       </TableCell>
 
                       {/* Estado del Plan (Insignias) */}
                       <TableCell className="min-w-[160px]">
                         <div className="space-y-1">
-                          {estadoFinal === 'vigente' && (
+                          {p.estado_plan === 'vigente' && (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                               ● Plan Vigente
                             </span>
                           )}
-                          {estadoFinal === 'por_renovar' && (
+                          {p.estado_plan === 'por_renovar' && (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                               ⚠️ Por Renovar (1 rest.)
                             </span>
                           )}
-                          {estadoFinal === 'finalizado' && (
+                          {p.estado_plan === 'finalizado' && (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
                               Finalizado
                             </span>
                           )}
-                          {estadoFinal === 'sin_plan' && (
+                          {(!p.estado_plan || p.estado_plan === 'sin_plan') && (
                             <span className="text-slate-400 text-xs">Sin Plan Activo</span>
                           )}
                           {/* Advertencia de Cobro Pendiente */}
