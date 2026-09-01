@@ -17,16 +17,9 @@ import { VistaResumenPaciente } from "@/types/database";
 import { formatRut, formatDateChile } from "@/lib/utils";
 import {
   Calendar,
-  Clock,
-  CheckCircle2,
-  ChevronRight,
   Plus,
-  User,
-  Activity,
-  AlertCircle,
   FolderOpen,
   Eye,
-  FileText,
   ShoppingCart,
   CalendarDays,
 } from "lucide-react";
@@ -82,18 +75,18 @@ export function PatientTable({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-      <Table>
+    <div className="w-full overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <Table className="w-full">
         <TableHeader>
           <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
-            <TableHead className="w-[100px]">Código</TableHead>
-            <TableHead>Paciente</TableHead>
-            <TableHead className="hidden md:table-cell">RUT</TableHead>
-            <TableHead className="hidden sm:table-cell">Previsión</TableHead>
-            <TableHead className="w-[180px]">Saldo Sesiones</TableHead>
-            <TableHead className="hidden lg:table-cell">Última Atención</TableHead>
-            <TableHead>Estado del Plan</TableHead>
-            <TableHead className="text-right w-[240px]">Acciones Rápidas</TableHead>
+            <TableHead className="w-[100px] min-w-[90px]">Código</TableHead>
+            <TableHead className="min-w-[180px]">Paciente</TableHead>
+            <TableHead className="hidden md:table-cell min-w-[130px]">RUT</TableHead>
+            <TableHead className="hidden sm:table-cell min-w-[110px]">Previsión</TableHead>
+            <TableHead className="w-[180px] min-w-[160px]">Saldo Sesiones</TableHead>
+            <TableHead className="hidden lg:table-cell min-w-[130px]">Última Atención</TableHead>
+            <TableHead className="min-w-[140px]">Estado del Plan</TableHead>
+            <TableHead className="text-right w-[240px] min-w-[240px]">Acciones Rápidas</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -118,20 +111,20 @@ export function PatientTable({
                 className="cursor-pointer group hover:bg-clinic-50/40 transition-colors"
               >
                 {/* Código */}
-                <TableCell className="font-mono text-xs font-bold text-slate-500">
+                <TableCell className="font-mono text-xs font-bold text-slate-500 whitespace-nowrap">
                   <span className="bg-slate-100 group-hover:bg-white group-hover:border-slate-300 border border-slate-200 px-2 py-1 rounded transition-colors">
                     {patient.codigo_paciente}
                   </span>
                 </TableCell>
 
                 {/* Nombre */}
-                <TableCell>
+                <TableCell className="font-medium text-slate-900 min-w-[180px]">
                   <div className="space-y-0.5">
                     <span className="font-bold text-slate-900 group-hover:text-clinic-700 transition-colors block text-sm">
                       {patient.nombre_completo}
                     </span>
                     <div className="flex items-center gap-2 md:hidden">
-                      <span className="text-xs text-slate-400 font-mono">
+                      <span className="text-xs text-slate-400 font-mono whitespace-nowrap">
                         {formatRut(patient.rut)}
                       </span>
                       {patient.prevision_salud && (
@@ -143,16 +136,16 @@ export function PatientTable({
                   </div>
                 </TableCell>
 
-                {/* RUT */}
-                <TableCell className="hidden md:table-cell font-mono text-xs text-slate-600">
+                {/* RUT con formato chileno estricto sin corte de línea */}
+                <TableCell className="hidden md:table-cell whitespace-nowrap font-mono text-sm text-slate-700 min-w-[130px]">
                   {formatRut(patient.rut)}
                 </TableCell>
 
                 {/* Previsión */}
-                <TableCell className="hidden sm:table-cell">
+                <TableCell className="hidden sm:table-cell min-w-[110px]">
                   <span
                     className={cn(
-                      "text-xs px-2 py-0.5 rounded-md font-semibold inline-block",
+                      "text-xs px-2 py-0.5 rounded-md font-semibold inline-block whitespace-nowrap",
                       patient.prevision_salud === "Fonasa"
                         ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
                         : patient.prevision_salud === "Isapre"
@@ -167,9 +160,9 @@ export function PatientTable({
                 </TableCell>
 
                 {/* Progreso de Sesiones */}
-                <TableCell>
+                <TableCell className="min-w-[160px]">
                   <div className="space-y-1.5 pr-2">
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center justify-between text-xs whitespace-nowrap">
                       <span className="font-semibold text-slate-700">
                         {patient.sesiones_consumidas} / {patient.total_sesiones}{" "}
                         <span className="text-slate-400 font-normal">ses.</span>
@@ -198,7 +191,7 @@ export function PatientTable({
                 </TableCell>
 
                 {/* Última Atención */}
-                <TableCell className="hidden lg:table-cell">
+                <TableCell className="hidden lg:table-cell min-w-[130px] whitespace-nowrap">
                   {patient.ultima_atencion ? (
                     <div className="space-y-0.5">
                       <div className="text-xs font-semibold text-slate-700 flex items-center gap-1">
@@ -221,13 +214,13 @@ export function PatientTable({
                 </TableCell>
 
                 {/* Estado del Plan */}
-                <TableCell>
+                <TableCell className="min-w-[140px] whitespace-nowrap">
                   <EstadoPlanBadge estado={patient.estado_plan} />
                 </TableCell>
 
-                {/* Acciones Rápidas: [ + Venta ], [ 📅 Agendar ], [ + Asistencia ], [ Ver Ficha ] */}
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1.5">
+                {/* Acciones Rápidas */}
+                <TableCell className="text-right min-w-[240px]">
+                  <div className="flex items-center justify-end gap-1.5 flex-nowrap shrink-0">
                     {/* Botón Nueva Venta */}
                     {onOpenSale && (
                       <Button
@@ -236,11 +229,11 @@ export function PatientTable({
                           e.stopPropagation();
                           onOpenSale(patient);
                         }}
-                        className="h-8 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-600 font-semibold text-xs transition-all shadow-2xs hover:shadow-xs flex items-center gap-1"
+                        className="h-8 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-600 font-semibold text-xs transition-all shadow-2xs hover:shadow-xs flex items-center gap-1 shrink-0"
                         title="Registrar nueva venta o recarga de plan"
                       >
-                        <ShoppingCart className="h-3 w-3" />
-                        <span className="hidden xl:inline">Venta</span>
+                        <ShoppingCart className="h-3 w-3 shrink-0" />
+                        <span>Venta</span>
                       </Button>
                     )}
 
@@ -248,11 +241,11 @@ export function PatientTable({
                     <Link
                       href={`/agenda?pacienteId=${patient.id}`}
                       onClick={(e) => e.stopPropagation()}
-                      className="h-8 px-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200 hover:border-blue-600 font-semibold text-xs transition-all shadow-2xs hover:shadow-xs flex items-center gap-1"
+                      className="h-8 px-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200 hover:border-blue-600 font-semibold text-xs transition-all shadow-2xs hover:shadow-xs flex items-center gap-1 shrink-0"
                       title="Agendar cita en calendario"
                     >
-                      <CalendarDays className="h-3 w-3" />
-                      <span className="hidden xl:inline">Agendar</span>
+                      <CalendarDays className="h-3 w-3 shrink-0" />
+                      <span>Agendar</span>
                     </Link>
 
                     {/* Botón Asistencia Rápida */}
@@ -265,11 +258,11 @@ export function PatientTable({
                           e
                         )
                       }
-                      className="h-8 rounded-lg bg-clinic-50 text-clinic-700 hover:bg-clinic-600 hover:text-white border border-clinic-200 hover:border-clinic-600 font-semibold text-xs transition-all shadow-2xs hover:shadow-xs flex items-center gap-1"
+                      className="h-8 rounded-lg bg-clinic-50 text-clinic-700 hover:bg-clinic-600 hover:text-white border border-clinic-200 hover:border-clinic-600 font-semibold text-xs transition-all shadow-2xs hover:shadow-xs flex items-center gap-1 shrink-0"
                       title="Registrar asistencia de hoy"
                     >
-                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-                      <span className="hidden sm:inline">Asist.</span>
+                      <Plus className="h-3.5 w-3.5 stroke-[2.5] shrink-0" />
+                      <span>Asist.</span>
                     </Button>
 
                     {/* Botón Ver Ficha */}
@@ -280,10 +273,10 @@ export function PatientTable({
                         e.stopPropagation();
                         onSelectPatient(patient);
                       }}
-                      className="h-8 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border-slate-200 font-semibold text-xs transition-all flex items-center gap-1 shadow-2xs"
+                      className="h-8 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border-slate-200 font-semibold text-xs transition-all flex items-center gap-1 shadow-2xs shrink-0"
                       title="Abrir ficha clínica completa"
                     >
-                      <Eye className="h-3.5 w-3.5 text-clinic-600" />
+                      <Eye className="h-3.5 w-3.5 text-clinic-600 shrink-0" />
                       <span>Ficha</span>
                     </Button>
                   </div>

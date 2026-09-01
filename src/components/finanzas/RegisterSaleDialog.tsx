@@ -6,11 +6,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogBody,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
   PlanCatalogo,
   VistaResumenPaciente,
@@ -27,17 +27,14 @@ import {
 import { formatCLP, formatRut } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
-  DollarSign,
   ShoppingCart,
   User,
   Layers,
   CreditCard,
   Tag,
   CheckCircle2,
-  AlertCircle,
   Search,
-  Receipt,
-  Sparkles,
+  Loader2,
 } from 'lucide-react';
 
 interface RegisterSaleDialogProps {
@@ -160,8 +157,6 @@ export function RegisterSaleDialog({
     );
   });
 
-  const currentPatient = patients.find((p) => p.id === selectedPatientId);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -221,261 +216,262 @@ export function RegisterSaleDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogHeader>
-        <div className="flex items-center gap-2.5 text-slate-800">
-          <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-700 border border-emerald-100">
+    <Dialog open={open} onOpenChange={onOpenChange} maxWidth="max-w-2xl">
+      {/* 1. Header Fijo */}
+      <DialogHeader onClose={() => onOpenChange(false)}>
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-700 border border-emerald-100 shrink-0">
             <ShoppingCart className="h-5 w-5" />
           </div>
           <div>
-            <DialogTitle className="text-lg font-extrabold text-slate-900">
-              Registrar Venta / Cobro de Plan
-            </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogTitle>Registrar Venta / Cobro de Plan</DialogTitle>
+            <DialogDescription>
               Asigna sesiones al saldo del paciente y registra el ingreso en el balance financiero.
             </DialogDescription>
           </div>
         </div>
       </DialogHeader>
 
-      <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-        {/* 1. Selección de Paciente */}
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5">
-          <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-            <User className="h-3.5 w-3.5 text-blue-600" />
-            1. Paciente Destinatario
-          </span>
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+        {/* 2. Cuerpo Scrolleable */}
+        <DialogBody className="space-y-4">
+          {/* 1. Selección de Paciente */}
+          <div className="rounded-2xl border border-slate-200/90 bg-slate-50/60 p-4 space-y-2.5">
+            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-blue-600" />
+              1. Paciente Destinatario
+            </span>
 
-          {selectedPatient ? (
-            <div className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between">
-              <div>
-                <strong className="text-sm font-bold text-slate-900 block">
-                  {selectedPatient.nombre_completo}
-                </strong>
-                <span className="text-xs text-slate-500 font-mono">
-                  RUT: {formatRut(selectedPatient.rut)} • {selectedPatient.codigo_paciente}
+            {selectedPatient ? (
+              <div className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <strong className="text-sm font-bold text-slate-900 block">
+                    {selectedPatient.nombre_completo}
+                  </strong>
+                  <span className="text-xs text-slate-500 font-mono">
+                    RUT: {formatRut(selectedPatient.rut)} • {selectedPatient.codigo_paciente}
+                  </span>
+                </div>
+                <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">
+                  Saldo: {selectedPatient.sesiones_restantes} sesiones
                 </span>
               </div>
-              <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">
-                Saldo: {selectedPatient.sesiones_restantes} sesiones
-              </span>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            ) : (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    placeholder="Buscar paciente por Nombre o RUT..."
+                    value={patientSearch}
+                    onChange={(e) => setPatientSearch(e.target.value)}
+                    className="pl-9 bg-white rounded-xl text-sm"
+                  />
+                </div>
+
+                <div className="max-h-32 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+                  {filteredPatients.slice(0, 5).map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPatientId(p.id);
+                        setPatientSearch(p.nombre_completo);
+                      }}
+                      className={`w-full text-left p-2.5 text-xs transition-colors flex items-center justify-between ${
+                        selectedPatientId === p.id
+                          ? 'bg-blue-50/80 font-bold text-blue-900'
+                          : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <div>
+                        <span className="block font-semibold">{p.nombre_completo}</span>
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          {formatRut(p.rut)} • {p.codigo_paciente}
+                        </span>
+                      </div>
+                      {selectedPatientId === p.id && (
+                        <CheckCircle2 className="h-4 w-4 text-blue-600 shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 2. Selección de Plan / Tarifa */}
+          <div className="rounded-2xl border border-slate-200/90 bg-slate-50/60 p-4 space-y-3">
+            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <Layers className="h-3.5 w-3.5 text-emerald-600" />
+              2. Plan o Servicio Adquirido
+            </span>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-xs font-semibold text-slate-700">Catálogo de Planes Activos</label>
+                <select
+                  value={selectedPlanId}
+                  onChange={(e) => handleSelectPlan(e.target.value)}
+                  className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  {planes.map((pl) => (
+                    <option key={pl.id} value={pl.id}>
+                      {pl.nombre_plan} — {formatCLP(pl.precio_clp)} ({pl.total_sesiones} ses.)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">
+                  Cantidad de Sesiones <span className="text-rose-500">*</span>
+                </label>
                 <Input
-                  placeholder="Buscar paciente por Nombre o RUT..."
-                  value={patientSearch}
-                  onChange={(e) => setPatientSearch(e.target.value)}
-                  className="pl-9 bg-white rounded-xl text-sm"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={totalSesiones}
+                  onChange={(e) => setTotalSesiones(parseInt(e.target.value, 10) || 1)}
+                  className="bg-white rounded-xl text-sm font-bold text-slate-800"
                 />
               </div>
 
-              {/* Patient select list */}
-              <div className="max-h-32 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
-                {filteredPatients.slice(0, 5).map((p) => (
-                  <button
-                    key={p.id}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">Precio Base CLP</label>
+                <Input
+                  type="number"
+                  step={1000}
+                  value={precioBase}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10) || 0;
+                    setPrecioBase(val);
+                    setTotalFinalCLP(Math.max(0, val - descuentoCLP));
+                  }}
+                  className="bg-white rounded-xl text-sm font-bold text-slate-800"
+                />
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-xs font-semibold text-slate-700">Cupón de Descuento (Opcional)</label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Tag className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <Input
+                      placeholder="Ej: BIENVENIDA, KIRO10"
+                      value={codigoCupon}
+                      onChange={(e) => setCodigoCupon(e.target.value.toUpperCase())}
+                      className="pl-9 uppercase bg-white rounded-xl text-xs font-mono"
+                    />
+                  </div>
+                  <Button
                     type="button"
-                    onClick={() => {
-                      setSelectedPatientId(p.id);
-                      setPatientSearch(p.nombre_completo);
-                    }}
-                    className={`w-full text-left p-2.5 text-xs transition-colors flex items-center justify-between ${
-                      selectedPatientId === p.id
-                        ? 'bg-blue-50/80 font-bold text-blue-900'
-                        : 'hover:bg-slate-50 text-slate-700'
+                    variant="outline"
+                    size="sm"
+                    onClick={handleApplyCoupon}
+                    className="rounded-xl text-xs font-bold"
+                  >
+                    Aplicar
+                  </Button>
+                </div>
+                {cuponMensaje && (
+                  <p
+                    className={`text-[11px] font-semibold ${
+                      cuponMensaje.isError ? 'text-rose-600' : 'text-emerald-600'
                     }`}
                   >
-                    <div>
-                      <span className="block font-semibold">{p.nombre_completo}</span>
-                      <span className="text-[11px] text-slate-400 font-mono">
-                        {formatRut(p.rut)} • {p.codigo_paciente}
-                      </span>
-                    </div>
-                    {selectedPatientId === p.id && (
-                      <CheckCircle2 className="h-4 w-4 text-blue-600 shrink-0" />
-                    )}
-                  </button>
-                ))}
+                    {cuponMensaje.text}
+                  </p>
+                )}
               </div>
-            </div>
-          )}
-        </div>
 
-        {/* 2. Selección de Plan / Tarifa */}
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-3">
-          <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-            <Layers className="h-3.5 w-3.5 text-emerald-600" />
-            2. Plan o Servicio Adquirido
-          </span>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Selector de Catálogo */}
-            <div className="space-y-1 sm:col-span-2">
-              <label className="text-xs font-semibold text-slate-700">
-                Catálogo de Planes Activos
-              </label>
-              <select
-                value={selectedPlanId}
-                onChange={(e) => handleSelectPlan(e.target.value)}
-                className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                {planes.map((pl) => (
-                  <option key={pl.id} value={pl.id}>
-                    {pl.nombre_plan} — {formatCLP(pl.precio_clp)} ({pl.total_sesiones} ses.)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Total de Sesiones */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">
-                Cantidad de Sesiones <span className="text-rose-500">*</span>
-              </label>
-              <Input
-                type="number"
-                min={1}
-                max={50}
-                value={totalSesiones}
-                onChange={(e) => setTotalSesiones(parseInt(e.target.value, 10) || 1)}
-                className="bg-white rounded-xl text-sm font-bold text-slate-800"
-              />
-            </div>
-
-            {/* Precio Base */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Precio Base CLP</label>
-              <Input
-                type="number"
-                step={1000}
-                value={precioBase}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10) || 0;
-                  setPrecioBase(val);
-                  setTotalFinalCLP(Math.max(0, val - descuentoCLP));
-                }}
-                className="bg-white rounded-xl text-sm font-bold text-slate-800"
-              />
-            </div>
-
-            {/* Cupón de descuento */}
-            <div className="space-y-1 sm:col-span-2">
-              <label className="text-xs font-semibold text-slate-700">Cupón de Descuento (Opcional)</label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Tag className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <Input
-                    placeholder="Ej: BIENVENIDA, KIRO10"
-                    value={codigoCupon}
-                    onChange={(e) => setCodigoCupon(e.target.value.toUpperCase())}
-                    className="pl-9 uppercase bg-white rounded-xl text-xs font-mono"
-                  />
+              <div className="space-y-1 sm:col-span-2 p-3 bg-white rounded-xl border border-emerald-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">Total Final a Cobrar:</span>
+                  <span className="text-lg font-extrabold text-emerald-700">
+                    {formatCLP(totalFinalCLP)}
+                  </span>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleApplyCoupon}
-                  className="rounded-xl text-xs font-bold"
-                >
-                  Aplicar
-                </Button>
-              </div>
-              {cuponMensaje && (
-                <p
-                  className={`text-[11px] font-semibold ${
-                    cuponMensaje.isError ? 'text-rose-600' : 'text-emerald-600'
-                  }`}
-                >
-                  {cuponMensaje.text}
-                </p>
-              )}
-            </div>
-
-            {/* Monto Final a Cobrar */}
-            <div className="space-y-1 sm:col-span-2 p-3 bg-white rounded-xl border border-emerald-200">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700">Total Final a Cobrar:</span>
-                <span className="text-lg font-extrabold text-emerald-700">
-                  {formatCLP(totalFinalCLP)}
-                </span>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* 3. Forma de Pago y Estado */}
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-3">
-          <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-            <CreditCard className="h-3.5 w-3.5 text-purple-600" />
-            3. Medio y Estado de Pago
-          </span>
+          {/* 3. Forma de Pago y Estado */}
+          <div className="rounded-2xl border border-slate-200/90 bg-slate-50/60 p-4 space-y-3">
+            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <CreditCard className="h-3.5 w-3.5 text-purple-600" />
+              3. Medio y Estado de Pago
+            </span>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Medio de Pago */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Medio de Pago</label>
-              <select
-                value={medioPago}
-                onChange={(e) => setMedioPago(e.target.value as MedioPago)}
-                className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="Transferencia">Transferencia Bancaria</option>
-                <option value="Débito / Transbank">Débito / Crédito (Transbank)</option>
-                <option value="Efectivo">Efectivo</option>
-                <option value="Convenio">Convenio Institucional</option>
-              </select>
-            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">Medio de Pago</label>
+                <select
+                  value={medioPago}
+                  onChange={(e) => setMedioPago(e.target.value as MedioPago)}
+                  className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="Transferencia">Transferencia Bancaria</option>
+                  <option value="Débito / Transbank">Débito / Crédito (Transbank)</option>
+                  <option value="Efectivo">Efectivo</option>
+                  <option value="Convenio">Convenio Institucional</option>
+                </select>
+              </div>
 
-            {/* Estado de Pago */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Estado del Cobro</label>
-              <select
-                value={estadoPago}
-                onChange={(e) => setEstadoPago(e.target.value as EstadoPago)}
-                className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="Pagado">✓ Pagado (Ingreso Realizado)</option>
-                <option value="Pendiente de Pago">⏳ Pendiente de Pago</option>
-                <option value="Parcial / Cuotas">🌓 Parcial / Cuotas</option>
-              </select>
-            </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">Estado del Cobro</label>
+                <select
+                  value={estadoPago}
+                  onChange={(e) => setEstadoPago(e.target.value as EstadoPago)}
+                  className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="Pagado">✓ Pagado (Ingreso Realizado)</option>
+                  <option value="Pendiente de Pago">⏳ Pendiente de Pago</option>
+                  <option value="Parcial / Cuotas">🌓 Parcial / Cuotas</option>
+                </select>
+              </div>
 
-            {/* Notas u Observaciones */}
-            <div className="space-y-1 sm:col-span-2">
-              <label className="text-xs font-semibold text-slate-700">
-                Observaciones / N° Comprobante (Opcional)
-              </label>
-              <Input
-                placeholder="Ej: Transferencia Banco de Chile comprobante #994821"
-                value={notas}
-                onChange={(e) => setNotas(e.target.value)}
-                className="bg-white rounded-xl text-xs"
-              />
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-xs font-semibold text-slate-700">
+                  Observaciones / N° Comprobante (Opcional)
+                </label>
+                <Input
+                  placeholder="Ej: Transferencia Banco de Chile comprobante #994821"
+                  value={notas}
+                  onChange={(e) => setNotas(e.target.value)}
+                  className="bg-white rounded-xl text-xs"
+                />
+              </div>
             </div>
           </div>
-        </div>
+        </DialogBody>
 
-        <DialogFooter className="pt-2">
+        {/* 3. Footer Fijo */}
+        <DialogFooter>
           <Button
             type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isSaving}
-            className="rounded-xl"
+            className="rounded-xl border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold h-9 px-4"
           >
             Cancelar
           </Button>
           <Button
             type="submit"
             disabled={isSaving}
-            className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2 shadow-xs"
+            className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2 shadow-xs text-xs h-9 px-5"
           >
-            <CheckCircle2 className="h-4 w-4" />
-            <span>{isSaving ? 'Registrando...' : 'Confirmar y Asignar Sesiones'}</span>
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Registrando...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Confirmar y Asignar Sesiones</span>
+              </>
+            )}
           </Button>
         </DialogFooter>
       </form>

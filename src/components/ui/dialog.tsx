@@ -8,9 +8,17 @@ interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
+  className?: string;
+  maxWidth?: string; // e.g. "max-w-2xl", "max-w-xl", "max-w-lg"
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
+export function Dialog({
+  open,
+  onOpenChange,
+  children,
+  className,
+  maxWidth = "max-w-2xl",
+}: DialogProps) {
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onOpenChange(false);
@@ -30,12 +38,21 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+        className="fixed inset-0 transition-opacity animate-in fade-in duration-200"
         onClick={() => onOpenChange(false)}
+        aria-hidden="true"
       />
-      <div className="relative z-50 w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200 border border-slate-200">
+      {/* Modal Card Container with bounded max-height and flex-col layout */}
+      <div
+        className={cn(
+          "relative z-50 w-full max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200",
+          maxWidth,
+          className
+        )}
+      >
         {children}
       </div>
     </div>
@@ -45,13 +62,30 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
 export function DialogHeader({
   className,
   children,
+  onClose,
 }: {
   className?: string;
   children: React.ReactNode;
+  onClose?: () => void;
 }) {
   return (
-    <div className={cn("flex flex-col space-y-1.5 pb-4", className)}>
-      {children}
+    <div
+      className={cn(
+        "flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-10 shrink-0",
+        className
+      )}
+    >
+      <div className="flex-1 pr-4 min-w-0">{children}</div>
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-xl p-2 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 transition-colors shrink-0"
+          aria-label="Cerrar modal"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }
@@ -65,7 +99,10 @@ export function DialogTitle({
 }) {
   return (
     <h3
-      className={cn("text-lg font-bold tracking-tight text-slate-900", className)}
+      className={cn(
+        "text-base sm:text-lg font-bold tracking-tight text-slate-900 leading-snug",
+        className
+      )}
     >
       {children}
     </h3>
@@ -80,7 +117,9 @@ export function DialogDescription({
   children: React.ReactNode;
 }) {
   return (
-    <p className={cn("text-sm text-slate-500", className)}>{children}</p>
+    <p className={cn("text-xs text-slate-500 mt-0.5 leading-normal", className)}>
+      {children}
+    </p>
   );
 }
 
@@ -96,13 +135,32 @@ export function DialogClose({
       type="button"
       onClick={onClick}
       className={cn(
-        "absolute right-4 top-4 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors",
+        "rounded-xl p-2 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 transition-colors shrink-0",
+        className
+      )}
+      aria-label="Cerrar modal"
+    >
+      <X className="h-4 w-4" />
+    </button>
+  );
+}
+
+export function DialogBody({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-5 min-h-0",
         className
       )}
     >
-      <X className="h-4 w-4" />
-      <span className="sr-only">Cerrar</span>
-    </button>
+      {children}
+    </div>
   );
 }
 
@@ -116,7 +174,7 @@ export function DialogFooter({
   return (
     <div
       className={cn(
-        "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 pt-4 border-t border-slate-100",
+        "flex items-center justify-end gap-2.5 px-5 sm:px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 sticky bottom-0 z-10 shrink-0",
         className
       )}
     >

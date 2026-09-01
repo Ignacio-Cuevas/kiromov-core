@@ -10,6 +10,14 @@ import { getPatients } from '@/actions/patients';
 import { formatRut, formatCLP, formatDateChile } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from '@/components/ui/table';
 import { toast } from 'sonner';
 import {
   Users,
@@ -27,11 +35,14 @@ import {
   Tag,
   CheckCircle2,
   ArrowRight,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 
 export default function PacientesPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -102,11 +113,34 @@ export default function PacientesPage() {
               </span>
             </h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Gestión de fichas, saldo de sesiones adquiridas y emisión de ventas clínicas.
+              Gestión de fichas clínicas, saldos de sesiones y emisión de ventas.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  viewMode === 'table' ? 'bg-slate-100 text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700'
+                }`}
+                title="Vista en Tabla"
+              >
+                <List className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  viewMode === 'grid' ? 'bg-slate-100 text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700'
+                }`}
+                title="Vista en Tarjetas"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            </div>
+
             <Button
               variant="outline"
               size="sm"
@@ -148,7 +182,7 @@ export default function PacientesPage() {
           </div>
         </div>
 
-        {/* Patients Grid */}
+        {/* Patients Content */}
         {isLoading ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-t-transparent mb-3" />
@@ -170,7 +204,121 @@ export default function PacientesPage() {
               <span>Registrar Paciente</span>
             </Button>
           </div>
+        ) : viewMode === 'table' ? (
+          /* Table View with responsive overflow protection */
+          <div className="w-full overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <Table className="w-full">
+              <TableHeader>
+                <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+                  <TableHead className="min-w-[180px]">Paciente</TableHead>
+                  <TableHead className="min-w-[130px]">RUT</TableHead>
+                  <TableHead className="min-w-[110px]">Previsión</TableHead>
+                  <TableHead className="min-w-[140px]">Teléfono</TableHead>
+                  <TableHead className="min-w-[160px]">Saldo Sesiones</TableHead>
+                  <TableHead className="text-right min-w-[220px]">Acciones Rápidas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {patients.map((p) => {
+                  const total = p.total_sessions || 0;
+                  const used = p.used_sessions || 0;
+                  const remaining = p.remaining_sessions ?? Math.max(0, total - used);
+                  const percent = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+
+                  return (
+                    <TableRow key={p.id} className="hover:bg-slate-50/60 transition-colors">
+                      {/* Paciente */}
+                      <TableCell className="font-medium text-slate-900 min-w-[180px]">
+                        <div>
+                          <strong className="block text-sm font-bold text-slate-900 leading-snug">
+                            {p.full_name}
+                          </strong>
+                          {p.medical_notes && (
+                            <span className="text-[11px] text-blue-600 line-clamp-1">
+                              {p.medical_notes}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      {/* RUT sin corte de línea */}
+                      <TableCell className="whitespace-nowrap font-mono text-sm text-slate-700 min-w-[130px]">
+                        {formatRut(p.rut)}
+                      </TableCell>
+
+                      {/* Previsión */}
+                      <TableCell className="min-w-[110px]">
+                        <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700 border border-slate-200 whitespace-nowrap">
+                          {p.health_insurance || 'Particular'}
+                        </span>
+                      </TableCell>
+
+                      {/* Teléfono */}
+                      <TableCell className="whitespace-nowrap font-mono text-xs text-slate-600 min-w-[140px]">
+                        {p.phone || '—'}
+                      </TableCell>
+
+                      {/* Saldo Sesiones */}
+                      <TableCell className="min-w-[160px]">
+                        <div className="space-y-1 pr-2">
+                          <div className="flex items-center justify-between text-xs whitespace-nowrap">
+                            <span className="font-semibold text-slate-600">
+                              {used} / {total} ses.
+                            </span>
+                            <span
+                              className={`font-bold ${
+                                remaining <= 1 ? 'text-amber-600' : 'text-emerald-700'
+                              }`}
+                            >
+                              {remaining} rest.
+                            </span>
+                          </div>
+                          <Progress value={percent} className="h-1.5" />
+                        </div>
+                      </TableCell>
+
+                      {/* Acciones */}
+                      <TableCell className="text-right min-w-[220px]">
+                        <div className="flex items-center justify-end gap-1.5 flex-nowrap shrink-0">
+                          <Button
+                            size="sm"
+                            onClick={() => handleOpenSale(p)}
+                            className="h-8 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 font-semibold text-xs gap-1 rounded-xl shadow-2xs shrink-0"
+                            title="Vender o asignar sesiones"
+                          >
+                            <ShoppingCart className="h-3 w-3 shrink-0" />
+                            <span>Venta</span>
+                          </Button>
+
+                          <Link
+                            href={`/agenda?pacienteId=${p.id}`}
+                            className="h-8 px-2.5 inline-flex items-center justify-center bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 font-semibold text-xs gap-1 rounded-xl transition-colors shadow-2xs shrink-0"
+                            title="Agendar cita"
+                          >
+                            <CalendarDays className="h-3 w-3 shrink-0" />
+                            <span>Agendar</span>
+                          </Link>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenEdit(p)}
+                            className="h-8 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs gap-1 rounded-xl shadow-2xs shrink-0"
+                            title="Editar datos"
+                          >
+                            <Edit2 className="h-3 w-3 text-slate-500 shrink-0" />
+                            <span>Editar</span>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         ) : (
+          /* Grid Card View */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {patients.map((p) => {
               const total = p.total_sessions || 0;
@@ -186,15 +334,15 @@ export default function PacientesPage() {
                   <div className="space-y-3">
                     {/* Header: Name and Prevision */}
                     <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="text-base font-bold text-slate-900 leading-snug">
+                      <div className="min-w-0">
+                        <h3 className="text-base font-bold text-slate-900 leading-snug truncate">
                           {p.full_name}
                         </h3>
-                        <span className="text-xs font-mono text-slate-500">
+                        <span className="text-xs font-mono text-slate-500 whitespace-nowrap block mt-0.5">
                           RUT: {formatRut(p.rut)}
                         </span>
                       </div>
-                      <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                      <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
                         {p.health_insurance || 'Particular'}
                       </span>
                     </div>
@@ -202,9 +350,9 @@ export default function PacientesPage() {
                     {/* Contact details */}
                     <div className="space-y-1 text-xs text-slate-600">
                       {p.phone && (
-                        <div className="flex items-center gap-1.5">
-                          <Phone className="h-3.5 w-3.5 text-slate-400" />
-                          <span>{p.phone}</span>
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
+                          <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <span className="font-mono">{p.phone}</span>
                         </div>
                       )}
                       {p.email && (
