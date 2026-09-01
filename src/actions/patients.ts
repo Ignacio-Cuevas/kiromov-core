@@ -11,6 +11,7 @@ export async function getPatients(searchQuery?: string): Promise<Patient[]> {
 
   if (supabase) {
     try {
+      // 1. Consultar tabla patients
       let query = supabase.from('patients').select(`
         *,
         patient_plans (
@@ -53,11 +54,16 @@ export async function getPatients(searchQuery?: string): Promise<Patient[]> {
             total_sessions: totalSessions,
             used_sessions: usedSessions,
             remaining_sessions: Math.max(0, totalSessions - usedSessions),
+            nombre_completo: p.full_name,
+            telefono: p.phone,
+            fecha_nacimiento: p.birth_date,
+            prevision_salud: p.health_insurance,
+            diagnostico_principal: p.medical_notes,
           };
         });
       }
 
-      // Fallback a tabla en español si patients está vacía
+      // 2. Fallback a tabla pacientes
       const { data: dataPac } = await supabase.from('pacientes').select('*');
       if (dataPac && dataPac.length > 0) {
         return dataPac.map((p: any) => ({
@@ -69,12 +75,17 @@ export async function getPatients(searchQuery?: string): Promise<Patient[]> {
           phone: p.telefono,
           email: p.email,
           birth_date: p.fecha_nacimiento,
-          health_insurance: p.prevision_salud || 'Particular',
-          medical_notes: p.diagnostico_medico || p.diagnostico_principal,
+          health_insurance: p.prevision || p.prevision_salud || 'Particular',
+          medical_notes: p.diagnostico_principal || p.diagnostico_medico,
           status: p.estado || 'active',
           total_sessions: 4,
           used_sessions: 1,
           remaining_sessions: 3,
+          nombre_completo: p.nombre_completo,
+          telefono: p.telefono,
+          fecha_nacimiento: p.fecha_nacimiento,
+          prevision_salud: p.prevision || p.prevision_salud || 'Particular',
+          diagnostico_principal: p.diagnostico_principal || p.diagnostico_medico,
         }));
       }
     } catch (err) {
@@ -96,6 +107,11 @@ export async function getPatients(searchQuery?: string): Promise<Patient[]> {
     total_sessions: 4,
     used_sessions: 1,
     remaining_sessions: 3,
+    nombre_completo: p.nombre_completo,
+    telefono: p.telefono,
+    fecha_nacimiento: p.fecha_nacimiento,
+    prevision_salud: p.prevision_salud || 'Particular',
+    diagnostico_principal: p.diagnostico_principal,
   }));
 
   if (searchQuery && searchQuery.trim()) {
@@ -120,6 +136,9 @@ export async function createPatient(data: {
   health_insurance?: string;
   medical_notes?: string | null;
   status?: string;
+  motivo_consulta?: string | null;
+  antecedentes_morbidos?: string | null;
+  alertas_seguridad?: string | null;
 }): Promise<{ success: boolean; data?: Patient; error?: string }> {
   if (!data.full_name || !data.full_name.trim()) {
     return { success: false, error: 'El nombre completo es obligatorio.' };
@@ -137,7 +156,7 @@ export async function createPatient(data: {
   const cleanRut = formatRut(data.rut);
   const cleanName = data.full_name.trim().toUpperCase();
 
-  const payload = {
+  const payloadPatients = {
     full_name: cleanName,
     rut: cleanRut,
     phone: data.phone?.trim() || null,
@@ -148,41 +167,64 @@ export async function createPatient(data: {
     status: data.status || 'active',
   };
 
+  const nextCode = `KIR-${Math.floor(1000 + Math.random() * 9000)}`;
+
   if (supabase) {
     try {
       // 1. Insertar en tabla patients
-      const { data: newPatient, error } = await supabase
+      const { data: newPatient, error: errPatients } = await supabase
         .from('patients')
-        .insert([payload])
+        .insert([payloadPatients])
         .select()
         .single();
 
-      // 2. Insertar en tabla pacientes (para compatibilidad dual)
-      const nextCode = `KIR-${Math.floor(1000 + Math.random() * 9000)}`;
-      await supabase.from('pacientes').insert([
-        {
-          id: newPatient?.id,
-          codigo_paciente: nextCode,
-          nombre_completo: cleanName,
-          rut: cleanRut,
-          telefono: payload.phone || '',
-          email: payload.email,
-          fecha_nacimiento: payload.birth_date,
-          prevision_salud: payload.health_insurance,
-          diagnostico_medico: payload.medical_notes,
-          diagnostico_principal: payload.medical_notes,
-          estado: payload.status,
-        },
-      ]);
+      // 2. Insertar en tabla pacientes con estructura flexible
+      const payloadPacientes: any = {
+        id: newPatient?.id,
+        codigo_paciente: nextCode,
+        nombre_completo: cleanName,
+        rut: cleanRut,
+        telefono: payloadPatients.phone,
+        email: payloadPatients.email,
+        fecha_nacimiento: payloadPatients.birth_date,
+        prevision: payloadPatients.health_insurance,
+        motivo_consulta: data.motivo_consulta || null,
+        diagnostico_principal: payloadPatients.medical_notes,
+        antecedentes_morbidos: data.antecedentes_morbidos || null,
+        alertas_seguridad: data.alertas_seguridad || null,
+        estado: 'activo',
+      };
 
-      if (!error && newPatient) {
+      const { error: errPacientes } = await supabase
+        .from('pacientes')
+        .insert([payloadPacientes]);
+
+      // Fallback si falta alguna columna en el esquema cache
+      if (errPacientes && errPacientes.message.includes('column')) {
+        await supabase.from('pacientes').insert([
+          {
+            id: newPatient?.id,
+            codigo_paciente: nextCode,
+            nombre_completo: cleanName,
+            rut: cleanRut,
+            telefono: payloadPatients.phone,
+            email: payloadPatients.email,
+            fecha_nacimiento: payloadPatients.birth_date,
+            prevision_salud: payloadPatients.health_insurance,
+            diagnostico_medico: payloadPatients.medical_notes,
+            estado: 'active',
+          },
+        ]);
+      }
+
+      if (!errPatients && newPatient) {
         revalidatePath('/pacientes');
         revalidatePath('/');
         revalidatePath('/agenda');
         return { success: true, data: newPatient as Patient };
       }
-      if (error) {
-        return { success: false, error: error.message };
+      if (errPatients) {
+        return { success: false, error: errPatients.message };
       }
     } catch (err: any) {
       return { success: false, error: err.message || 'Error al conectar con la base de datos' };
@@ -190,10 +232,10 @@ export async function createPatient(data: {
   }
 
   const localNew: Patient = {
-    ...payload,
+    ...payloadPatients,
     id: 'pat-' + Date.now(),
     created_at: new Date().toISOString(),
-    status: payload.status as any,
+    status: payloadPatients.status as any,
     total_sessions: 0,
     used_sessions: 0,
     remaining_sessions: 0,
@@ -206,7 +248,12 @@ export async function createPatient(data: {
 
 export async function updatePatient(
   id: string,
-  data: Partial<Patient>
+  data: Partial<Patient> & {
+    motivo_consulta?: string | null;
+    diagnostico_principal?: string | null;
+    antecedentes_morbidos?: string | null;
+    alertas_seguridad?: string | null;
+  }
 ): Promise<{ success: boolean; data?: Patient; error?: string }> {
   const supabase = await createClient();
 
@@ -220,15 +267,24 @@ export async function updatePatient(
       if (updates.full_name) updates.full_name = updates.full_name.trim().toUpperCase();
       if (updates.rut) updates.rut = formatRut(updates.rut);
 
-      const { data: updated, error } = await supabase
+      const { data: updated, error: errPatients } = await supabase
         .from('patients')
-        .update(updates)
+        .update({
+          full_name: updates.full_name,
+          rut: updates.rut,
+          phone: updates.phone,
+          email: updates.email,
+          birth_date: updates.birth_date,
+          health_insurance: updates.health_insurance,
+          medical_notes: updates.medical_notes,
+          updated_at: updates.updated_at,
+        })
         .eq('id', id)
         .select()
         .single();
 
-      // Compatibilidad con tabla pacientes
-      await supabase
+      // Sincronizar tabla pacientes
+      const { error: errPac } = await supabase
         .from('pacientes')
         .update({
           nombre_completo: updates.full_name,
@@ -236,17 +292,37 @@ export async function updatePatient(
           telefono: updates.phone,
           email: updates.email,
           fecha_nacimiento: updates.birth_date,
-          prevision_salud: updates.health_insurance,
-          diagnostico_medico: updates.medical_notes,
+          prevision: updates.health_insurance,
+          motivo_consulta: updates.motivo_consulta,
+          diagnostico_principal: updates.medical_notes || updates.diagnostico_principal,
+          antecedentes_morbidos: updates.antecedentes_morbidos,
+          alertas_seguridad: updates.alertas_seguridad,
+          updated_at: updates.updated_at,
         })
         .eq('id', id);
 
-      if (!error && updated) {
+      if (errPac && errPac.message.includes('column')) {
+        await supabase
+          .from('pacientes')
+          .update({
+            nombre_completo: updates.full_name,
+            rut: updates.rut,
+            telefono: updates.phone,
+            email: updates.email,
+            fecha_nacimiento: updates.birth_date,
+            prevision_salud: updates.health_insurance,
+            diagnostico_medico: updates.medical_notes,
+            updated_at: updates.updated_at,
+          })
+          .eq('id', id);
+      }
+
+      if (!errPatients && updated) {
         revalidatePath('/pacientes');
         revalidatePath('/');
         return { success: true, data: updated as Patient };
       }
-      if (error) return { success: false, error: error.message };
+      if (errPatients) return { success: false, error: errPatients.message };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
