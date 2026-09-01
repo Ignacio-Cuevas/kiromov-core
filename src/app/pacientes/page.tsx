@@ -51,17 +51,21 @@ function getPlanCategory(
 ): 'vigente' | 'por_renovar' | 'finalizado' | 'sin_plan' {
   if (!estadoPlan) return 'sin_plan';
   const s = estadoPlan.toLowerCase().trim();
-  if (s === 'vigente' || s === 'plan vigente') return 'vigente';
+  if (s === 'vigente' || s === 'plan vigente' || s === 'activo') return 'vigente';
   if (
     s === 'por_renovar' ||
     s === 'por renovar' ||
     s.includes('por renovar') ||
+    s.includes('renovar') ||
     s.includes('1 restante')
   ) {
     return 'por_renovar';
   }
   if (s === 'finalizado' || s === 'plan finalizado' || s === 'completed') {
     return 'finalizado';
+  }
+  if (s === 'sin_plan' || s === 'sin plan' || s === 'sin plan activo') {
+    return 'sin_plan';
   }
   return 'sin_plan';
 }
@@ -87,69 +91,154 @@ export default function PatientsPage() {
   const [selectedPatientForDrawer, setSelectedPatientForDrawer] = useState<any | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // 1. Cargar Datos con reconciliación en tiempo real (vista_resumen_pacientes + compras_planes + citas_atenciones)
+  // Helper: determina si un paciente tiene plan vigente basado en datos disponibles
+  const tienePlanVigente = (p: any): boolean => {
+    if (!p) return false;
+    const estadoValido = ['vigente', 'activo', 'por_renovar', 'plan vigente'].includes(
+      (p.estado_plan || '').toLowerCase().trim()
+    );
+    const tieneSaldo =
+      Number(p.sesiones_restantes) > 0 ||
+      Number(p.sesiones_totales) > Number(p.sesiones_usadas);
+    return Boolean(p.plan_id || p.nombre_plan) && (estadoValido || tieneSaldo);
+  };
+
+  // 1. Cargar Datos — FUENTE PRIMARIA: vista_resumen_pacientes (PostgreSQL calcula saldos y estado)
+  //    Solo si la vista no devuelve datos, se recurre a reconciliación manual con tablas subyacentes.
   const loadData = useCallback(async (showToast = false) => {
     try {
       if (showToast) setIsRefreshing(true);
 
       let vistaData: any[] = [];
+      let useVistaDirectly = false;
+
+      if (supabase) {
+        // Paso 1: Consultar la vista materializada — fuente de verdad
+        try {
+          const { data: vData, error: vErr } = await supabase
+            .from('vista_resumen_pacientes')
+            .select('*')
+            .order('nombre_completo', { ascending: true });
+
+          if (!vErr && vData && vData.length > 0) {
+            vistaData = vData;
+            useVistaDirectly = true;
+          } else if (vErr) {
+            console.warn('[Diagnóstico] Error en vista_resumen_pacientes:', vErr.message);
+          }
+        } catch (err) {
+          console.warn('[Diagnóstico] Excepción al consultar vista:', err);
+        }
+      }
+
+      // Paso 2: Si la vista devolvió datos, usarlos directamente SIN sobreescribir
+      if (useVistaDirectly && vistaData.length > 0) {
+        const finalPatients = vistaData.map((p: any) => {
+          const totalSes = Number(p.sesiones_totales ?? 0);
+          const usedSes = Number(p.sesiones_usadas ?? 0);
+          const remainingSes = p.sesiones_restantes !== undefined && p.sesiones_restantes !== null
+            ? Number(p.sesiones_restantes)
+            : Math.max(0, totalSes - usedSes);
+          const percent = totalSes > 0 ? Math.min(100, Math.round((usedSes / totalSes) * 100)) : 0;
+
+          // Normalizar estado_plan desde la vista (ya viene calculado por PostgreSQL)
+          const rawEstado = (p.estado_plan || '').toLowerCase().trim();
+          let estadoPlan: string;
+          if (rawEstado === 'vigente' || rawEstado === 'plan vigente' || rawEstado === 'activo') {
+            estadoPlan = remainingSes === 1 ? 'por_renovar' : 'vigente';
+          } else if (rawEstado === 'por_renovar' || rawEstado === 'por renovar' || rawEstado.includes('renovar')) {
+            estadoPlan = 'por_renovar';
+          } else if (rawEstado === 'finalizado' || rawEstado === 'plan finalizado' || rawEstado === 'completed') {
+            estadoPlan = 'finalizado';
+          } else if (totalSes > 0 && remainingSes > 0) {
+            // La vista tiene sesiones pero el estado no matchea — inferir del saldo
+            estadoPlan = remainingSes === 1 ? 'por_renovar' : 'vigente';
+          } else if (totalSes > 0 && remainingSes <= 0) {
+            estadoPlan = 'finalizado';
+          } else {
+            estadoPlan = 'sin_plan';
+          }
+
+          // Detectar cobro pendiente desde la vista
+          const rawPago = (p.estado_pago || '').toLowerCase().trim();
+          const hasPending = rawPago.includes('pendiente') || rawPago === 'pending' || rawPago === 'unpaid';
+
+          return {
+            id: p.id,
+            codigo_paciente: p.codigo_paciente || 'PAC-CLINIC',
+            nombre_completo: p.nombre_completo || 'Paciente Sin Nombre',
+            full_name: p.nombre_completo || 'Paciente Sin Nombre',
+            rut: p.rut || '',
+            telefono: p.telefono || p.phone || '',
+            phone: p.telefono || p.phone || '',
+            email: p.email || '',
+            prevision: p.prevision || p.prevision_salud || p.health_insurance || 'Particular',
+            prevision_salud: p.prevision || p.prevision_salud || p.health_insurance || 'Particular',
+            health_insurance: p.prevision || p.prevision_salud || p.health_insurance || 'Particular',
+            diagnostico_principal: p.diagnostico_principal || p.diagnostico_medico || p.motivo_consulta || '',
+            medical_notes: p.diagnostico_principal || p.diagnostico_medico || p.motivo_consulta || '',
+            plan_id: p.plan_id || (totalSes > 0 ? 'active-plan' : null),
+            nombre_plan: p.nombre_plan || (totalSes > 0 ? 'Plan de Kinesiología' : null),
+            sesiones_totales: totalSes,
+            total_sesiones: totalSes,
+            total_sessions: totalSes,
+            sesiones_usadas: usedSes,
+            sesiones_consumidas: usedSes,
+            used_sessions: usedSes,
+            sesiones_restantes: remainingSes,
+            remaining_sessions: remainingSes,
+            percent,
+            estado_plan: estadoPlan,
+            has_pending_payment: hasPending,
+            pending_plan: hasPending ? { id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.monto_clp } : null,
+            active_plan: p.plan_id ? { id: p.plan_id, nombre_plan: p.nombre_plan } : null,
+            planes: [],
+            // Pasar campos adicionales de la vista sin transformar
+            ultima_atencion: p.ultima_atencion,
+            estado_pago: p.estado_pago,
+            monto_clp: p.monto_clp,
+          };
+        });
+
+        setPacientes(finalPatients);
+        if (showToast) toast.success(`Directorio actualizado: ${finalPatients.length} pacientes cargados`);
+        return;
+      }
+
+      // Paso 3: FALLBACK — La vista no devolvió datos, recurrir a tablas individuales
       let pacientesData: any[] = [];
       let comprasData: any[] = [];
       let citasData: any[] = [];
 
       if (supabase) {
         try {
-          const [vRes, pRes, cpRes, caRes] = await Promise.all([
-            supabase.from('vista_resumen_pacientes').select('*'),
+          const [pRes, cpRes, caRes] = await Promise.all([
             supabase.from('pacientes').select('*').order('nombre_completo', { ascending: true }),
             supabase.from('compras_planes').select('*').order('fecha_compra', { ascending: false }),
             supabase.from('citas_atenciones').select('*'),
           ]);
-
-          if (!vRes.error && vRes.data && vRes.data.length > 0) {
-            vistaData = vRes.data;
-          }
-          if (!pRes.error && pRes.data && pRes.data.length > 0) {
-            pacientesData = pRes.data;
-          }
-          if (!cpRes.error && cpRes.data && cpRes.data.length > 0) {
-            comprasData = cpRes.data;
-          }
-          if (!caRes.error && caRes.data && caRes.data.length > 0) {
-            citasData = caRes.data;
-          }
+          if (!pRes.error && pRes.data) pacientesData = pRes.data;
+          if (!cpRes.error && cpRes.data) comprasData = cpRes.data;
+          if (!caRes.error && caRes.data) citasData = caRes.data;
         } catch (err) {
-          console.warn('Error al consultar datos en paralelo:', err);
+          console.warn('[Fallback] Error al consultar tablas individuales:', err);
         }
       }
 
-      const baseList =
-        vistaData.length > 0
-          ? vistaData
-          : pacientesData.length > 0
-          ? pacientesData
-          : await fetchVistaResumenPacientes();
+      const baseList = pacientesData.length > 0
+        ? pacientesData
+        : await fetchVistaResumenPacientes();
 
-      // Mapa de citas asistidas reales por paciente
+      // Mapa de citas asistidas por paciente
       const realAttendedMap = new Map<string, number>();
       citasData.forEach((c: any) => {
         const st = (c.estado || '').toLowerCase().trim();
-        if (
-          st === 'asistió' ||
-          st === 'asistio' ||
-          st === 'atendido' ||
-          st === 'completada' ||
-          st === 'completado' ||
-          st === 'inasistencia (descuenta sesión)'
-        ) {
-          realAttendedMap.set(
-            c.paciente_id,
-            (realAttendedMap.get(c.paciente_id) || 0) + 1
-          );
+        if (['asistió', 'asistio', 'atendido', 'completada', 'completado', 'inasistencia (descuenta sesión)'].includes(st)) {
+          realAttendedMap.set(c.paciente_id, (realAttendedMap.get(c.paciente_id) || 0) + 1);
         }
       });
 
-      // Mapa de compras_planes por paciente
+      // Mapa de compras por paciente
       const planesByPatientMap = new Map<string, any[]>();
       comprasData.forEach((cp: any) => {
         const list = planesByPatientMap.get(cp.paciente_id) || [];
@@ -160,56 +249,27 @@ export default function PatientsPage() {
       const finalPatients = baseList.map((p: any) => {
         const patientId = p.id || p.paciente_id;
         const patientPlans = planesByPatientMap.get(patientId) || [];
-        const activePlan =
-          patientPlans.find((pl: any) => pl.estado === 'activo') ||
-          patientPlans[0] ||
-          null;
+        const activePlan = patientPlans.find((pl: any) => pl.estado === 'activo') || patientPlans[0] || null;
 
-        // Calcular totales de sesiones
-        const realAttendedCount =
-          realAttendedMap.get(patientId) ??
-          Number(p.sesiones_usadas ?? p.sesiones_consumidas ?? p.used_sessions ?? 0);
-
-        let totalPurchased = patientPlans.reduce(
-          (sum: number, pl: any) =>
-            sum + Number(pl.total_sesiones || pl.sesiones_totales || 0),
-          0
+        const usedSes = realAttendedMap.get(patientId) ??
+          Number(p.sesiones_usadas ?? p.sesiones_consumidas ?? 0);
+        let totalSes = patientPlans.reduce(
+          (sum: number, pl: any) => sum + Number(pl.total_sesiones || pl.sesiones_totales || 0), 0
         );
+        if (totalSes === 0) totalSes = Number(p.sesiones_totales ?? p.total_sesiones ?? 0);
 
-        if (totalPurchased === 0) {
-          totalPurchased = Number(
-            p.sesiones_totales ?? p.total_sesiones ?? p.total_sessions ?? 0
-          );
-        }
+        const remainingSes = Math.max(0, totalSes - usedSes);
+        const percent = totalSes > 0 ? Math.min(100, Math.round((usedSes / totalSes) * 100)) : 0;
 
-        const finalTotal =
-          totalPurchased > 0
-            ? totalPurchased
-            : realAttendedCount > 0
-            ? realAttendedCount
-            : 0;
-        const remaining = Math.max(0, finalTotal - realAttendedCount);
-        const percent =
-          finalTotal > 0
-            ? Math.min(100, Math.round((realAttendedCount / finalTotal) * 100))
-            : 0;
-
-        // Determinar estado_plan normalizado
         let estadoPlan: string = 'sin_plan';
-        if (finalTotal === 0) {
-          estadoPlan = 'sin_plan';
-        } else if (remaining <= 0) {
-          estadoPlan = 'finalizado';
-        } else if (remaining === 1) {
-          estadoPlan = 'por_renovar';
-        } else {
-          estadoPlan = 'vigente';
-        }
+        if (totalSes === 0) estadoPlan = 'sin_plan';
+        else if (remainingSes <= 0) estadoPlan = 'finalizado';
+        else if (remainingSes === 1) estadoPlan = 'por_renovar';
+        else estadoPlan = 'vigente';
 
-        // Detectar si tiene cobro pendiente
         const pendingPlanObj = patientPlans.find((pl: any) => {
           const st = (pl.estado_pago || '').toLowerCase().trim();
-          return st.includes('pendiente') || st === 'pending' || st === 'unpaid';
+          return st.includes('pendiente') || st === 'pending';
         });
 
         return {
@@ -221,37 +281,21 @@ export default function PatientsPage() {
           telefono: p.telefono || p.phone || '',
           phone: p.telefono || p.phone || '',
           email: p.email || '',
-          prevision:
-            p.prevision || p.prevision_salud || p.health_insurance || 'Particular',
-          prevision_salud:
-            p.prevision || p.prevision_salud || p.health_insurance || 'Particular',
-          health_insurance:
-            p.prevision || p.prevision_salud || p.health_insurance || 'Particular',
-          diagnostico_principal:
-            p.diagnostico_principal ||
-            p.diagnostico_medico ||
-            p.motivo_consulta ||
-            p.medical_notes ||
-            '',
-          medical_notes:
-            p.diagnostico_principal ||
-            p.diagnostico_medico ||
-            p.motivo_consulta ||
-            p.medical_notes ||
-            '',
-          plan_id: activePlan?.id || p.plan_id || (finalTotal > 0 ? 'active-plan' : null),
-          nombre_plan:
-            activePlan?.nombre_plan ||
-            p.nombre_plan ||
-            (finalTotal > 0 ? 'Plan de Kinesiología' : null),
-          sesiones_totales: finalTotal,
-          total_sesiones: finalTotal,
-          total_sessions: finalTotal,
-          sesiones_usadas: realAttendedCount,
-          sesiones_consumidas: realAttendedCount,
-          used_sessions: realAttendedCount,
-          sesiones_restantes: remaining,
-          remaining_sessions: remaining,
+          prevision: p.prevision || p.prevision_salud || 'Particular',
+          prevision_salud: p.prevision || p.prevision_salud || 'Particular',
+          health_insurance: p.prevision || p.prevision_salud || 'Particular',
+          diagnostico_principal: p.diagnostico_principal || p.diagnostico_medico || p.motivo_consulta || '',
+          medical_notes: p.diagnostico_principal || p.diagnostico_medico || p.motivo_consulta || '',
+          plan_id: activePlan?.id || p.plan_id || (totalSes > 0 ? 'active-plan' : null),
+          nombre_plan: activePlan?.nombre_plan || p.nombre_plan || (totalSes > 0 ? 'Plan de Kinesiología' : null),
+          sesiones_totales: totalSes,
+          total_sesiones: totalSes,
+          total_sessions: totalSes,
+          sesiones_usadas: usedSes,
+          sesiones_consumidas: usedSes,
+          used_sessions: usedSes,
+          sesiones_restantes: remainingSes,
+          remaining_sessions: remainingSes,
           percent,
           estado_plan: estadoPlan,
           has_pending_payment: !!pendingPlanObj,
@@ -262,9 +306,9 @@ export default function PatientsPage() {
       });
 
       setPacientes(finalPatients);
-      if (showToast) toast.success('Directorio de pacientes actualizado');
+      if (showToast) toast.success(`Directorio actualizado: ${finalPatients.length} pacientes cargados`);
     } catch (err) {
-      console.error('Error en loadData:', err);
+      console.error('[loadData] Error fatal:', err);
       toast.error('Error al cargar pacientes');
     } finally {
       setIsLoading(false);
