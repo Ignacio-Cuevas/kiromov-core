@@ -1,326 +1,386 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { Header } from "@/components/dashboard/Header";
-import { KpiCards } from "@/components/dashboard/KpiCards";
-import { PatientTable } from "@/components/dashboard/PatientTable";
-import { PatientDrawer } from "@/components/patients/PatientDrawer";
-import { CreatePatientDialog } from "@/components/patients/CreatePatientDialog";
-import { RegisterSaleDialog } from "@/components/finanzas/RegisterSaleDialog";
-import { VistaResumenPaciente, Paciente, CompraPlan } from "@/types/database";
-import {
-  fetchVistaResumenPacientes,
-  registrarAsistenciaHoy,
-  isSupabaseConfigured,
-} from "@/lib/supabase";
-import { toast } from "sonner";
-import {
-  Activity,
-  Calendar,
-  CheckCircle2,
-  Database,
-  RefreshCw,
-  Sparkles,
-  Users2,
-  Layers,
-  Search,
-  X,
-  UserPlus,
-  ShoppingCart,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import React, { useState, useEffect, useMemo } from 'react';
+import { createClient } from '@/utils/supabase/client';
+import Link from 'next/link';
 
-export default function DashboardPage() {
-  const [patients, setPatients] = React.useState<VistaResumenPaciente[]>([]);
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const [selectedFilter, setSelectedFilter] = React.useState<string | null>(null);
-  const [selectedPatient, setSelectedPatient] =
-    React.useState<VistaResumenPaciente | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
+interface PacienteResumen {
+  id: string;
+  nombre_completo: string;
+  rut: string | null;
+  telefono: string | null;
+  email: string | null;
+  prevision: string;
+  estado: string;
+  plan_id: string | null;
+  nombre_plan: string | null;
+  sesiones_totales: number;
+  sesiones_usadas: number;
+  sesiones_restantes: number;
+  estado_plan: 'vigente' | 'por_renovar' | 'finalizado' | 'sin_plan';
+  estado_pago: 'pagado' | 'pendiente' | null;
+  monto_clp: number | null;
+}
 
-  // Dialogs
-  const [isCreatePatientOpen, setIsCreatePatientOpen] = React.useState(false);
-  const [isRegisterSaleOpen, setIsRegisterSaleOpen] = React.useState(false);
-  const [salePatientTarget, setSalePatientTarget] =
-    React.useState<VistaResumenPaciente | null>(null);
+export default function PacientesPage() {
+  const supabase = createClient();
+  const [pacientes, setPacientes] = useState<PacienteResumen[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filtroTab, setFiltroTab] = useState<'todos' | 'vigentes' | 'renovar' | 'finalizados'>('todos');
+  const [busqueda, setBusqueda] = useState('');
 
-  // Load patients data from Supabase / vista_resumen_pacientes
-  const loadPatients = React.useCallback(async (showToast = false) => {
-    try {
-      if (showToast) setIsRefreshing(true);
-      const data = await fetchVistaResumenPacientes();
-      setPatients(data || []);
-      if (showToast) {
-        toast.success("Datos actualizados correctamente");
-      }
-    } catch (err) {
-      console.error("Error fetching patients summary:", err);
-      toast.error("Error al cargar la lista de pacientes");
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+  // 1. Carga de datos directa y limpia desde la vista de Supabase
+  const cargarPacientes = async () => {
+    if (!supabase) {
+      setLoading(false);
+      return;
     }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('vista_resumen_pacientes')
+        .select('*')
+        .order('nombre_completo', { ascending: true });
+
+      if (error) throw error;
+      setPacientes((data as PacienteResumen[]) || []);
+    } catch (err) {
+      console.error('Error cargando pacientes:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarPacientes();
   }, []);
 
-  React.useEffect(() => {
-    loadPatients();
-  }, [loadPatients]);
+  // 2. Métricas y KPIs Superiores
+  const kpis = useMemo(() => {
+    const vigentes = pacientes.filter(p => p.estado_plan === 'vigente').length;
+    const porRenovar = pacientes.filter(p => p.estado_plan === 'por_renovar').length;
+    const finalizados = pacientes.filter(p => p.estado_plan === 'finalizado').length;
+    return { vigentes, porRenovar, finalizados, total: pacientes.length };
+  }, [pacientes]);
 
-  // Handle row click to open patient drawer
-  const handleSelectPatient = (patient: VistaResumenPaciente) => {
-    setSelectedPatient(patient);
-    setIsDrawerOpen(true);
-  };
+  // 3. Filtrado por Búsqueda y Pestañas
+  const pacientesFiltrados = useMemo(() => {
+    return pacientes.filter(p => {
+      // Filtro de texto (nombre, rut o teléfono)
+      const term = busqueda.toLowerCase().trim();
+      const matchText = 
+        (p.nombre_completo && p.nombre_completo.toLowerCase().includes(term)) ||
+        (p.rut && p.rut.toLowerCase().includes(term)) ||
+        (p.telefono && p.telefono.includes(term));
 
-  // Open sale registration for specific patient
-  const handleOpenSaleForPatient = (patient: VistaResumenPaciente) => {
-    setSalePatientTarget(patient);
-    setIsRegisterSaleOpen(true);
-  };
+      if (!matchText) return false;
 
-  // Direct quick attendance button from table row
-  const handleRegisterQuickAttendance = async (
-    patientId: string,
-    patientName: string,
-    e: React.MouseEvent
-  ) => {
-    e.stopPropagation(); // Prevent opening drawer
-
-    try {
-      const result = await registrarAsistenciaHoy(
-        patientId,
-        "Klgo. Ignacio Cuevas Silva"
-      );
-
-      if (result.success && result.data) {
-        toast.success("¡Asistencia Registrada!", {
-          description: `Atención de hoy marcada para ${patientName}`,
-          icon: <CheckCircle2 className="h-5 w-5 text-emerald-500" />,
-        });
-
-        // Refresh summary view to reflect session decrement and last attention date
-        await loadPatients();
-      } else {
-        toast.error("No se pudo registrar la asistencia.");
-      }
-    } catch (err) {
-      toast.error("Error de conexión al marcar asistencia.");
-    }
-  };
-
-  // Callback when attendance is registered from inside the drawer
-  const handleAttendanceRegisteredFromDrawer = async () => {
-    await loadPatients();
-  };
-
-  const handlePatientCreated = async (newPatient: Paciente) => {
-    await loadPatients();
-  };
-
-  const handleSaleRegistered = async (newSale: CompraPlan) => {
-    await loadPatients();
-  };
-
-  // Filter patients with strict null-safety (Name, RUT, Phone, Code)
-  const filteredPatients = React.useMemo(() => {
-    const query = (searchQuery || "").trim().toLowerCase();
-    const queryDigits = query.replace(/[^0-9kK]/g, "");
-
-    return (patients || []).filter((p) => {
-      // 1. Filtro por estado del plan
-      if (selectedFilter) {
-        if (selectedFilter === "Vigentes" && p?.estado_plan !== "Plan Vigente") return false;
-        if (selectedFilter === "Por Renovar" && !p?.estado_plan?.includes("Por Renovar")) return false;
-        if (selectedFilter === "Finalizados" && p?.estado_plan !== "Plan Finalizado") return false;
-        if (
-          selectedFilter !== "Vigentes" &&
-          selectedFilter !== "Por Renovar" &&
-          selectedFilter !== "Finalizados" &&
-          p?.estado_plan !== selectedFilter
-        ) {
-          return false;
-        }
-      }
-
-      // 2. Si no hay texto de búsqueda, pasa el filtro
-      if (!query) return true;
-
-      // 3. Extracción segura de campos (evitando null/undefined)
-      const nombre = (p?.nombre_completo || "").toLowerCase();
-      const rutRaw = (p?.rut || "").toLowerCase();
-      const rutDigits = rutRaw.replace(/[^0-9kK]/g, "");
-      const codigo = (p?.codigo_paciente || "").toLowerCase();
-      const telefono = (p?.telefono || "").replace(/\D/g, "");
-
-      return (
-        nombre.includes(query) ||
-        rutRaw.includes(query) ||
-        (queryDigits.length >= 2 && rutDigits.includes(queryDigits)) ||
-        codigo.includes(query) ||
-        (queryDigits.length >= 3 && telefono.includes(queryDigits))
-      );
+      // Filtro de pestañas
+      if (filtroTab === 'vigentes') return p.estado_plan === 'vigente';
+      if (filtroTab === 'renovar') return p.estado_plan === 'por_renovar';
+      if (filtroTab === 'finalizados') return p.estado_plan === 'finalizado';
+      return true; // 'todos'
     });
-  }, [patients, searchQuery, selectedFilter]);
-
-  // Compute today's attendances count (patients whose last attention was today)
-  const todayAttendanceCount = React.useMemo(() => {
-    return (patients || []).filter((p) => p?.dias_sin_atencion === 0).length;
-  }, [patients]);
+  }, [pacientes, busqueda, filtroTab]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
-      {/* Top Header */}
-      <Header
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        isSupabaseOnline={isSupabaseConfigured}
-      />
-
-      {/* Main Content Dashboard */}
-      <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
-        {/* Welcome and Actions Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-              <span>Panel de Gestión Clínica</span>
-              <span className="text-xs font-semibold text-clinic-700 bg-clinic-100/70 border border-clinic-300/60 px-2.5 py-0.5 rounded-full">
-                En vivo
-              </span>
-            </h1>
-            <p className="text-sm text-slate-500 mt-0.5">
-              Control de sesiones activas, directorio de pacientes y emisión de ventas.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => loadPatients(true)}
-              disabled={isRefreshing}
-              className="gap-2 bg-white text-slate-700 hover:bg-slate-50 border-slate-200"
-            >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin text-clinic-600" : ""}`}
-              />
-              <span>Actualizar</span>
-            </Button>
-
-            <Button
-              size="sm"
-              onClick={() => {
-                setSalePatientTarget(null);
-                setIsRegisterSaleOpen(true);
-              }}
-              className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs"
-            >
-              <ShoppingCart className="h-4 w-4" />
-              <span>+ Registrar Venta</span>
-            </Button>
-
-            <Button
-              size="sm"
-              onClick={() => setIsCreatePatientOpen(true)}
-              className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs"
-            >
-              <UserPlus className="h-4 w-4" />
-              <span>+ Nuevo Paciente</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* Resumen KPI Cards */}
-        <KpiCards
-          patients={patients}
-          todayAttendanceCount={todayAttendanceCount}
-          selectedFilter={selectedFilter}
-          onSelectFilter={setSelectedFilter}
-        />
-
-        {/* Data Table Section */}
-        <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+    <div className="min-h-screen bg-slate-50/50 pb-16">
+      
+      {/* Header Clínico Superior */}
+      <header className="bg-white border-b border-slate-200/80 sticky top-0 z-20 backdrop-blur-md bg-white/90">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
-              <Users2 className="h-5 w-5 text-slate-700" />
-              <h2 className="text-lg font-bold text-slate-900">
-                Directorio de Pacientes ({filteredPatients.length})
-              </h2>
-              {selectedFilter && (
-                <span className="text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md font-semibold ml-2">
-                  Filtro: {selectedFilter}
-                </span>
-              )}
+              <span className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">K</span>
+              <span className="font-bold text-slate-900 text-lg tracking-tight">KIROMOV <span className="text-blue-600 font-normal text-sm">Core</span></span>
             </div>
 
-            {/* Quick Search Input */}
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar por Nombre, RUT o Teléfono..."
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
+            <nav className="hidden md:flex items-center gap-1">
+              <Link href="/pacientes" className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-50 text-blue-700">Pacientes</Link>
+              <Link href="/agenda" className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">Agenda</Link>
+              <Link href="/finanzas" className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">Finanzas & Caja</Link>
+              <Link href="/planes" className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">Tarifas & Planes</Link>
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-right hidden sm:block">
+              <p className="text-xs font-bold text-slate-900 leading-none">Klgo. Ignacio Cuevas</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Director Clínico</p>
+            </div>
+            <button 
+              onClick={async () => {
+                if (supabase) {
+                  await supabase.auth.signOut();
+                }
+                window.location.href = '/login';
+              }}
+              className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 text-xs font-medium transition-colors"
+              title="Cerrar Sesión"
+            >
+              Salir
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Contenedor Principal */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
+        
+        {/* Título y Acciones Globales */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Directorio Clínico y Pacientes</h1>
+            <p className="text-sm text-slate-500 mt-1">Control de tratamientos activos, saldos de sesiones y fichas clínicas.</p>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button 
+              onClick={() => cargarPacientes()}
+              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors shadow-sm"
+            >
+              ⟳ Actualizar
+            </button>
+            <Link 
+              href="/agenda" 
+              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors shadow-sm"
+            >
+              + Registrar Venta
+            </Link>
+            <button 
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
+            >
+              + Nuevo Paciente
+            </button>
+          </div>
+        </div>
+
+        {/* Tarjetas KPI Superiores */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Planes Vigentes</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-1">{kpis.vigentes}</p>
+              <p className="text-xs text-slate-400 mt-0.5">En tratamiento activo</p>
+            </div>
+            <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">
+              ✓
             </div>
           </div>
 
-          <PatientTable
-            patients={filteredPatients}
-            onSelectPatient={handleSelectPatient}
-            onRegisterQuickAttendance={handleRegisterQuickAttendance}
-            onOpenSale={handleOpenSaleForPatient}
-            isLoading={isLoading}
-          />
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Por Renovar</p>
+              <p className="text-2xl font-bold text-amber-600 mt-1">{kpis.porRenovar}</p>
+              <p className="text-xs text-slate-400 mt-0.5">1 sesión restante</p>
+            </div>
+            <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-lg">
+              ⚠️
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Pacientes</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{kpis.total}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{kpis.finalizados} planes finalizados</p>
+            </div>
+            <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-lg">
+              👥
+            </div>
+          </div>
         </div>
+
+        {/* Barra de Filtros y Búsqueda */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-white p-2 rounded-2xl border border-slate-200/80 shadow-sm">
+          {/* Pestañas */}
+          <div className="flex items-center gap-1 overflow-x-auto p-1">
+            <button
+              onClick={() => setFiltroTab('todos')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${filtroTab === 'todos' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              Todos ({kpis.total})
+            </button>
+            <button
+              onClick={() => setFiltroTab('vigentes')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${filtroTab === 'vigentes' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              Vigentes ({kpis.vigentes})
+            </button>
+            <button
+              onClick={() => setFiltroTab('renovar')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${filtroTab === 'renovar' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              Por Renovar ({kpis.porRenovar})
+            </button>
+            <button
+              onClick={() => setFiltroTab('finalizados')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${filtroTab === 'finalizados' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              Finalizados ({kpis.finalizados})
+            </button>
+          </div>
+
+          {/* Buscador */}
+          <div className="relative flex-1 max-w-md px-2">
+            <input
+              type="text"
+              placeholder="Buscar por Nombre, RUT o Teléfono..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            />
+            <svg className="w-4 h-4 text-slate-400 absolute left-5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Tabla de Pacientes */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th className="px-5 py-3.5">Paciente</th>
+                  <th className="px-5 py-3.5">RUT / Contacto</th>
+                  <th className="px-5 py-3.5">Previsión</th>
+                  <th className="px-5 py-3.5">Saldo Sesiones</th>
+                  <th className="px-5 py-3.5">Estado Plan</th>
+                  <th className="px-5 py-3.5 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-12 text-center text-slate-400">
+                      <div className="inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-2" />
+                      <p>Cargando directorio clínico...</p>
+                    </td>
+                  </tr>
+                ) : pacientesFiltrados.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-12 text-center text-slate-400">
+                      No se encontraron pacientes con los criterios de búsqueda.
+                    </td>
+                  </tr>
+                ) : (
+                  pacientesFiltrados.map((p) => {
+                    const tienePlan = p.estado_plan !== 'sin_plan' && p.sesiones_totales > 0;
+                    const pct = tienePlan ? Math.min(100, Math.round((p.sesiones_usadas / p.sesiones_totales) * 100)) : 0;
+
+                    return (
+                      <tr key={p.id} className="hover:bg-slate-50/80 transition-colors group">
+                        
+                        {/* Paciente con Avatar */}
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs flex-shrink-0 border border-slate-200">
+                              {p.nombre_completo ? p.nombre_completo.charAt(0).toUpperCase() : 'P'}
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                                {p.nombre_completo}
+                              </p>
+                              {p.email && <p className="text-[11px] text-slate-400">{p.email}</p>}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* RUT y WhatsApp */}
+                        <td className="px-5 py-3.5 whitespace-nowrap">
+                          <p className="font-mono text-xs text-slate-700">{p.rut || '—'}</p>
+                          {p.telefono && (
+                            <a
+                              href={`https://wa.me/56${p.telefono.replace(/\D/g, '').slice(-9)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] text-emerald-600 hover:text-emerald-700 font-medium inline-flex items-center gap-1 mt-0.5"
+                            >
+                              <span>💬 {p.telefono}</span>
+                            </a>
+                          )}
+                        </td>
+
+                        {/* Previsión */}
+                        <td className="px-5 py-3.5">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">
+                            {p.prevision || 'Particular'}
+                          </span>
+                        </td>
+
+                        {/* Saldo de Sesiones */}
+                        <td className="px-5 py-3.5">
+                          {tienePlan ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900">
+                                <span>{p.sesiones_usadas}/{p.sesiones_totales} ses.</span>
+                                <span className="text-slate-400 font-normal">({p.sesiones_restantes} rest.)</span>
+                              </div>
+                              <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full transition-all ${
+                                    p.estado_plan === 'por_renovar' ? 'bg-amber-500' : 'bg-emerald-500'
+                                  }`} 
+                                  style={{ width: `${pct}%` }} 
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Sin plan activo</span>
+                          )}
+                        </td>
+
+                        {/* Estado del Plan */}
+                        <td className="px-5 py-3.5 whitespace-nowrap">
+                          {p.estado_plan === 'vigente' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              ● Plan Vigente
+                            </span>
+                          )}
+                          {p.estado_plan === 'por_renovar' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                              ⚠️ Por Renovar (1 rest.)
+                            </span>
+                          )}
+                          {p.estado_plan === 'finalizado' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
+                              Finalizado
+                            </span>
+                          )}
+                          {p.estado_plan === 'sin_plan' && (
+                            <span className="text-slate-400 text-xs">—</span>
+                          )}
+                        </td>
+
+                        {/* Acciones Rápidas */}
+                        <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5">
+                            <Link
+                              href={`/agenda?pacienteId=${p.id}`}
+                              className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold transition-colors"
+                            >
+                              Agendar
+                            </Link>
+                            <Link
+                              href={`/agenda?pacienteId=${p.id}&ficha=true`}
+                              className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold transition-colors"
+                            >
+                              Ficha →
+                            </Link>
+                          </div>
+                        </td>
+
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </main>
-
-      {/* Patient Drawer Side Panel (Sheet) */}
-      <PatientDrawer
-        patient={selectedPatient}
-        open={isDrawerOpen}
-        onOpenChange={setIsDrawerOpen}
-        onAttendanceRegistered={handleAttendanceRegisteredFromDrawer}
-      />
-
-      {/* Create Patient Dialog */}
-      <CreatePatientDialog
-        open={isCreatePatientOpen}
-        onOpenChange={setIsCreatePatientOpen}
-        onPatientCreated={handlePatientCreated}
-      />
-
-      {/* Register Sale Dialog */}
-      <RegisterSaleDialog
-        open={isRegisterSaleOpen}
-        onOpenChange={setIsRegisterSaleOpen}
-        selectedPatient={salePatientTarget}
-        onSaleRegistered={handleSaleRegistered}
-      />
-
-      {/* Modern Footer */}
-      <footer className="border-t border-slate-200/80 bg-white py-4 mt-auto">
-        <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between gap-2 px-4 sm:px-6 lg:px-8 text-xs text-slate-400">
-          <p>© {new Date().getFullYear()} KIROMOV Centro Clínico. Todos los derechos reservados.</p>
-          <div className="flex items-center gap-3 font-medium">
-            <span className="flex items-center gap-1.5 text-slate-500">
-              <span className="h-2 w-2 rounded-full bg-clinic-500" />
-              Kiromov Core v1.0
-            </span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

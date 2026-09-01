@@ -1,55 +1,41 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Header } from '@/components/dashboard/Header';
-import { PatientModal } from '@/components/patients/PatientModal';
-import { SaleModal } from '@/components/sales/SaleModal';
-import { PayPlanModal } from '@/components/patients/PayPlanModal';
-import { PatientDrawer } from '@/components/patients/PatientDrawer';
 import { createClient } from '@/utils/supabase/client';
-import { formatRut } from '@/lib/utils';
-import { ResumenPaciente } from '@/types/paciente';
-import {
-  UserPlus,
-  Search,
-  ShoppingCart,
-  CalendarDays,
-  Activity,
-  PackageCheck,
-  AlertTriangle,
-  Clock,
-  Stethoscope,
-  CreditCard,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
 import Link from 'next/link';
+
+interface PacienteResumen {
+  id: string;
+  nombre_completo: string;
+  rut: string | null;
+  telefono: string | null;
+  email: string | null;
+  prevision: string;
+  estado: string;
+  plan_id: string | null;
+  nombre_plan: string | null;
+  sesiones_totales: number;
+  sesiones_usadas: number;
+  sesiones_restantes: number;
+  estado_plan: 'vigente' | 'por_renovar' | 'finalizado' | 'sin_plan';
+  estado_pago: 'pagado' | 'pendiente' | null;
+  monto_clp: number | null;
+}
 
 export default function PacientesPage() {
   const supabase = createClient();
-  const [pacientes, setPacientes] = useState<ResumenPaciente[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilterTab, setActiveFilterTab] = useState<'todos' | 'vigentes' | 'por_renovar' | 'finalizados' | 'sin_plan'>('todos');
+  const [pacientes, setPacientes] = useState<PacienteResumen[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filtroTab, setFiltroTab] = useState<'todos' | 'vigentes' | 'renovar' | 'finalizados'>('todos');
+  const [busqueda, setBusqueda] = useState('');
 
-  // Modals state
-  const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
-  const [patientToEdit, setPatientToEdit] = useState<any | null>(null);
-  
-  const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
-  const [patientTargetSale, setPatientTargetSale] = useState<any | null>(null);
-  
-  const [isPayPlanOpen, setIsPayPlanOpen] = useState(false);
-  const [planToPay, setPlanToPay] = useState<any | null>(null);
-  const [patientNameToPay, setPatientNameToPay] = useState<string>('');
-  
-  const [selectedPatientForDrawer, setSelectedPatientForDrawer] = useState<any | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-
-  const [atencionesHoy, setAtencionesHoy] = useState(0);
-
-  const fetchPacientes = async (showToast = false) => {
-    if (!supabase) return;
+  // 1. Carga de datos directa y limpia desde la vista de Supabase
+  const cargarPacientes = async () => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('vista_resumen_pacientes')
@@ -57,391 +43,344 @@ export default function PacientesPage() {
         .order('nombre_completo', { ascending: true });
 
       if (error) throw error;
-      setPacientes((data as ResumenPaciente[]) || []);
-
-      // Fetch atenciones hoy for KPI
-      const today = new Date().toISOString().split('T')[0];
-      const { count: countHoy, error: errorHoy } = await supabase
-        .from('citas_atenciones')
-        .select('*', { count: 'exact', head: true })
-        .eq('fecha', today)
-        .in('estado', ['asistio', 'atendido', 'asistió']);
-      
-      if (!errorHoy && countHoy !== null) {
-        setAtencionesHoy(countHoy);
-      }
-
-      if (showToast) toast.success('Directorio de pacientes actualizado');
-    } catch (err: any) {
-      console.error("Error al cargar pacientes:", err);
-      toast.error("Error de conexión con el directorio de pacientes");
+      setPacientes((data as PacienteResumen[]) || []);
+    } catch (err) {
+      console.error('Error cargando pacientes:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPacientes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    cargarPacientes();
   }, []);
 
-  const vigentesCount = pacientes.filter(p => p.estado_plan === 'vigente').length;
-  const porRenovarCount = pacientes.filter(p => p.estado_plan === 'por_renovar').length;
-  const finalizadosCount = pacientes.filter(p => p.estado_plan === 'finalizado').length;
-  const sinPlanCount = pacientes.filter(p => !p.estado_plan || p.estado_plan === 'sin_plan').length;
+  // 2. Métricas y KPIs Superiores
+  const kpis = useMemo(() => {
+    const vigentes = pacientes.filter(p => p.estado_plan === 'vigente').length;
+    const porRenovar = pacientes.filter(p => p.estado_plan === 'por_renovar').length;
+    const finalizados = pacientes.filter(p => p.estado_plan === 'finalizado').length;
+    return { vigentes, porRenovar, finalizados, total: pacientes.length };
+  }, [pacientes]);
 
-  const filteredPacientes = useMemo(() => {
-    return pacientes.filter((p) => {
-      // Pestaña
-      const estado = p.estado_plan || 'sin_plan';
-      if (activeFilterTab === 'vigentes' && estado !== 'vigente') return false;
-      if (activeFilterTab === 'por_renovar' && estado !== 'por_renovar') return false;
-      if (activeFilterTab === 'finalizados' && estado !== 'finalizado') return false;
-      if (activeFilterTab === 'sin_plan' && estado !== 'sin_plan') return false;
+  // 3. Filtrado por Búsqueda y Pestañas
+  const pacientesFiltrados = useMemo(() => {
+    return pacientes.filter(p => {
+      // Filtro de texto (nombre, rut o teléfono)
+      const term = busqueda.toLowerCase().trim();
+      const matchText = 
+        (p.nombre_completo && p.nombre_completo.toLowerCase().includes(term)) ||
+        (p.rut && p.rut.toLowerCase().includes(term)) ||
+        (p.telefono && p.telefono.includes(term));
 
-      // Buscador
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase().trim();
-      const rutClean = p.rut ? p.rut.replace(/[^0-9kK]/g, '') : '';
-      return (
-        p.nombre_completo.toLowerCase().includes(q) ||
-        (q.replace(/[^0-9kK]/g, '').length >= 2 && rutClean.includes(q.replace(/[^0-9kK]/g, ''))) ||
-        (p.telefono && p.telefono.includes(q))
-      );
+      if (!matchText) return false;
+
+      // Filtro de pestañas
+      if (filtroTab === 'vigentes') return p.estado_plan === 'vigente';
+      if (filtroTab === 'renovar') return p.estado_plan === 'por_renovar';
+      if (filtroTab === 'finalizados') return p.estado_plan === 'finalizado';
+      return true; // 'todos'
     });
-  }, [pacientes, activeFilterTab, searchQuery]);
+  }, [pacientes, busqueda, filtroTab]);
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
-      <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 space-y-6">
+    <div className="min-h-screen bg-slate-50/50 pb-16">
+      
+      {/* Header Clínico Superior */}
+      <header className="bg-white border-b border-slate-200/80 sticky top-0 z-20 backdrop-blur-md bg-white/90">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <span className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">K</span>
+              <span className="font-bold text-slate-900 text-lg tracking-tight">KIROMOV <span className="text-blue-600 font-normal text-sm">Core</span></span>
+            </div>
+
+            <nav className="hidden md:flex items-center gap-1">
+              <Link href="/pacientes" className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-50 text-blue-700">Pacientes</Link>
+              <Link href="/agenda" className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">Agenda</Link>
+              <Link href="/finanzas" className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">Finanzas & Caja</Link>
+              <Link href="/planes" className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">Tarifas & Planes</Link>
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-right hidden sm:block">
+              <p className="text-xs font-bold text-slate-900 leading-none">Klgo. Ignacio Cuevas</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Director Clínico</p>
+            </div>
+            <button 
+              onClick={async () => {
+                if (supabase) {
+                  await supabase.auth.signOut();
+                }
+                window.location.href = '/login';
+              }}
+              className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 text-xs font-medium transition-colors"
+              title="Cerrar Sesión"
+            >
+              Salir
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Contenedor Principal */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
         
-        {/* Encabezado y Acciones */}
+        {/* Título y Acciones Globales */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Directorio de Pacientes</h1>
-            <p className="text-slate-500 mt-1">Gestión integral de pacientes y planes de tratamiento</p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Directorio Clínico y Pacientes</h1>
+            <p className="text-sm text-slate-500 mt-1">Control de tratamientos activos, saldos de sesiones y fichas clínicas.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button 
-              onClick={() => {
-                setPatientTargetSale(null);
-                setIsSaleModalOpen(true);
-              }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs"
+
+          <div className="flex items-center gap-2.5">
+            <button 
+              onClick={() => cargarPacientes()}
+              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors shadow-sm"
             >
-              <ShoppingCart className="w-4 h-4 mr-2" />
-              Vender Plan
-            </Button>
-            <Button 
-              onClick={() => {
-                setPatientToEdit(null);
-                setIsPatientModalOpen(true);
-              }}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs"
+              ⟳ Actualizar
+            </button>
+            <Link 
+              href="/agenda" 
+              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors shadow-sm"
             >
-              <UserPlus className="w-4 h-4 mr-2" />
-              Nuevo Paciente
-            </Button>
+              + Registrar Venta
+            </Link>
+            <button 
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
+            >
+              + Nuevo Paciente
+            </button>
           </div>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+        {/* Tarjetas KPI Superiores */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
             <div>
-              <span className="text-sm font-semibold text-slate-500 block">Atenciones Hoy</span>
-              <span className="text-3xl font-extrabold text-slate-900">{atencionesHoy}</span>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Planes Vigentes</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-1">{kpis.vigentes}</p>
+              <p className="text-xs text-slate-400 mt-0.5">En tratamiento activo</p>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center border border-slate-100">
-              <Activity className="h-6 w-6" />
+            <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">
+              ✓
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
             <div>
-              <span className="text-sm font-semibold text-slate-500 block">Planes Vigentes</span>
-              <span className="text-3xl font-extrabold text-emerald-600">{vigentesCount}</span>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Por Renovar</p>
+              <p className="text-2xl font-bold text-amber-600 mt-1">{kpis.porRenovar}</p>
+              <p className="text-xs text-slate-400 mt-0.5">1 sesión restante</p>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <PackageCheck className="h-6 w-6" />
+            <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-lg">
+              ⚠️
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
             <div>
-              <span className="text-sm font-semibold text-slate-500 block">Por Renovar (1 ses. restante)</span>
-              <span className="text-3xl font-extrabold text-amber-600">{porRenovarCount}</span>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Pacientes</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{kpis.total}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{kpis.finalizados} planes finalizados</p>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <AlertTriangle className="h-6 w-6" />
+            <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-lg">
+              👥
             </div>
           </div>
         </div>
 
-        {/* Filtros y Buscador */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex flex-nowrap overflow-x-auto gap-1 w-full md:w-auto p-1 bg-slate-100/50 rounded-xl">
+        {/* Barra de Filtros y Búsqueda */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-white p-2 rounded-2xl border border-slate-200/80 shadow-sm">
+          {/* Pestañas */}
+          <div className="flex items-center gap-1 overflow-x-auto p-1">
             <button
-              type="button"
-              onClick={() => setActiveFilterTab('todos')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${
-                activeFilterTab === 'todos' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={() => setFiltroTab('todos')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${filtroTab === 'todos' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
             >
-              Todos ({pacientes.length})
+              Todos ({kpis.total})
             </button>
             <button
-              type="button"
-              onClick={() => setActiveFilterTab('vigentes')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${
-                activeFilterTab === 'vigentes' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={() => setFiltroTab('vigentes')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${filtroTab === 'vigentes' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
             >
-              Planes Vigentes ({vigentesCount})
+              Vigentes ({kpis.vigentes})
             </button>
             <button
-              type="button"
-              onClick={() => setActiveFilterTab('por_renovar')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${
-                activeFilterTab === 'por_renovar' ? 'bg-white text-amber-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={() => setFiltroTab('renovar')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${filtroTab === 'renovar' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
             >
-              Por Renovar ({porRenovarCount})
+              Por Renovar ({kpis.porRenovar})
             </button>
             <button
-              type="button"
-              onClick={() => setActiveFilterTab('finalizados')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${
-                activeFilterTab === 'finalizados' ? 'bg-white text-slate-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={() => setFiltroTab('finalizados')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${filtroTab === 'finalizados' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
             >
-              Finalizados ({finalizadosCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveFilterTab('sin_plan')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${
-                activeFilterTab === 'sin_plan' ? 'bg-white text-slate-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Sin Plan ({sinPlanCount})
+              Finalizados ({kpis.finalizados})
             </button>
           </div>
-          
-          <div className="relative w-full md:w-80">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+
+          {/* Buscador */}
+          <div className="relative flex-1 max-w-md px-2">
             <input
               type="text"
-              placeholder="Buscar por nombre, RUT o teléfono..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              placeholder="Buscar por Nombre, RUT o Teléfono..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
+            <svg className="w-4 h-4 text-slate-400 absolute left-5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </div>
         </div>
 
         {/* Tabla de Pacientes */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="px-5 py-4 font-semibold text-slate-500">PACIENTE</th>
-                  <th className="px-5 py-4 font-semibold text-slate-500">RUT / CONTACTO</th>
-                  <th className="px-5 py-4 font-semibold text-slate-500">PREVISIÓN</th>
-                  <th className="px-5 py-4 font-semibold text-slate-500">SALDO DE SESIONES</th>
-                  <th className="px-5 py-4 font-semibold text-slate-500">ESTADO</th>
-                  <th className="px-5 py-4 font-semibold text-slate-500 text-right">ACCIONES</th>
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th className="px-5 py-3.5">Paciente</th>
+                  <th className="px-5 py-3.5">RUT / Contacto</th>
+                  <th className="px-5 py-3.5">Previsión</th>
+                  <th className="px-5 py-3.5">Saldo Sesiones</th>
+                  <th className="px-5 py-3.5">Estado Plan</th>
+                  <th className="px-5 py-3.5 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
                 {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="animate-pulse">
-                      <td className="px-5 py-4"><div className="h-4 bg-slate-100 rounded w-40"></div></td>
-                      <td className="px-5 py-4"><div className="h-4 bg-slate-100 rounded w-24"></div></td>
-                      <td className="px-5 py-4"><div className="h-4 bg-slate-100 rounded w-20"></div></td>
-                      <td className="px-5 py-4"><div className="h-4 bg-slate-100 rounded w-32"></div></td>
-                      <td className="px-5 py-4"><div className="h-4 bg-slate-100 rounded w-24"></div></td>
-                      <td className="px-5 py-4 text-right"><div className="h-8 bg-slate-100 rounded w-32 inline-block"></div></td>
-                    </tr>
-                  ))
-                ) : filteredPacientes.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-12 text-center text-slate-500">
-                      <div className="flex flex-col items-center justify-center">
-                        <UserPlus className="h-10 w-10 text-slate-300 mb-3" />
-                        <p className="text-base font-medium text-slate-600">No se encontraron pacientes</p>
-                        <p className="text-sm">Intenta ajustar tu búsqueda o agregar uno nuevo.</p>
-                      </div>
+                    <td colSpan={6} className="px-5 py-12 text-center text-slate-400">
+                      <div className="inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-2" />
+                      <p>Cargando directorio clínico...</p>
+                    </td>
+                  </tr>
+                ) : pacientesFiltrados.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-12 text-center text-slate-400">
+                      No se encontraron pacientes con los criterios de búsqueda.
                     </td>
                   </tr>
                 ) : (
-                  filteredPacientes.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-5 py-4">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedPatientForDrawer(p);
-                            setIsDrawerOpen(true);
-                          }}
-                          className="text-left font-bold text-slate-900 hover:text-blue-600 transition-colors"
-                        >
-                          {p.nombre_completo}
-                        </button>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex flex-col">
-                          <span className="font-mono text-slate-700">{formatRut(p.rut || '') || '—'}</span>
-                          <span className="font-mono text-slate-500 text-xs">{p.telefono || '—'}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-700">
-                          {p.prevision || 'Particular'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        {p.estado_plan && p.estado_plan !== 'sin_plan' && p.sesiones_totales > 0 ? (
-                          <div className="space-y-1.5">
-                            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
-                              <span>{p.sesiones_usadas ?? 0}/{p.sesiones_totales} ses.</span>
-                              <span className="text-slate-400 font-normal">({p.sesiones_restantes ?? 0} rest.)</span>
+                  pacientesFiltrados.map((p) => {
+                    const tienePlan = p.estado_plan !== 'sin_plan' && p.sesiones_totales > 0;
+                    const pct = tienePlan ? Math.min(100, Math.round((p.sesiones_usadas / p.sesiones_totales) * 100)) : 0;
+
+                    return (
+                      <tr key={p.id} className="hover:bg-slate-50/80 transition-colors group">
+                        
+                        {/* Paciente con Avatar */}
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs flex-shrink-0 border border-slate-200">
+                              {p.nombre_completo ? p.nombre_completo.charAt(0).toUpperCase() : 'P'}
                             </div>
-                            <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-emerald-500 rounded-full transition-all" 
-                                style={{ width: `${Math.min(100, (((p.sesiones_usadas ?? 0) / p.sesiones_totales) * 100))}%` }}
-                              />
+                            <div>
+                              <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                                {p.nombre_completo}
+                              </p>
+                              {p.email && <p className="text-[11px] text-slate-400">{p.email}</p>}
                             </div>
                           </div>
-                        ) : (
-                          <span className="text-slate-400 text-xs italic">Sin plan activo</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex flex-col items-start gap-1">
+                        </td>
+
+                        {/* RUT y WhatsApp */}
+                        <td className="px-5 py-3.5 whitespace-nowrap">
+                          <p className="font-mono text-xs text-slate-700">{p.rut || '—'}</p>
+                          {p.telefono && (
+                            <a
+                              href={`https://wa.me/56${p.telefono.replace(/\D/g, '').slice(-9)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] text-emerald-600 hover:text-emerald-700 font-medium inline-flex items-center gap-1 mt-0.5"
+                            >
+                              <span>💬 {p.telefono}</span>
+                            </a>
+                          )}
+                        </td>
+
+                        {/* Previsión */}
+                        <td className="px-5 py-3.5">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">
+                            {p.prevision || 'Particular'}
+                          </span>
+                        </td>
+
+                        {/* Saldo de Sesiones */}
+                        <td className="px-5 py-3.5">
+                          {tienePlan ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900">
+                                <span>{p.sesiones_usadas}/{p.sesiones_totales} ses.</span>
+                                <span className="text-slate-400 font-normal">({p.sesiones_restantes} rest.)</span>
+                              </div>
+                              <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full transition-all ${
+                                    p.estado_plan === 'por_renovar' ? 'bg-amber-500' : 'bg-emerald-500'
+                                  }`} 
+                                  style={{ width: `${pct}%` }} 
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Sin plan activo</span>
+                          )}
+                        </td>
+
+                        {/* Estado del Plan */}
+                        <td className="px-5 py-3.5 whitespace-nowrap">
                           {p.estado_plan === 'vigente' && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              ● Vigente
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              ● Plan Vigente
                             </span>
                           )}
                           {p.estado_plan === 'por_renovar' && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                              ⚠️ Por Renovar
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                              ⚠️ Por Renovar (1 rest.)
                             </span>
                           )}
                           {p.estado_plan === 'finalizado' && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
                               Finalizado
                             </span>
                           )}
-                          {(!p.estado_plan || p.estado_plan === 'sin_plan') && (
+                          {p.estado_plan === 'sin_plan' && (
                             <span className="text-slate-400 text-xs">—</span>
                           )}
-                          {p.estado_pago === 'pendiente' && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
-                              <AlertTriangle className="w-3 h-3" /> Pago Pendiente
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {p.estado_pago === 'pendiente' ? (
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setPlanToPay({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.monto_clp });
-                                setPatientNameToPay(p.nombre_completo);
-                                setIsPayPlanOpen(true);
-                              }}
-                              className="h-8 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 rounded-lg shadow-2xs"
+                        </td>
+
+                        {/* Acciones Rápidas */}
+                        <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5">
+                            <Link
+                              href={`/agenda?pacienteId=${p.id}`}
+                              className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold transition-colors"
                             >
-                              <CreditCard className="w-3.5 h-3.5 mr-1" />
-                              Cobrar
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setPatientTargetSale(p);
-                                setIsSaleModalOpen(true);
-                              }}
-                              className="h-8 border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold px-3 rounded-lg shadow-2xs"
+                              Agendar
+                            </Link>
+                            <Link
+                              href={`/agenda?pacienteId=${p.id}&ficha=true`}
+                              className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold transition-colors"
                             >
-                              Venta
-                            </Button>
-                          )}
-                          <Link
-                            href={`/agenda?pacienteId=${p.id}`}
-                            className="h-8 inline-flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 rounded-lg transition-colors shadow-2xs"
-                          >
-                            Agendar
-                          </Link>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setSelectedPatientForDrawer(p);
-                              setIsDrawerOpen(true);
-                            }}
-                            className="h-8 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-bold px-3 rounded-lg shadow-2xs"
-                          >
-                            <Stethoscope className="w-3.5 h-3.5 mr-1" />
-                            Ficha →
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                              Ficha →
+                            </Link>
+                          </div>
+                        </td>
+
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
         </div>
+
       </main>
-
-      {/* Patient Create / Edit Modal */}
-      <PatientModal
-        open={isPatientModalOpen}
-        onOpenChange={setIsPatientModalOpen}
-        patientToEdit={patientToEdit}
-        onPatientSaved={() => fetchPacientes(true)}
-      />
-
-      {/* Sale / Billing Modal */}
-      <SaleModal
-        open={isSaleModalOpen}
-        onOpenChange={setIsSaleModalOpen}
-        initialPatient={patientTargetSale}
-        onSaleCompleted={() => fetchPacientes(true)}
-      />
-
-      {/* Pay Plan Modal */}
-      {isPayPlanOpen && planToPay && (
-        <PayPlanModal
-          open={isPayPlanOpen}
-          onOpenChange={setIsPayPlanOpen}
-          onClose={() => {
-            setIsPayPlanOpen(false);
-            setPlanToPay(null);
-          }}
-          plan={planToPay}
-          patientName={patientNameToPay}
-          onSuccess={() => fetchPacientes(true)}
-        />
-      )}
-
-      {/* Patient Clinical Drawer */}
-      <PatientDrawer
-        patient={selectedPatientForDrawer}
-        isOpen={isDrawerOpen}
-        onOpenChange={setIsDrawerOpen}
-        onAttendanceRegistered={() => fetchPacientes(true)}
-      />
     </div>
   );
 }
