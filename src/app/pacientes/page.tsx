@@ -70,6 +70,24 @@ function getPlanCategory(
   return 'sin_plan';
 }
 
+const getPatientPlanInfo = (p: any) => {
+  const totales = Number(p.sesiones_totales ?? p.total_sessions ?? p.sesiones_compradas ?? 0);
+  const usadas = Number(p.sesiones_usadas ?? p.used_sessions ?? 0);
+  const restantes = Number(p.sesiones_restantes ?? p.remaining_sessions ?? Math.max(0, totales - usadas));
+  
+  const estadoRaw = (p.estado_plan || p.plan_status || p.estado || '').toLowerCase();
+  const tienePlanActivo = restantes > 0 || totales > 0 || ['vigente', 'activo', 'por_renovar'].includes(estadoRaw);
+
+  let estadoFinal: 'vigente' | 'por_renovar' | 'finalizado' | 'sin_plan' = 'sin_plan';
+  if (tienePlanActivo) {
+    if (restantes <= 0 && totales > 0) estadoFinal = 'finalizado';
+    else if (restantes === 1) estadoFinal = 'por_renovar';
+    else estadoFinal = 'vigente';
+  }
+
+  return { totales, usadas, restantes, estadoFinal, tienePlanActivo };
+};
+
 export default function PatientsPage() {
   const supabase = createClient();
 
@@ -328,12 +346,10 @@ export default function PatientsPage() {
     let sin = 0;
 
     pacientes.forEach((p) => {
-      const cat = getPlanCategory(p.estado_plan);
-      if (cat === 'vigente') vig++;
-      else if (cat === 'por_renovar') {
-        vig++;
-        ren++;
-      } else if (cat === 'finalizado') fin++;
+      const { estadoFinal } = getPatientPlanInfo(p);
+      if (estadoFinal === 'vigente') vig++;
+      else if (estadoFinal === 'por_renovar') ren++;
+      else if (estadoFinal === 'finalizado') fin++;
       else sin++;
     });
 
@@ -349,15 +365,15 @@ export default function PatientsPage() {
   const filteredPatients = useMemo(() => {
     return pacientes.filter((p) => {
       // 1. Filtro por Pestaña
-      const cat = getPlanCategory(p.estado_plan);
+      const { estadoFinal } = getPatientPlanInfo(p);
       if (activeFilterTab === 'vigentes') {
-        if (cat !== 'vigente' && cat !== 'por_renovar') return false;
+        if (estadoFinal !== 'vigente' && estadoFinal !== 'por_renovar') return false;
       } else if (activeFilterTab === 'por_renovar') {
-        if (cat !== 'por_renovar') return false;
+        if (estadoFinal !== 'por_renovar') return false;
       } else if (activeFilterTab === 'finalizados') {
-        if (cat !== 'finalizado') return false;
+        if (estadoFinal !== 'finalizado') return false;
       } else if (activeFilterTab === 'sin_plan') {
-        if (cat !== 'sin_plan') return false;
+        if (estadoFinal !== 'sin_plan') return false;
       }
 
       // 2. Filtro por Búsqueda (Nombre, RUT, Teléfono)
@@ -659,7 +675,7 @@ export default function PatientsPage() {
                 <TableRow className="bg-slate-50/80 hover:bg-slate-50/80 text-xs">
                   <TableHead className="min-w-[200px]">Paciente</TableHead>
                   <TableHead className="min-w-[130px]">RUT</TableHead>
-                  <TableHead className="min-w-[110px]">Previsión</TableHead>
+<TableHead className="min-w-[110px]">Previsión</TableHead>
                   <TableHead className="min-w-[130px]">Teléfono</TableHead>
                   <TableHead className="min-w-[170px]">Saldo de Sesiones</TableHead>
                   <TableHead className="min-w-[160px]">Estado del Plan</TableHead>
@@ -668,16 +684,8 @@ export default function PatientsPage() {
               </TableHeader>
               <TableBody>
                 {filteredPatients.map((p) => {
-                  const hasPlan =
-                    p.plan_id ||
-                    (p.sesiones_totales && p.sesiones_totales > 0) ||
-                    (p.total_sesiones && p.total_sesiones > 0);
-
-                  const total = p.sesiones_totales || p.total_sesiones || 0;
-                  const used = p.sesiones_usadas ?? p.sesiones_consumidas ?? 0;
-                  const remaining = p.sesiones_restantes ?? Math.max(0, total - used);
-                  const percent = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
-                  const planCat = getPlanCategory(p.estado_plan);
+                  const { totales, usadas, restantes, estadoFinal, tienePlanActivo } = getPatientPlanInfo(p);
+                  const percent = totales > 0 ? Math.min(100, Math.round((usadas / totales) * 100)) : 0;
 
                   return (
                     <TableRow key={p.id} className="hover:bg-slate-50/60 transition-colors text-xs">
@@ -718,56 +726,54 @@ export default function PatientsPage() {
 
                       {/* Saldo de Sesiones */}
                       <TableCell className="min-w-[170px]">
-                        {hasPlan ? (
+                        {(!tienePlanActivo || totales === 0) ? (
+                          <span className="text-slate-400 text-xs italic">Sin plan activo</span>
+                        ) : (
                           <div className="space-y-1">
                             <div className="flex items-center gap-1.5 font-medium text-xs text-slate-700">
                               <span className="font-semibold text-slate-900">
-                                {used}/{total} ses.
+                                {usadas}/{totales} ses.
                               </span>
                               <span className="text-slate-400 font-mono">
-                                ({remaining} rest.)
+                                ({restantes} rest.)
                               </span>
                             </div>
-                            <Progress value={percent} className="h-1.5" />
+                            <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-emerald-500 rounded-full transition-all" 
+                                style={{ width: `${percent}%` }}
+                              />
+                            </div>
                           </div>
-                        ) : (
-                          <span className="text-slate-400 text-xs italic">Sin plan activo</span>
                         )}
                       </TableCell>
 
                       {/* Estado del Plan (Insignias) */}
                       <TableCell className="min-w-[160px]">
                         <div className="space-y-1">
-                          {planCat === 'vigente' && (
+                          {estadoFinal === 'vigente' && (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                               ● Plan Vigente
                             </span>
                           )}
-                          {planCat === 'por_renovar' && (
+                          {estadoFinal === 'por_renovar' && (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                               ⚠️ Por Renovar (1 rest.)
                             </span>
                           )}
-                          {planCat === 'finalizado' && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                          {estadoFinal === 'finalizado' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
                               Finalizado
                             </span>
                           )}
-                          {planCat === 'sin_plan' && (
-                            <span className="text-slate-400 text-xs italic">Sin Plan Activo</span>
+                          {estadoFinal === 'sin_plan' && (
+                            <span className="text-slate-400 text-xs">Sin Plan Activo</span>
                           )}
-
+                          {/* Advertencia de Cobro Pendiente */}
                           {p.has_pending_payment && (
-                            <div>
-                              <button
-                                type="button"
-                                onClick={() => handleOpenPayPlan(p)}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 transition-colors"
-                              >
-                                <AlertCircle className="h-3 w-3 text-amber-600" />
-                                <span>⚠️ Pago Pendiente</span>
-                              </button>
-                            </div>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200 whitespace-nowrap mt-1">
+                              <AlertTriangle className="w-3 h-3" /> Pago Pendiente
+                            </span>
                           )}
                         </div>
                       </TableCell>
