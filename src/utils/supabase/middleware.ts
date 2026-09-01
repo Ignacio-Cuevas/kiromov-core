@@ -78,11 +78,11 @@ export const updateSession = async (request: NextRequest) => {
       return NextResponse.redirect(loginUrl);
     }
 
-    // 2. Si ya está autenticado y va a /login -> redirigir al panel /
-    if (user && pathname === "/login") {
-      const homeUrl = request.nextUrl.clone();
-      homeUrl.pathname = "/";
-      return NextResponse.redirect(homeUrl);
+    // 2. Si ya está autenticado y va a /login -> redirigir a /pacientes
+    if (user && pathname.startsWith("/login")) {
+      const targetUrl = request.nextUrl.clone();
+      targetUrl.pathname = "/pacientes";
+      return NextResponse.redirect(targetUrl);
     }
 
     return supabaseResponse;

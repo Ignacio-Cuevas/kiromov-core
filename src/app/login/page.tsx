@@ -34,17 +34,19 @@ export default function LoginPage() {
         });
 
         if (!error && data?.session) {
-          toast.success('Sesión iniciada correctamente', {
-            description: 'Bienvenido al panel clínico de Kiromov Core.',
-          });
-          router.push('/');
-          router.refresh();
+          toast.success('¡Bienvenido a Kiromov Core!');
+          // Forzar redirección completa con envío de cookies al servidor
+          window.location.href = '/pacientes';
           return;
         }
 
         if (error) {
           console.warn('Supabase Auth error:', error.message);
-          setErrorMsg('Credenciales inválidas. Acceso restringido al equipo clínico.');
+          const msg = error.message === 'Invalid login credentials'
+            ? 'Credenciales incorrectas. Verifica tu email y contraseña.'
+            : error.message;
+          setErrorMsg(msg);
+          toast.error(msg);
           setLoading(false);
           return;
         }
@@ -52,11 +54,11 @@ export default function LoginPage() {
 
       // Fallback para desarrollo local / offline si no hay credenciales de Supabase
       toast.success('Acceso autorizado (Modo Clínico Local)');
-      router.push('/');
-      router.refresh();
+      window.location.href = '/pacientes';
     } catch (err: any) {
       console.error('Error durante inicio de sesión:', err);
-      setErrorMsg('Error de conexión con el servidor de autenticación.');
+      setErrorMsg('Error al conectar con el servicio de autenticación');
+      toast.error('Error al conectar con el servicio de autenticación');
     } finally {
       setLoading(false);
     }
