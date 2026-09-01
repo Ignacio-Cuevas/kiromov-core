@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Patient, Plan, PaymentMethod, PaymentStatus, Sale } from '@/types/clinical';
+import { Patient, Plan, Sale } from '@/types/clinical';
 import { createClient } from '@/utils/supabase/client';
-import { createSale } from '@/actions/sales';
+import { createSale, settlePendingPlan } from '@/actions/sales';
 import { getPlans } from '@/actions/plans';
 import { getPatients } from '@/actions/patients';
 import { formatCLP, formatRut } from '@/lib/utils';
@@ -17,6 +17,8 @@ import {
   Search,
   Loader2,
   FileText,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 
 interface SaleModalProps {
@@ -56,6 +58,10 @@ export function SaleModal({
   const [plans, setPlans] = useState<Plan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
 
+  // Mode: 'new_sale' | 'settle_pending'
+  const [modalMode, setModalMode] = useState<'new_sale' | 'settle_pending'>('new_sale');
+  const [pendingPlan, setPendingPlan] = useState<any | null>(null);
+
   // Form Fields
   const [concept, setConcept] = useState('');
   const [sessionsQuantity, setSessionsQuantity] = useState<number>(4);
@@ -68,9 +74,9 @@ export function SaleModal({
 
   const targetPatientProp = selectedPatient || initialPatient;
 
+  // Cargar pacientes y planes
   useEffect(() => {
     if (isModalOpen) {
-      // 1. Cargar Planes
       getPlans().then((data) => {
         setPlans(data);
         const active = data.filter((p) => p.is_active);
@@ -83,7 +89,6 @@ export function SaleModal({
         }
       });
 
-      // 2. Cargar Pacientes
       getPatients().then((data) => {
         setPatients(data);
       });
@@ -98,12 +103,40 @@ export function SaleModal({
         setPatientSearch('');
       }
 
+      setModalMode('new_sale');
+      setPendingPlan(null);
       setPaymentMethod('transferencia');
       setPaymentStatus('pagado');
       setBoletaNumber('');
       setNotes('');
     }
   }, [isModalOpen, targetPatientProp]);
+
+  // Detectar si el paciente seleccionado tiene un plan con cobro pendiente
+  useEffect(() => {
+    const currentId = selectedPatientId || targetPatientProp?.id;
+    if (!currentId || !supabase) {
+      setPendingPlan(null);
+      return;
+    }
+
+    supabase
+      .from('compras_planes')
+      .select('*')
+      .eq('paciente_id', currentId)
+      .order('fecha_compra', { ascending: false })
+      .then(({ data, error }) => {
+        if (!error && data && data.length > 0) {
+          const foundPending = data.find((p: any) => {
+            const st = (p.estado_pago || '').toLowerCase().trim();
+            return st.includes('pendiente') || st === 'pending' || st === 'unpaid';
+          });
+          setPendingPlan(foundPending || null);
+        } else {
+          setPendingPlan(null);
+        }
+      });
+  }, [selectedPatientId, targetPatientProp, supabase]);
 
   const handleSelectPlan = (planId: string) => {
     setSelectedPlanId(planId);
@@ -167,61 +200,42 @@ export function SaleModal({
     setIsSubmitting(true);
 
     try {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const todayStr = `${year}-${month}-${day}`;
+      // MODO 1: Regularizar / Cobrar Plan Pendiente Existente
+      if (modalMode === 'settle_pending' && pendingPlan?.id) {
+        const settleResult = await settlePendingPlan({
+          plan_id: pendingPlan.id,
+          payment_method: paymentMethod,
+          numero_boleta: cleanBoleta,
+          monto_clp: finalAmount,
+          notes: notes.trim() || pendingPlan.notas || null,
+        });
 
-      const medioPagoDbMap: Record<string, string> = {
-        transferencia: 'Transferencia',
-        tarjeta: 'Débito / Transbank',
-        efectivo: 'Efectivo',
-        convenio: 'Convenio',
-      };
+        if (settleResult.success) {
+          toast.success('¡Cobro registrado con éxito! Plan marcado como pagado.', {
+            description: `${pendingPlan.nombre_plan} — ${formatCLP(finalAmount)}${cleanBoleta ? ` | Boleta N° ${cleanBoleta}` : ''}`,
+            icon: <CheckCircle2 className="h-5 w-5 text-emerald-500" />,
+          });
 
-      const estadoPagoDbMap: Record<string, string> = {
-        pagado: 'Pagado',
-        pendiente: 'Pendiente de Pago',
-        parcial: 'Parcial / Cuotas',
-      };
+          onSuccess?.();
+          onSaleCompleted?.({
+            id: pendingPlan.id,
+            patient_id: patientId,
+            concept: pendingPlan.nombre_plan,
+            sessions_quantity: pendingPlan.total_sesiones,
+            total_amount_clp: finalAmount,
+            payment_method: paymentMethod as any,
+            payment_status: 'paid',
+          });
 
-      // 1. Guardar en Supabase compras_planes
-      if (supabase) {
-        try {
-          const { error: errInsert } = await supabase.from('compras_planes').insert([
-            {
-              paciente_id: patientId,
-              plan_id: selectedPlanId !== 'custom' ? selectedPlanId : null,
-              catalogo_plan_id: selectedPlanId !== 'custom' ? selectedPlanId : null,
-              nombre_plan: planName,
-              sesiones_totales: totalSessions,
-              total_sesiones: totalSessions,
-              sesiones_usadas: 0,
-              monto_clp: finalAmount,
-              monto_total: finalAmount,
-              precio_base: finalAmount,
-              valor_total: finalAmount,
-              total_final_clp: finalAmount,
-              metodo_pago: paymentMethod,
-              medio_pago: medioPagoDbMap[paymentMethod] || 'Transferencia',
-              estado_pago: estadoPagoDbMap[paymentStatus] || 'Pagado',
-              numero_boleta: cleanBoleta,
-              fecha_compra: todayStr,
-              estado: 'activo',
-              notas: notes.trim() || null,
-            },
-          ]);
-
-          if (errInsert) {
-            console.warn('Error en supabase compras_planes insert:', errInsert.message);
-          }
-        } catch (dbErr) {
-          console.warn('Excepción al insertar compras_planes:', dbErr);
+          handleCloseModal();
+          return;
+        } else {
+          toast.error(settleResult.error || 'Error al regularizar el cobro');
+          return;
         }
       }
 
-      // 2. Sincronizar mediante Server Action (sales y patient_plans)
+      // MODO 2: Crear Nueva Venta de Plan
       const actionMethod: 'transfer' | 'card' | 'cash' | 'agreement' =
         paymentMethod === 'tarjeta'
           ? 'card'
@@ -247,26 +261,21 @@ export function SaleModal({
         notes: notes.trim() || null,
       });
 
-      toast.success('¡Venta registrada y sesiones asignadas con éxito!', {
-        description: `${planName} — ${formatCLP(finalAmount)} (${totalSessions} sesiones asignadas)${cleanBoleta ? ` | Boleta N° ${cleanBoleta}` : ''}`,
-        icon: <CheckCircle2 className="h-5 w-5 text-emerald-500" />,
-      });
+      if (actionRes.success && actionRes.data) {
+        toast.success('¡Venta registrada y sesiones asignadas con éxito!', {
+          description: `${planName} — ${formatCLP(finalAmount)} (${totalSessions} sesiones asignadas)${cleanBoleta ? ` | Boleta N° ${cleanBoleta}` : ''}`,
+          icon: <CheckCircle2 className="h-5 w-5 text-emerald-500" />,
+        });
 
-      onSuccess?.();
-      onSaleCompleted?.(actionRes?.data || {
-        id: 'sale-' + Date.now(),
-        patient_id: patientId,
-        concept: planName,
-        sessions_quantity: totalSessions,
-        total_amount_clp: finalAmount,
-        payment_method: actionMethod,
-        payment_status: actionStatus,
-      });
-
-      handleCloseModal();
+        onSuccess?.();
+        onSaleCompleted?.(actionRes.data);
+        handleCloseModal();
+      } else {
+        toast.error(actionRes.error || 'No se pudo registrar la venta en Supabase');
+      }
     } catch (err: any) {
-      console.error('Error al registrar venta:', err);
-      toast.error(err?.message || 'No se pudo registrar la venta');
+      console.error('Error al registrar venta/cobro:', err);
+      toast.error(err?.message || 'Error de conexión al procesar la venta');
     } finally {
       setIsSubmitting(false);
     }
@@ -285,10 +294,14 @@ export function SaleModal({
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-lg leading-tight">
-                Registrar Venta / Cobro de Plan
+                {modalMode === 'settle_pending'
+                  ? 'Registrar Cobro de Plan Adeudado'
+                  : 'Registrar Venta / Cobro de Plan'}
               </h3>
               <p className="text-xs text-slate-500">
-                Asigna saldo de sesiones al paciente y registra el ingreso contable.
+                {modalMode === 'settle_pending'
+                  ? 'Regulariza el pago y asigna número de boleta al plan existente.'
+                  : 'Asigna saldo de sesiones al paciente y registra el ingreso contable.'}
               </p>
             </div>
           </div>
@@ -365,6 +378,44 @@ export function SaleModal({
                   </div>
                 </div>
               )}
+
+              {/* Alerta si el paciente tiene cobro pendiente */}
+              {pendingPlan && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                    <div>
+                      <strong className="text-amber-900 block font-bold">
+                        ⚠️ Cobro Pendiente Detectado:
+                      </strong>
+                      <span className="text-amber-800">
+                        {pendingPlan.nombre_plan} ({formatCLP(pendingPlan.total_final_clp ?? pendingPlan.valor_total ?? pendingPlan.monto_clp ?? 0)})
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (modalMode === 'settle_pending') {
+                        setModalMode('new_sale');
+                      } else {
+                        setModalMode('settle_pending');
+                        setConcept(pendingPlan.nombre_plan);
+                        setSessionsQuantity(pendingPlan.total_sesiones || pendingPlan.sesiones_totales || 4);
+                        setTotalAmountCLP(pendingPlan.total_final_clp ?? pendingPlan.valor_total ?? pendingPlan.monto_clp ?? 0);
+                        setBoletaNumber(pendingPlan.numero_boleta || '');
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      modalMode === 'settle_pending'
+                        ? 'bg-slate-800 text-white'
+                        : 'bg-amber-600 hover:bg-amber-700 text-white shadow-2xs'
+                    }`}
+                  >
+                    {modalMode === 'settle_pending' ? 'Cambiar a Nueva Venta' : 'Regularizar Pago'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Sección 2: Plan y Precio */}
@@ -375,23 +426,25 @@ export function SaleModal({
               </span>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1 sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Seleccionar Tarifa del Catálogo
-                  </label>
-                  <select
-                    value={selectedPlanId}
-                    onChange={(e) => handleSelectPlan(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 p-2.5 text-sm bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none font-medium"
-                  >
-                    {plans.map((pl) => (
-                      <option key={pl.id} value={pl.id}>
-                        {pl.name} — {formatCLP(pl.price_clp)} ({pl.sessions_count} ses.)
-                      </option>
-                    ))}
-                    <option value="custom">✏️ Plan Personalizado / Ajuste Manual</option>
-                  </select>
-                </div>
+                {modalMode !== 'settle_pending' && (
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Seleccionar Tarifa del Catálogo
+                    </label>
+                    <select
+                      value={selectedPlanId}
+                      onChange={(e) => handleSelectPlan(e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 p-2.5 text-sm bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                    >
+                      {plans.map((pl) => (
+                        <option key={pl.id} value={pl.id}>
+                          {pl.name} — {formatCLP(pl.price_clp)} ({pl.sessions_count} ses.)
+                        </option>
+                      ))}
+                      <option value="custom">✏️ Plan Personalizado / Ajuste Manual</option>
+                    </select>
+                  </div>
+                )}
 
                 <div className="space-y-1 sm:col-span-2">
                   <label className="block text-xs font-semibold text-slate-700">
@@ -443,7 +496,7 @@ export function SaleModal({
               </div>
             </div>
 
-            {/* Sección 3: MEDIO Y ESTADO DE PAGO (Completamente visible) */}
+            {/* Sección 3: MEDIO Y ESTADO DE PAGO */}
             <div className="space-y-4 pt-2 border-t border-slate-100">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                 <CreditCard className="h-3.5 w-3.5 text-purple-600" />
@@ -514,7 +567,7 @@ export function SaleModal({
             </div>
           </div>
 
-          {/* Footer Fijo con Botón Submit Funcional */}
+          {/* Footer Fijo con Botón Submit */}
           <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50 sticky bottom-0 z-10">
             <button
               type="button"
@@ -533,12 +586,16 @@ export function SaleModal({
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Guardando Venta...</span>
+                  <span>Procesando...</span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="h-4 w-4" />
-                  <span>Confirmar y Asignar Sesiones</span>
+                  <span>
+                    {modalMode === 'settle_pending'
+                      ? 'Confirmar Cobro de Plan'
+                      : 'Confirmar y Asignar Sesiones'}
+                  </span>
                 </>
               )}
             </button>
