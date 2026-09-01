@@ -15,6 +15,7 @@ import { SoapEvolutionForm } from "./SoapEvolutionForm";
 import { AttendanceHistoryTab } from "./AttendanceHistoryTab";
 import { PlansHistoryTab } from "./PlansHistoryTab";
 import { RenewPlanDialog } from "./RenewPlanDialog";
+import { PayPlanModal } from "./PayPlanModal";
 import { ClinicalCertificateDialog } from "./ClinicalCertificateDialog";
 import { EditPatientDialog } from "./EditPatientDialog";
 import {
@@ -31,7 +32,7 @@ import {
   fetchEvolucionesByPaciente,
   registrarAsistenciaHoy,
 } from "@/lib/supabase";
-import { formatRut, getWhatsAppUrl } from "@/lib/utils";
+import { formatRut, formatCLP, getWhatsAppUrl } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   MessageCircle,
@@ -47,6 +48,8 @@ import {
   Edit2,
   Receipt,
   AlertTriangle,
+  AlertCircle,
+  CreditCard,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
@@ -100,6 +103,8 @@ export function PatientDrawer({
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [isRegisteringAttendance, setIsRegisteringAttendance] = useState(false);
   const [isRenewPlanOpen, setIsRenewPlanOpen] = useState(false);
+  const [isPayPlanOpen, setIsPayPlanOpen] = useState(false);
+  const [selectedPlanToPay, setSelectedPlanToPay] = useState<CompraPlan | null>(null);
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   const [selectedBoletaForCert, setSelectedBoletaForCert] = useState<string | null>(null);
   const [isEditPatientOpen, setIsEditPatientOpen] = useState(false);
@@ -183,6 +188,7 @@ export function PatientDrawer({
     progressPercent,
     computedEstadoPlan,
     activePlan,
+    isActivePlanPendingPayment,
   } = useMemo(() => {
     // Total de sesiones asistidas/completadas contabilizadas en citas_atenciones
     const countAttended = citasPrevias.filter((c) => isAttendedStatus(c.estado)).length;
@@ -194,6 +200,7 @@ export function PatientDrawer({
     }
 
     const firstActivePlan = planes.find((p) => p.estado === "activo") || planes[0] || null;
+    const isPending = (firstActivePlan?.estado_pago || "").toLowerCase().includes("pendiente") || (firstActivePlan?.estado_pago || "").toLowerCase() === "pending";
 
     const finalTotal = totalPurchased > 0 ? totalPurchased : countAttended > 0 ? countAttended : 0;
     const remaining = Math.max(0, finalTotal - countAttended);
@@ -217,6 +224,7 @@ export function PatientDrawer({
       progressPercent: percent,
       computedEstadoPlan: estadoPlan,
       activePlan: firstActivePlan,
+      isActivePlanPendingPayment: isPending,
     };
   }, [citasPrevias, planes, currentPatient?.total_sesiones]);
 
@@ -386,9 +394,9 @@ export function PatientDrawer({
               </div>
             )}
 
-            {/* Tarjeta de Consumo de Sesiones Real */}
-            <div className="mt-2 rounded-2xl bg-white p-3.5 border border-slate-200 shadow-xs space-y-2">
-              <div className="flex items-center justify-between text-xs font-medium">
+            {/* Tarjeta de Consumo de Sesiones Real y Estado de Pago */}
+            <div className="mt-2 rounded-2xl bg-white p-3.5 border border-slate-200 shadow-xs space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-medium">
                 <div className="flex items-center gap-2">
                   <span className="text-slate-600">
                     Consumo de Sesiones:{" "}
@@ -423,7 +431,31 @@ export function PatientDrawer({
                   </button>
                 </div>
               </div>
+
               <Progress value={progressPercent} />
+
+              {/* Si el plan activo tiene pago pendiente, mostrar aviso destacado */}
+              {isActivePlanPendingPayment && activePlan && (
+                <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-200 p-2.5 rounded-xl text-xs">
+                  <div className="flex items-center gap-1.5 text-amber-900 font-bold">
+                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>
+                      ⚠️ Pago Pendiente ({formatCLP(activePlan.total_final_clp ?? activePlan.valor_total ?? activePlan.monto_clp ?? 0)})
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setSelectedPlanToPay(activePlan);
+                      setIsPayPlanOpen(true);
+                    }}
+                    className="h-7 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs gap-1 rounded-lg shadow-2xs"
+                  >
+                    <CreditCard className="h-3.5 w-3.5" />
+                    <span>Pagar</span>
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Botón de Acción Rápida: Registrar Asistencia Hoy */}
@@ -519,10 +551,15 @@ export function PatientDrawer({
               <PlansHistoryTab
                 planes={planes}
                 isLoading={loadingHistory}
+                sesionesConsumidas={sesionesConsumidas}
                 onOpenRenewModal={() => setIsRenewPlanOpen(true)}
                 onEmitCertificate={(plan) => {
                   setSelectedBoletaForCert(plan?.numero_boleta || null);
                   setIsCertificateOpen(true);
+                }}
+                onPayPlan={(plan) => {
+                  setSelectedPlanToPay(plan);
+                  setIsPayPlanOpen(true);
                 }}
               />
             </TabsContent>
@@ -538,6 +575,23 @@ export function PatientDrawer({
           open={isRenewPlanOpen}
           onOpenChange={setIsRenewPlanOpen}
           onPlanPurchased={handlePlanPurchased}
+        />
+      )}
+
+      {isPayPlanOpen && selectedPlanToPay && (
+        <PayPlanModal
+          open={isPayPlanOpen}
+          onOpenChange={setIsPayPlanOpen}
+          onClose={() => {
+            setIsPayPlanOpen(false);
+            setSelectedPlanToPay(null);
+          }}
+          plan={selectedPlanToPay}
+          patientName={currentPatient.nombre_completo || currentPatient.full_name}
+          onSuccess={() => {
+            loadPatientData();
+            onAttendanceRegistered?.(currentPatient.id);
+          }}
         />
       )}
 

@@ -26,9 +26,14 @@ export interface Patient {
   // Campos calculados y adicionales
   codigo_paciente?: string;
   nombre_completo?: string; // alias compatible
+  telefono?: string | null;
+  fecha_nacimiento?: string | null;
+  prevision_salud?: string | null;
+  diagnostico_principal?: string | null;
   total_sessions?: number;
   used_sessions?: number;
   remaining_sessions?: number;
+  has_pending_payment?: boolean;
   last_attention_date?: string | null;
 }
 

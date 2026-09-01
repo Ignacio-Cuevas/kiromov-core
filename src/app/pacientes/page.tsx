@@ -1,56 +1,56 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { Header } from '@/components/dashboard/Header';
 import { PatientModal } from '@/components/patients/PatientModal';
 import { SaleModal } from '@/components/sales/SaleModal';
-import { Patient, Sale } from '@/types/clinical';
+import { PatientDrawer } from '@/components/patients/PatientDrawer';
+import { Patient } from '@/types/clinical';
 import { getPatients } from '@/actions/patients';
-import { formatRut, formatCLP, formatDateChile } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { formatRut } from '@/lib/utils';
 import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from '@/components/ui/table';
-import { toast } from 'sonner';
-import {
-  Users,
   UserPlus,
   Search,
   ShoppingCart,
-  Calendar,
-  Phone,
-  Mail,
+  CalendarDays,
   Edit2,
   RefreshCw,
+  Phone,
+  Mail,
   FolderOpen,
-  CalendarDays,
-  ShieldCheck,
-  Tag,
-  CheckCircle2,
-  ArrowRight,
   LayoutGrid,
   List,
+  AlertCircle,
+  Stethoscope,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { toast } from 'sonner';
+import Link from 'next/link';
 
-export default function PacientesPage() {
+export default function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
-  // Modals
+  // Modals state
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
   const [patientToEdit, setPatientToEdit] = useState<Patient | null>(null);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
   const [patientTargetSale, setPatientTargetSale] = useState<Patient | null>(null);
+  const [selectedPatientForDrawer, setSelectedPatientForDrawer] = useState<Patient | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const loadData = useCallback(async (showToast = false) => {
     try {
@@ -83,6 +83,11 @@ export default function PacientesPage() {
   const handleOpenSale = (p: Patient) => {
     setPatientTargetSale(p);
     setIsSaleModalOpen(true);
+  };
+
+  const handleOpenDrawer = (p: Patient) => {
+    setSelectedPatientForDrawer(p);
+    setIsDrawerOpen(true);
   };
 
   const handlePatientSaved = () => {
@@ -148,15 +153,14 @@ export default function PacientesPage() {
               disabled={isRefreshing}
               className="gap-2 bg-white text-slate-700 hover:bg-slate-50 border-slate-200"
             >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`}
-              />
-              <span>Actualizar</span>
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Actualizar</span>
             </Button>
 
             <Button
+              size="sm"
               onClick={handleOpenCreate}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2 shadow-xs"
+              className="gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs rounded-xl"
             >
               <UserPlus className="h-4 w-4" />
               <span>+ Nuevo Paciente</span>
@@ -164,29 +168,22 @@ export default function PacientesPage() {
           </div>
         </div>
 
-        {/* Search & Filter Bar */}
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por Nombre, RUT o Teléfono..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-            />
-          </div>
-
-          <div className="text-xs text-slate-500 font-medium">
-            Mostrando <strong className="text-slate-800">{patients.length}</strong> pacientes encontrados
-          </div>
+        {/* Search Bar */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input
+            placeholder="Buscar por nombre, RUT (+569)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 h-10 bg-white border-slate-200 rounded-xl text-sm shadow-2xs"
+          />
         </div>
 
-        {/* Patients Content */}
+        {/* Content Body */}
         {isLoading ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
-            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-t-transparent mb-3" />
-            <p className="text-sm font-semibold text-slate-700">Cargando directorio de pacientes...</p>
+          <div className="py-20 text-center text-slate-400">
+            <RefreshCw className="mx-auto h-8 w-8 animate-spin text-blue-600 mb-2" />
+            <p className="text-sm font-semibold">Cargando directorio de pacientes...</p>
           </div>
         ) : patients.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-xs space-y-3">
@@ -199,14 +196,14 @@ export default function PacientesPage() {
                 Registra el primer paciente con el botón superior para comenzar.
               </p>
             </div>
-            <Button onClick={handleOpenCreate} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold">
+            <Button onClick={handleOpenCreate} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl">
               <UserPlus className="h-4 w-4" />
               <span>Registrar Paciente</span>
             </Button>
           </div>
         ) : viewMode === 'table' ? (
           /* Table View with responsive overflow protection */
-          <div className="w-full overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-xs">
             <Table className="w-full">
               <TableHeader>
                 <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
@@ -214,8 +211,8 @@ export default function PacientesPage() {
                   <TableHead className="min-w-[130px]">RUT</TableHead>
                   <TableHead className="min-w-[110px]">Previsión</TableHead>
                   <TableHead className="min-w-[140px]">Teléfono</TableHead>
-                  <TableHead className="min-w-[160px]">Saldo Sesiones</TableHead>
-                  <TableHead className="text-right min-w-[220px]">Acciones Rápidas</TableHead>
+                  <TableHead className="min-w-[170px]">Saldo Sesiones</TableHead>
+                  <TableHead className="text-right min-w-[260px]">Acciones Rápidas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -229,8 +226,12 @@ export default function PacientesPage() {
                     <TableRow key={p.id} className="hover:bg-slate-50/60 transition-colors">
                       {/* Paciente */}
                       <TableCell className="font-medium text-slate-900 min-w-[180px]">
-                        <div>
-                          <strong className="block text-sm font-bold text-slate-900 leading-snug">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDrawer(p)}
+                          className="text-left hover:text-blue-600 transition-colors group"
+                        >
+                          <strong className="block text-sm font-bold text-slate-900 group-hover:text-blue-600 leading-snug">
                             {p.full_name}
                           </strong>
                           {p.medical_notes && (
@@ -238,7 +239,7 @@ export default function PacientesPage() {
                               {p.medical_notes}
                             </span>
                           )}
-                        </div>
+                        </button>
                       </TableCell>
 
                       {/* RUT sin corte de línea */}
@@ -259,43 +260,59 @@ export default function PacientesPage() {
                       </TableCell>
 
                       {/* Saldo Sesiones */}
-                      <TableCell className="min-w-[160px]">
-                        <div className="space-y-1 pr-2">
+                      <TableCell className="min-w-[170px]">
+                        <div className="space-y-1.5 pr-2">
                           <div className="flex items-center justify-between text-xs whitespace-nowrap">
-                            <span className="font-semibold text-slate-600">
+                            <span className="font-bold text-slate-800">
                               {used} / {total} ses.
                             </span>
                             <span
-                              className={`font-bold ${
-                                remaining <= 1 ? 'text-amber-600' : 'text-emerald-700'
+                              className={`font-extrabold ${
+                                remaining <= 1 ? 'text-amber-600' : 'text-blue-700'
                               }`}
                             >
                               {remaining} rest.
                             </span>
                           </div>
                           <Progress value={percent} className="h-1.5" />
+                          {p.has_pending_payment && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">
+                              <AlertCircle className="h-3 w-3 text-amber-600" />
+                              Pago Pendiente
+                            </span>
+                          )}
                         </div>
                       </TableCell>
 
                       {/* Acciones */}
-                      <TableCell className="text-right min-w-[220px]">
+                      <TableCell className="text-right min-w-[260px]">
                         <div className="flex items-center justify-end gap-1.5 flex-nowrap shrink-0">
+                          <Button
+                            size="sm"
+                            onClick={() => handleOpenDrawer(p)}
+                            className="h-8 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200 font-semibold text-xs gap-1 rounded-xl shadow-2xs shrink-0"
+                            title="Abrir ficha clínica del paciente"
+                          >
+                            <Stethoscope className="h-3.5 w-3.5 shrink-0" />
+                            <span>Ficha</span>
+                          </Button>
+
                           <Button
                             size="sm"
                             onClick={() => handleOpenSale(p)}
                             className="h-8 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 font-semibold text-xs gap-1 rounded-xl shadow-2xs shrink-0"
                             title="Vender o asignar sesiones"
                           >
-                            <ShoppingCart className="h-3 w-3 shrink-0" />
+                            <ShoppingCart className="h-3.5 w-3.5 shrink-0" />
                             <span>Venta</span>
                           </Button>
 
                           <Link
                             href={`/agenda?pacienteId=${p.id}`}
-                            className="h-8 px-2.5 inline-flex items-center justify-center bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 font-semibold text-xs gap-1 rounded-xl transition-colors shadow-2xs shrink-0"
+                            className="h-8 px-2.5 inline-flex items-center justify-center bg-slate-100 hover:bg-slate-800 text-slate-700 hover:text-white border border-slate-200 font-semibold text-xs gap-1 rounded-xl transition-colors shadow-2xs shrink-0"
                             title="Agendar cita"
                           >
-                            <CalendarDays className="h-3 w-3 shrink-0" />
+                            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
                             <span>Agendar</span>
                           </Link>
 
@@ -335,9 +352,15 @@ export default function PacientesPage() {
                     {/* Header: Name and Prevision */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h3 className="text-base font-bold text-slate-900 leading-snug truncate">
-                          {p.full_name}
-                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDrawer(p)}
+                          className="text-left hover:text-blue-600 transition-colors"
+                        >
+                          <h3 className="text-base font-bold text-slate-900 leading-snug truncate hover:text-blue-600">
+                            {p.full_name}
+                          </h3>
+                        </button>
                         <span className="text-xs font-mono text-slate-500 whitespace-nowrap block mt-0.5">
                           RUT: {formatRut(p.rut)}
                         </span>
@@ -374,31 +397,47 @@ export default function PacientesPage() {
                     )}
 
                     {/* Session Balance Card */}
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-semibold text-slate-600">Saldo de Sesiones:</span>
                         <span
                           className={`font-bold ${
-                            remaining <= 1 ? 'text-amber-600' : 'text-emerald-700'
+                            remaining <= 1 ? 'text-amber-600' : 'text-blue-700'
                           }`}
                         >
                           {remaining} disponibles
                         </span>
                       </div>
                       <Progress value={percent} className="h-2" />
-                      <div className="flex items-center justify-between text-[11px] text-slate-400">
-                        <span>Realizadas: {used}</span>
-                        <span>Total: {total}</span>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500">
+                        <span>Realizadas: <strong>{used}</strong></span>
+                        <span>Total: <strong>{total}</strong></span>
                       </div>
+                      {p.has_pending_payment && (
+                        <div className="pt-1 flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100/70 border border-amber-200 px-2 py-0.5 rounded-md">
+                          <AlertCircle className="h-3 w-3 text-amber-600" />
+                          <span>⚠️ Pago Pendiente</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="pt-3 border-t border-slate-100 grid grid-cols-3 gap-2">
+                  {/* Actions Buttons */}
+                  <div className="grid grid-cols-4 gap-1.5 pt-3 border-t border-slate-100">
+                    <Button
+                      size="sm"
+                      onClick={() => handleOpenDrawer(p)}
+                      className="bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 font-bold text-xs gap-1 rounded-xl shadow-2xs"
+                      title="Abrir ficha clínica"
+                    >
+                      <Stethoscope className="h-3.5 w-3.5" />
+                      <span>Ficha</span>
+                    </Button>
+
                     <Button
                       size="sm"
                       onClick={() => handleOpenSale(p)}
-                      className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1 rounded-xl shadow-2xs"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1 rounded-xl shadow-2xs"
                       title="Vender o asignar sesiones a este paciente"
                     >
                       <ShoppingCart className="h-3.5 w-3.5" />
@@ -407,11 +446,11 @@ export default function PacientesPage() {
 
                     <Link
                       href={`/agenda?pacienteId=${p.id}`}
-                      className="h-8 inline-flex items-center justify-center bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 font-bold text-xs gap-1 rounded-xl transition-colors shadow-2xs"
+                      className="h-8 inline-flex items-center justify-center bg-slate-100 hover:bg-slate-800 text-slate-700 hover:text-white border border-slate-200 font-bold text-xs gap-1 rounded-xl transition-colors shadow-2xs"
                       title="Agendar cita en el calendario"
                     >
                       <CalendarDays className="h-3.5 w-3.5" />
-                      <span>Agendar</span>
+                      <span>Agenda</span>
                     </Link>
 
                     <Button
@@ -446,6 +485,14 @@ export default function PacientesPage() {
         onOpenChange={setIsSaleModalOpen}
         initialPatient={patientTargetSale}
         onSaleCompleted={handleSaleCompleted}
+      />
+
+      {/* Patient Clinical Drawer */}
+      <PatientDrawer
+        patient={selectedPatientForDrawer}
+        isOpen={isDrawerOpen}
+        onOpenChange={setIsDrawerOpen}
+        onAttendanceRegistered={() => loadData()}
       />
     </div>
   );
