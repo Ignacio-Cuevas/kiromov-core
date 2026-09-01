@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, Suspense } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Header } from '@/components/dashboard/Header';
 import { formatRut } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -27,20 +26,20 @@ import {
   Edit2,
   Trash2,
   CheckCircle2,
-  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   MessageCircle,
   Stethoscope,
   Search,
   Loader2,
-  X,
+  CalendarDays,
+  RefreshCw,
 } from 'lucide-react';
 
 type VistaAgenda = 'dia' | 'semana' | 'mes';
 
-// Helper para obtener fecha local en formato YYYY-MM-DD sin desfase UTC
-function toLocalDateString(d: Date): string {
+// Helper exacto para obtener fecha local en formato YYYY-MM-DD sin desfase UTC
+function getFormattedLocalDate(d: Date): string {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -53,10 +52,11 @@ function AgendaContent() {
   const initialPacienteIdParam = searchParams.get('pacienteId');
 
   const [vista, setVista] = useState<VistaAgenda>('dia');
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [citas, setCitas] = useState<any[]>([]);
   const [pacientes, setPacientes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Control de WhatsApp Menu abierto
   const [openWhatsappId, setOpenWhatsappId] = useState<string | null>(null);
@@ -69,7 +69,7 @@ function AgendaContent() {
   const [showNewCitaModal, setShowNewCitaModal] = useState(false);
   const [pacienteId, setPacienteId] = useState('');
   const [pacienteSearch, setPacienteSearch] = useState('');
-  const [fechaCita, setFechaCita] = useState(toLocalDateString(new Date()));
+  const [fechaCita, setFechaCita] = useState(getFormattedLocalDate(new Date()));
   const [horaCita, setHoraCita] = useState('09:00');
   const [profesional, setProfesional] = useState('Klgo. Ignacio Cuevas');
   const [motivo, setMotivo] = useState('Sesión de Tratamiento Kinésico');
@@ -87,32 +87,21 @@ function AgendaContent() {
   const [deletingCita, setDeletingCita] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 1. Cargar Citas y Pacientes
-  async function loadAgenda() {
-    setLoading(true);
-    let citasDataList: any[] = [];
-    let pDataList: any[] = [];
+  // 1. Cargar Citas y Pacientes de forma robusta
+  const loadAgenda = useCallback(async (showToast = false) => {
+    try {
+      if (showToast) setIsRefreshing(true);
+      else setLoading(true);
 
-    const y = currentDate.getFullYear();
-    const m = currentDate.getMonth();
-    const startDate = toLocalDateString(new Date(y, m - 1, 1));
-    const endDate = toLocalDateString(new Date(y, m + 2, 0));
+      let pDataList: any[] = [];
+      let citasDataList: any[] = [];
 
-    if (supabase) {
-      try {
-        // Cargar citas con relación exacta a pacientes
-        const { data: citasData, error: errCitas } = await supabase
-          .from('citas_atenciones')
-          .select(`
-            id,
-            paciente_id,
-            fecha,
-            hora,
-            profesional,
-            estado,
-            motivo_consulta,
-            google_event_id,
-            pacientes:paciente_id (
+      if (supabase) {
+        // A. Cargar Pacientes para indexar por ID
+        try {
+          const { data: pData } = await supabase
+            .from('pacientes')
+            .select(`
               id,
               nombre_completo,
               rut,
@@ -122,37 +111,94 @@ function AgendaContent() {
               prevision_salud,
               diagnostico_principal,
               diagnostico_medico
-            )
-          `)
-          .gte('fecha', startDate)
-          .lte('fecha', endDate)
-          .order('hora', { ascending: true });
+            `)
+            .order('nombre_completo', { ascending: true });
 
-        // Cargar lista de pacientes
-        const { data: pData } = await supabase
-          .from('pacientes')
-          .select('*')
-          .order('nombre_completo', { ascending: true });
+          if (pData && pData.length > 0) {
+            pDataList = pData;
+          }
+        } catch (e) {
+          console.warn('Error al cargar pacientes:', e);
+        }
 
-        if (!errCitas && citasData) {
-          citasDataList = citasData;
+        const pacientesMap = new Map(pDataList.map((p) => [p.id, p]));
+
+        // B. Consultar citas_atenciones con join resiliente
+        try {
+          let { data: citasData, error: errCitas } = await supabase
+            .from('citas_atenciones')
+            .select(`
+              id,
+              paciente_id,
+              fecha,
+              hora,
+              profesional,
+              estado,
+              motivo_consulta,
+              google_event_id,
+              paciente:pacientes (
+                id,
+                nombre_completo,
+                rut,
+                telefono,
+                email,
+                prevision
+              )
+            `)
+            .order('hora', { ascending: true });
+
+          // Si el join con alias 'paciente' arroja error de foreign key cache, reintentar directo
+          if (errCitas || !citasData) {
+            const { data: rawCitas, error: rawErr } = await supabase
+              .from('citas_atenciones')
+              .select('*')
+              .order('hora', { ascending: true });
+
+            if (!rawErr && rawCitas) {
+              citasData = rawCitas;
+            }
+          }
+
+          if (citasData) {
+            // Mapear asegurando que 'paciente' y 'pacientes' siempre estén disponibles
+            citasDataList = citasData.map((c: any) => {
+              const pac =
+                c.paciente ||
+                c.pacientes ||
+                pacientesMap.get(c.paciente_id) || {
+                  id: c.paciente_id,
+                  nombre_completo: 'Paciente Clínico',
+                  rut: '',
+                };
+
+              return {
+                ...c,
+                paciente: pac,
+                pacientes: pac,
+              };
+            });
+          }
+        } catch (err) {
+          console.error('Error al cargar citas de la agenda:', err);
         }
-        if (pData) {
-          pDataList = pData;
-        }
-      } catch (err) {
-        console.warn('Supabase agenda load error:', err);
       }
+
+      setPacientes(pDataList);
+      setCitas(citasDataList);
+      if (showToast) toast.success('Agenda actualizada con éxito');
+    } catch (err) {
+      console.error('Error general en loadAgenda:', err);
+      toast.error('Error al conectar con la base de datos de agenda');
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
     }
+  }, [supabase]);
 
-    setCitas(citasDataList);
-    setPacientes(pDataList);
-    setLoading(false);
-  }
-
+  // Ejecutar carga al montar o cambiar de fecha
   useEffect(() => {
     loadAgenda();
-  }, [currentDate.getMonth(), currentDate.getFullYear()]);
+  }, [loadAgenda, selectedDate]);
 
   // Si viene con pacienteId en query params, pre-abrir modal
   useEffect(() => {
@@ -160,30 +206,35 @@ function AgendaContent() {
       setPacienteId(initialPacienteIdParam);
       const found = pacientes.find((p) => p.id === initialPacienteIdParam);
       if (found) setPacienteSearch(found.nombre_completo);
-      setFechaCita(toLocalDateString(currentDate));
+      setFechaCita(getFormattedLocalDate(selectedDate));
       setShowNewCitaModal(true);
     }
-  }, [initialPacienteIdParam, pacientes.length]);
+  }, [initialPacienteIdParam, pacientes.length, selectedDate]);
 
-  // Navegación de Fechas
+  // Navegación de Fechas Reactiva
   const handleNav = (direction: number) => {
-    const d = new Date(currentDate);
+    const d = new Date(selectedDate);
     if (vista === 'dia') d.setDate(d.getDate() + direction);
     else if (vista === 'semana') d.setDate(d.getDate() + direction * 7);
     else if (vista === 'mes') d.setMonth(d.getMonth() + direction);
-    setCurrentDate(d);
+    setSelectedDate(d);
   };
 
-  const selectedDateStr = toLocalDateString(currentDate);
+  const handleGoToday = () => {
+    setSelectedDate(new Date());
+  };
 
-  // Citas del día seleccionado
+  // Fecha del día seleccionado en formato YYYY-MM-DD
+  const selectedDateStr = getFormattedLocalDate(selectedDate);
+
+  // 2. Citas del día seleccionado
   const citasDelDia = useMemo(() => {
     return citas.filter((c) => c.fecha === selectedDateStr);
   }, [citas, selectedDateStr]);
 
   // Citas de la semana actual (Lunes a Sábado)
   const diasSemana = useMemo(() => {
-    const d = new Date(currentDate);
+    const d = new Date(selectedDate);
     const day = d.getDay();
     const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Ajustar a Lunes
     const lunes = new Date(d.getFullYear(), d.getMonth(), diff);
@@ -191,7 +242,7 @@ function AgendaContent() {
     const arr = [];
     for (let i = 0; i < 6; i++) {
       const dayDate = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + i);
-      const dateStr = toLocalDateString(dayDate);
+      const dateStr = getFormattedLocalDate(dayDate);
       arr.push({
         date: dayDate,
         dateStr,
@@ -200,12 +251,12 @@ function AgendaContent() {
       });
     }
     return arr;
-  }, [currentDate, citas]);
+  }, [selectedDate, citas]);
 
   // Citas del Mes
   const diasDelMes = useMemo(() => {
-    const y = currentDate.getFullYear();
-    const m = currentDate.getMonth();
+    const y = selectedDate.getFullYear();
+    const m = selectedDate.getMonth();
     const primerDiaMes = new Date(y, m, 1);
     const ultimoDiaMes = new Date(y, m + 1, 0);
 
@@ -217,7 +268,7 @@ function AgendaContent() {
 
     for (let i = 1; i <= ultimoDiaMes.getDate(); i++) {
       const d = new Date(y, m, i);
-      const dateStr = toLocalDateString(d);
+      const dateStr = getFormattedLocalDate(d);
       arr.push({
         dayNumber: i,
         dateStr,
@@ -226,7 +277,7 @@ function AgendaContent() {
       });
     }
     return arr;
-  }, [currentDate, citas]);
+  }, [selectedDate, citas]);
 
   // Actualizar estado de cita
   const updateEstadoCita = async (citaId: string, nuevoEstado: string, pacienteInfo?: any) => {
@@ -279,10 +330,7 @@ function AgendaContent() {
         const { data, error } = await supabase
           .from('citas_atenciones')
           .insert([payload])
-          .select(`
-            *,
-            pacientes:paciente_id (*)
-          `)
+          .select()
           .single();
 
         if (!error) {
@@ -308,6 +356,7 @@ function AgendaContent() {
     const nuevaCitaLocal = {
       id: 'cita-' + Date.now(),
       ...payload,
+      paciente: pSeleccionado,
       pacientes: pSeleccionado,
     };
 
@@ -421,7 +470,7 @@ function AgendaContent() {
   // Título de fecha
   const tituloFecha = useMemo(() => {
     if (vista === 'dia') {
-      return currentDate.toLocaleDateString('es-CL', {
+      return selectedDate.toLocaleDateString('es-CL', {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
@@ -430,8 +479,8 @@ function AgendaContent() {
     } else if (vista === 'semana') {
       return `Semana del ${diasSemana[0]?.dateStr} al ${diasSemana[diasSemana.length - 1]?.dateStr}`;
     }
-    return currentDate.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
-  }, [vista, currentDate, diasSemana]);
+    return selectedDate.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+  }, [vista, selectedDate, diasSemana]);
 
   // Pacientes filtrados para selector
   const filteredPacientes = pacientes.filter((p) => {
@@ -460,7 +509,7 @@ function AgendaContent() {
               {tituloFecha}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Agenda médica conectada a la tabla citas_atenciones en Supabase.
+              Control de citas, registro en box y confirmaciones vía WhatsApp.
             </p>
           </div>
 
@@ -499,29 +548,48 @@ function AgendaContent() {
               </button>
             </div>
 
-            {/* Controles de Navegación */}
+            {/* Controles de Navegación Reactivos */}
             <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-2xs">
               <button
+                type="button"
                 onClick={() => handleNav(-1)}
-                className="px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1"
                 title="Día anterior"
               >
                 <ChevronLeft className="h-4 w-4" />
+                <span>Ant</span>
               </button>
               <button
-                onClick={() => setCurrentDate(new Date())}
+                type="button"
+                onClick={handleGoToday}
                 className="px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
               >
                 Hoy
               </button>
               <button
+                type="button"
                 onClick={() => handleNav(1)}
-                className="px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1"
                 title="Día siguiente"
               >
+                <span>Sig</span>
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
+
+            {/* Botón Refrescar */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadAgenda(true)}
+              disabled={isRefreshing}
+              className="gap-2 bg-white text-slate-700 hover:bg-slate-50 border-slate-200 rounded-xl"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin text-blue-600" : ""}`}
+              />
+              <span>Actualizar</span>
+            </Button>
 
             {/* Botón Agendar Cita */}
             <button
@@ -580,26 +648,38 @@ function AgendaContent() {
               {loading ? (
                 <div className="p-12 text-center text-slate-500">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-blue-600 mb-2" />
-                  <span>Cargando agenda médica...</span>
+                  <span className="text-sm font-semibold">Cargando citas de la agenda...</span>
                 </div>
               ) : citasDelDia.length === 0 ? (
-                <div className="p-12 text-center text-slate-400 space-y-2">
-                  <CalendarIcon className="h-8 w-8 mx-auto text-slate-300" />
-                  <p className="text-sm font-semibold">No hay citas programadas para este día.</p>
+                /* Estado Vacío Limpio */
+                <div className="p-12 text-center space-y-3">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                    <CalendarDays className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-slate-800">
+                      No hay citas programadas para este día
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {selectedDateStr} no tiene atenciones agendadas en box.
+                    </p>
+                  </div>
                   <button
+                    type="button"
                     onClick={() => {
                       setFechaCita(selectedDateStr);
                       setShowNewCitaModal(true);
                     }}
-                    className="text-xs text-blue-600 hover:text-blue-800 font-bold underline"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl px-4 py-2 inline-flex items-center gap-2 text-xs shadow-xs transition-all"
                   >
-                    + Agendar la primera cita de hoy
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>+ Agendar Cita</span>
                   </button>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
                   {citasDelDia.map((cita) => {
-                    const p = cita.pacientes;
+                    const p = cita.paciente || cita.pacientes;
                     const horaStr = cita.hora?.slice(0, 5) || '09:00';
                     const telClean = p?.telefono ? p.telefono.replace(/\D/g, '') : '';
                     const waPhone = telClean.startsWith('56') ? telClean : `56${telClean}`;
@@ -754,7 +834,7 @@ function AgendaContent() {
         {vista === 'semana' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {diasSemana.map((col, idx) => {
-              const isToday = col.dateStr === toLocalDateString(new Date());
+              const isToday = col.dateStr === getFormattedLocalDate(new Date());
               return (
                 <div
                   key={idx}
@@ -778,26 +858,29 @@ function AgendaContent() {
                     {col.citas.length === 0 ? (
                       <span className="text-xs text-slate-300 block text-center py-8">Sin citas</span>
                     ) : (
-                      col.citas.map((c) => (
-                        <div
-                          key={c.id}
-                          onClick={() => c.pacientes && handleOpenPatient(c.pacientes)}
-                          className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-blue-50/50 hover:border-blue-200 cursor-pointer transition-all text-xs space-y-1"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-blue-700">{c.hora?.slice(0, 5)}</span>
-                            <span className="text-[10px] font-semibold text-slate-400">{c.estado}</span>
-                          </div>
-                          <div className="font-bold text-slate-800 truncate">
-                            {c.pacientes?.nombre_completo || 'Paciente'}
-                          </div>
-                          {c.motivo_consulta && (
-                            <div className="text-[11px] text-slate-500 truncate italic">
-                              {c.motivo_consulta}
+                      col.citas.map((c) => {
+                        const pac = c.paciente || c.pacientes;
+                        return (
+                          <div
+                            key={c.id}
+                            onClick={() => pac && handleOpenPatient(pac)}
+                            className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-blue-50/50 hover:border-blue-200 cursor-pointer transition-all text-xs space-y-1"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-blue-700">{c.hora?.slice(0, 5)}</span>
+                              <span className="text-[10px] font-semibold text-slate-400">{c.estado}</span>
                             </div>
-                          )}
-                        </div>
-                      ))
+                            <div className="font-bold text-slate-800 truncate">
+                              {pac?.nombre_completo || 'Paciente'}
+                            </div>
+                            {c.motivo_consulta && (
+                              <div className="text-[11px] text-slate-500 truncate italic">
+                                {c.motivo_consulta}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -820,7 +903,7 @@ function AgendaContent() {
             </div>
             <div className="grid grid-cols-7 divide-x divide-y divide-slate-100">
               {diasDelMes.map((dia, idx) => {
-                const isToday = dia.dateStr === toLocalDateString(new Date());
+                const isToday = dia.dateStr === getFormattedLocalDate(new Date());
                 return (
                   <div
                     key={idx}
@@ -844,18 +927,21 @@ function AgendaContent() {
                     </div>
 
                     <div className="space-y-1 mt-1 overflow-hidden">
-                      {dia.citas.slice(0, 2).map((c) => (
-                        <div
-                          key={c.id}
-                          onClick={() => {
-                            setCurrentDate(new Date(dia.dateStr + 'T12:00:00'));
-                            setVista('dia');
-                          }}
-                          className="text-[10px] bg-blue-50 text-blue-900 truncate px-1 py-0.5 rounded cursor-pointer hover:bg-blue-100 font-medium"
-                        >
-                          {c.hora?.slice(0, 5)} {c.pacientes?.nombre_completo}
-                        </div>
-                      ))}
+                      {dia.citas.slice(0, 2).map((c) => {
+                        const pac = c.paciente || c.pacientes;
+                        return (
+                          <div
+                            key={c.id}
+                            onClick={() => {
+                              setSelectedDate(new Date(dia.dateStr + 'T12:00:00'));
+                              setVista('dia');
+                            }}
+                            className="text-[10px] bg-blue-50 text-blue-900 truncate px-1 py-0.5 rounded cursor-pointer hover:bg-blue-100 font-medium"
+                          >
+                            {c.hora?.slice(0, 5)} {pac?.nombre_completo}
+                          </div>
+                        );
+                      })}
                       {dia.citas.length > 2 && (
                         <span className="text-[9px] text-slate-400 block text-right font-bold">
                           +{dia.citas.length - 2} más
@@ -1024,7 +1110,7 @@ function AgendaContent() {
             <div>
               <DialogTitle>Editar Cita Programada</DialogTitle>
               <DialogDescription>
-                Paciente: <strong className="text-slate-800">{editingCita?.pacientes?.nombre_completo}</strong>
+                Paciente: <strong className="text-slate-800">{(editingCita?.paciente || editingCita?.pacientes)?.nombre_completo}</strong>
               </DialogDescription>
             </div>
           </div>
@@ -1134,7 +1220,7 @@ function AgendaContent() {
           <p>
             ¿Estás seguro de que deseas eliminar la cita de{' '}
             <strong className="text-slate-900">
-              {deletingCita?.pacientes?.nombre_completo || 'este paciente'}
+              {(deletingCita?.paciente || deletingCita?.pacientes)?.nombre_completo || 'este paciente'}
             </strong>{' '}
             programada para el{' '}
             <strong className="text-slate-900">
