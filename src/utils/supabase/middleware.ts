@@ -79,10 +79,8 @@ export const updateSession = async (request: NextRequest) => {
     }
 
     // 2. Si ya está autenticado y va a /login -> redirigir a /pacientes
-    if (user && pathname.startsWith("/login")) {
-      const targetUrl = request.nextUrl.clone();
-      targetUrl.pathname = "/pacientes";
-      return NextResponse.redirect(targetUrl);
+    if (user && request.nextUrl.pathname.startsWith('/login')) {
+      return NextResponse.redirect(new URL('/pacientes', request.url));
     }
 
     return supabaseResponse;
