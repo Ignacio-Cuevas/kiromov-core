@@ -19,6 +19,7 @@ interface ClinicalCertificateDialogProps {
     fecha: string;
     estado: string;
   }>;
+  evoluciones?: any[];
 }
 
 const LOGO_URL = "https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:logo.png";

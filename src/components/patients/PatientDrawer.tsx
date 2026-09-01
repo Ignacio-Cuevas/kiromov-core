@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Sheet,
   SheetHeader,
@@ -22,6 +22,7 @@ import {
   CitaAtencion,
   CompraPlan,
   EvolucionSOAP,
+  EstadoPlan,
 } from "@/types/database";
 import {
   supabase,
@@ -41,20 +42,35 @@ import {
   CheckCircle2,
   Mail,
   Plus,
-  CreditCard,
   FileText,
   Printer,
   Edit2,
+  Clock,
+  AlertTriangle,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 export interface PatientDrawerProps {
-  patient: VistaResumenPaciente | null;
+  patient: VistaResumenPaciente | any | null;
   open?: boolean;
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   onClose?: () => void;
   onAttendanceRegistered?: (patientId: string) => void;
+}
+
+// Helper para determinar si un estado de cita corresponde a una atención consumida
+export function isAttendedStatus(estado?: string | null): boolean {
+  if (!estado) return false;
+  const s = estado.toLowerCase().trim();
+  return (
+    s === "asistió" ||
+    s === "asistio" ||
+    s === "atendido" ||
+    s === "completada" ||
+    s === "completado" ||
+    s === "inasistencia (descuenta sesión)"
+  );
 }
 
 export function PatientDrawer({
@@ -71,7 +87,7 @@ export function PatientDrawer({
     if (!nextOpen && onClose) onClose();
   };
 
-  const [currentPatient, setCurrentPatient] = useState<VistaResumenPaciente | null>(patient);
+  const [currentPatient, setCurrentPatient] = useState<any | null>(patient);
 
   useEffect(() => {
     setCurrentPatient(patient);
@@ -87,93 +103,122 @@ export function PatientDrawer({
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   const [isEditPatientOpen, setIsEditPatientOpen] = useState(false);
 
-  // Hook que se dispara cada vez que cambia el paciente o se abre el drawer
-  useEffect(() => {
-    if (!currentPatient?.id || !isDrawerOpen) return;
+  // 1. Cargar Datos del Paciente desde Supabase (Citas, Planes, SOAP)
+  const loadPatientData = useCallback(async () => {
+    if (!currentPatient?.id) return;
+    setLoadingHistory(true);
 
-    let isMounted = true;
+    let soapData: EvolucionSOAP[] | null = null;
+    let citasData: CitaAtencion[] | null = null;
+    let planesData: CompraPlan[] | null = null;
 
-    async function loadPatientData() {
-      if (!currentPatient?.id) return;
-      setLoadingHistory(true);
+    try {
+      if (supabase) {
+        // A. Citas y Atenciones
+        const { data: cData, error: citasError } = await supabase
+          .from("citas_atenciones")
+          .select("*")
+          .eq("paciente_id", currentPatient.id)
+          .order("fecha", { ascending: false });
 
-      let soapData: EvolucionSOAP[] | null = null;
-      let citasData: CitaAtencion[] | null = null;
-      let planesData: CompraPlan[] | null = null;
-
-      try {
-        if (supabase) {
-          // 1. Obtener notas SOAP directamente de Supabase
-          const { data: sData, error: soapError } = await supabase
-            .from("evoluciones_soap")
-            .select("*")
-            .eq("paciente_id", currentPatient.id)
-            .order("fecha", { ascending: false });
-
-          if (soapError) {
-            console.error("Error SOAP:", soapError);
-          } else if (sData && sData.length > 0) {
-            soapData = sData as EvolucionSOAP[];
-          }
-
-          // 2. Obtener historial de citas directamente de Supabase
-          const { data: cData, error: citasError } = await supabase
-            .from("citas_atenciones")
-            .select("*")
-            .eq("paciente_id", currentPatient.id)
-            .order("fecha", { ascending: false });
-
-          if (citasError) {
-            console.error("Error Citas:", citasError);
-          } else if (cData && cData.length > 0) {
-            citasData = cData as CitaAtencion[];
-          }
-
-          // 3. Obtener planes directamente de Supabase
-          const { data: pData, error: planesError } = await supabase
-            .from("compras_planes")
-            .select("*")
-            .eq("paciente_id", currentPatient.id)
-            .order("fecha_compra", { ascending: false });
-
-          if (planesError) {
-            console.error("Error Planes:", planesError);
-          } else if (pData && pData.length > 0) {
-            planesData = pData as CompraPlan[];
-          }
+        if (!citasError && cData) {
+          citasData = cData as CitaAtencion[];
         }
-      } catch (err) {
-        console.warn("Error en consulta a Supabase, usando respaldo:", err);
-      }
 
-      // Si no hay datos en BD o está en modo local/fallback, consultar respaldo
-      if (!soapData) {
-        soapData = await fetchEvolucionesByPaciente(currentPatient.id);
-      }
-      if (!citasData) {
-        citasData = await fetchCitasByPaciente(currentPatient.id);
-      }
-      if (!planesData) {
-        planesData = await fetchPlanesByPaciente(currentPatient.id);
-      }
+        // B. Compras y Planes Activos
+        const { data: pData, error: planesError } = await supabase
+          .from("compras_planes")
+          .select("*")
+          .eq("paciente_id", currentPatient.id)
+          .order("fecha_compra", { ascending: false });
 
-      if (isMounted) {
-        setEvoluciones(soapData || []);
-        setCitasPrevias(citasData || []);
-        setPlanes(planesData || []);
-        setLoadingHistory(false);
+        if (!planesError && pData) {
+          planesData = pData as CompraPlan[];
+        }
+
+        // C. Notas SOAP
+        const { data: sData, error: soapError } = await supabase
+          .from("evoluciones_soap")
+          .select("*")
+          .eq("paciente_id", currentPatient.id)
+          .order("fecha", { ascending: false });
+
+        if (!soapError && sData) {
+          soapData = sData as EvolucionSOAP[];
+        }
       }
+    } catch (err) {
+      console.warn("Error en consulta a Supabase:", err);
     }
 
-    loadPatientData();
+    // Fallbacks locales
+    if (!citasData) {
+      citasData = await fetchCitasByPaciente(currentPatient.id);
+    }
+    if (!planesData) {
+      planesData = await fetchPlanesByPaciente(currentPatient.id);
+    }
+    if (!soapData) {
+      soapData = await fetchEvolucionesByPaciente(currentPatient.id);
+    }
 
-    return () => {
-      isMounted = false;
+    setCitasPrevias(citasData || []);
+    setPlanes(planesData || []);
+    setEvoluciones(soapData || []);
+    setLoadingHistory(false);
+  }, [currentPatient?.id]);
+
+  useEffect(() => {
+    if (currentPatient?.id && isDrawerOpen) {
+      loadPatientData();
+    }
+  }, [currentPatient?.id, isDrawerOpen, loadPatientData]);
+
+  // 2. Cálculo Real de Consumo de Sesiones
+  const {
+    sesionesConsumidas,
+    totalSesiones,
+    sesionesRestantes,
+    progressPercent,
+    computedEstadoPlan,
+  } = useMemo(() => {
+    // Total de sesiones asistidas/completadas contabilizadas en citas_atenciones
+    const countAttended = citasPrevias.filter((c) => isAttendedStatus(c.estado)).length;
+
+    // Total de sesiones compradas en planes
+    let totalPurchased = planes.reduce((acc, p) => acc + (p.total_sesiones || 0), 0);
+    if (totalPurchased === 0 && currentPatient?.total_sesiones) {
+      totalPurchased = currentPatient.total_sesiones;
+    }
+
+    // Si aún así no hay planes registrados pero hay atenciones, se establece la base
+    const finalTotal = totalPurchased > 0 ? totalPurchased : countAttended > 0 ? countAttended : 0;
+    const remaining = Math.max(0, finalTotal - countAttended);
+    const percent = finalTotal > 0 ? Math.min(100, Math.round((countAttended / finalTotal) * 100)) : 0;
+
+    let estadoPlan: EstadoPlan = "Sin Plan Activo";
+    if (finalTotal === 0) {
+      estadoPlan = "Sin Plan Activo";
+    } else if (remaining === 0) {
+      estadoPlan = "Plan Finalizado";
+    } else if (remaining === 1) {
+      estadoPlan = "Por Renovar (1 restante)";
+    } else {
+      estadoPlan = "Plan Vigente";
+    }
+
+    return {
+      sesionesConsumidas: countAttended,
+      totalSesiones: finalTotal,
+      sesionesRestantes: remaining,
+      progressPercent: percent,
+      computedEstadoPlan: estadoPlan,
     };
-  }, [currentPatient?.id, isDrawerOpen]);
+  }, [citasPrevias, planes, currentPatient?.total_sesiones]);
 
   if (!currentPatient) return null;
 
+  // 3. Acción [ ✓ Registrar Asistencia Hoy ]
   const handleRegisterAttendance = async () => {
     setIsRegisteringAttendance(true);
 
@@ -184,17 +229,17 @@ export function PatientDrawer({
       );
 
       if (result.success && result.data) {
-        setCitasPrevias((prev) => [result.data!, ...prev]);
         toast.success("¡Asistencia registrada correctamente!", {
-          description: `Atención marcada para ${currentPatient.nombre_completo} hoy a las ${result.data.hora || "09:00"}`,
+          description: `Atención marcada para ${currentPatient.nombre_completo} hoy a las ${result.data.hora?.slice(0, 5) || "09:00"}`,
           icon: <CheckCircle2 className="h-5 w-5 text-emerald-500" />,
         });
 
+        await loadPatientData();
         onAttendanceRegistered?.(currentPatient.id);
       } else {
         toast.error("No se pudo registrar la asistencia.");
       }
-    } catch (err) {
+    } catch {
       toast.error("Error de conexión al registrar asistencia.");
     } finally {
       setIsRegisteringAttendance(false);
@@ -203,35 +248,34 @@ export function PatientDrawer({
 
   const handleEvolutionSaved = (newEvo: EvolucionSOAP) => {
     setEvoluciones((prev) => [newEvo, ...prev]);
+    loadPatientData();
   };
 
   const handlePlanPurchased = (newPlan: CompraPlan) => {
     setPlanes((prev) => [newPlan, ...prev]);
+    loadPatientData();
     onAttendanceRegistered?.(currentPatient.id);
   };
 
-  const progressPercent =
-    currentPatient.total_sesiones > 0
-      ? Math.min(
-          100,
-          Math.round(
-            (currentPatient.sesiones_consumidas / currentPatient.total_sesiones) * 100
-          )
-        )
-      : 0;
+  // Verificar si ya asistió hoy
+  const nowLocal = new Date();
+  const year = nowLocal.getFullYear();
+  const month = String(nowLocal.getMonth() + 1).padStart(2, "0");
+  const day = String(nowLocal.getDate()).padStart(2, "0");
+  const todayStr = `${year}-${month}-${day}`;
 
   const isTodayAttended = citasPrevias.some((c) => {
-    const today = new Date().toISOString().split("T")[0];
-    return c.fecha === today && c.estado === "Asistió";
+    return c.fecha === todayStr && isAttendedStatus(c.estado);
   });
 
-  const inasistenciasCount =
-    currentPatient.inasistencias_acumuladas ??
-    citasPrevias.filter(
-      (c) =>
-        c.estado === "Inasistencia (Descuenta Sesión)" ||
-        c.estado === "No Asistió"
-    ).length;
+  const inasistenciasCount = citasPrevias.filter((c) => {
+    const st = (c.estado || "").toLowerCase();
+    return (
+      st.includes("inasistencia") ||
+      st.includes("no asistió") ||
+      st.includes("no asistio")
+    );
+  }).length;
 
   return (
     <>
@@ -240,16 +284,17 @@ export function PatientDrawer({
           <SheetClose onClick={() => handleClose(false)} />
 
           <div className="space-y-3 pr-8">
-            {/* Code, Status Badge, Inasistencias and Action Buttons */}
+            {/* Header: Código, Badge Estado del Plan e Inasistencias */}
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs font-bold uppercase tracking-wider text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded">
-                  {currentPatient.codigo_paciente}
+                  {currentPatient.codigo_paciente || "PAC-CLINIC"}
                 </span>
-                <EstadoPlanBadge estado={currentPatient.estado_plan} />
+                <EstadoPlanBadge estado={computedEstadoPlan} />
                 {inasistenciasCount > 0 && (
                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
-                    ⚠️ {inasistenciasCount} inasistencia{inasistenciasCount > 1 ? "s" : ""} registrada{inasistenciasCount > 1 ? "s" : ""}
+                    <AlertTriangle className="h-3 w-3" />
+                    {inasistenciasCount} inasistencia{inasistenciasCount > 1 ? "s" : ""}
                   </span>
                 )}
               </div>
@@ -278,23 +323,32 @@ export function PatientDrawer({
               </div>
             </div>
 
-            {/* Name */}
+            {/* Nombre del Paciente */}
             <SheetTitle className="text-2xl font-bold text-slate-900 leading-tight">
-              {currentPatient.nombre_completo}
+              {currentPatient.nombre_completo || currentPatient.full_name}
             </SheetTitle>
 
-            {/* Metadata: RUT, Phone with WhatsApp */}
+            {/* Metadata: RUT, Previsión, Teléfono con WhatsApp */}
             <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs sm:text-sm text-slate-600">
               <div className="flex items-center gap-1.5 font-medium">
                 <span className="text-slate-400">RUT:</span>
-                <span className="font-semibold text-slate-800">
+                <span className="font-semibold text-slate-800 font-mono">
                   {formatRut(currentPatient.rut)}
                 </span>
               </div>
 
+              {(currentPatient.prevision || currentPatient.prevision_salud || currentPatient.health_insurance) && (
+                <div className="flex items-center gap-1 font-medium">
+                  <span className="text-slate-400">Previsión:</span>
+                  <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md text-xs">
+                    {currentPatient.prevision || currentPatient.prevision_salud || currentPatient.health_insurance}
+                  </span>
+                </div>
+              )}
+
               {currentPatient.telefono && (
                 <a
-                  href={getWhatsAppUrl(currentPatient.telefono, currentPatient.nombre_completo)}
+                  href={getWhatsAppUrl(currentPatient.telefono, currentPatient.nombre_completo || currentPatient.full_name)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 transition-colors border border-emerald-200"
@@ -313,37 +367,41 @@ export function PatientDrawer({
               )}
             </div>
 
-            {/* Diagnóstico Médico si está ingresado */}
-            {(currentPatient.diagnostico_medico || currentPatient.diagnostico_principal) && (
+            {/* Diagnóstico Clínico si está disponible */}
+            {(currentPatient.diagnostico_principal || currentPatient.diagnostico_medico || currentPatient.medical_notes) && (
               <div className="text-xs font-semibold text-blue-900 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl flex items-center gap-2">
                 <span className="text-blue-600 font-bold">🩺 Diagnóstico Clínico:</span>
-                <span>{currentPatient.diagnostico_medico || currentPatient.diagnostico_principal}</span>
+                <span>
+                  {currentPatient.diagnostico_principal ||
+                    currentPatient.diagnostico_medico ||
+                    currentPatient.medical_notes}
+                </span>
               </div>
             )}
 
-            {/* Session Progress Card with Quick Plan Renewal Button */}
-            <div className="mt-2 rounded-xl bg-white p-3 border border-slate-200 shadow-xs space-y-2">
+            {/* Tarjeta de Consumo de Sesiones Real */}
+            <div className="mt-2 rounded-2xl bg-white p-3.5 border border-slate-200 shadow-xs space-y-2">
               <div className="flex items-center justify-between text-xs font-medium">
                 <span className="text-slate-600">
                   Consumo de Sesiones:{" "}
-                  <strong className="text-slate-900">
-                    {currentPatient.sesiones_consumidas} / {currentPatient.total_sesiones}
+                  <strong className="text-slate-900 font-extrabold text-sm">
+                    {sesionesConsumidas} / {totalSesiones}
                   </strong>
                 </span>
                 <div className="flex items-center gap-2">
                   <span
                     className={
-                      currentPatient.sesiones_restantes <= 1
+                      sesionesRestantes <= 1
                         ? "font-bold text-amber-600"
-                        : "font-semibold text-clinic-700"
+                        : "font-semibold text-blue-700"
                     }
                   >
-                    {currentPatient.sesiones_restantes} restantes ({progressPercent}%)
+                    {sesionesRestantes} restantes ({progressPercent}%)
                   </span>
                   <button
                     type="button"
                     onClick={() => setIsRenewPlanOpen(true)}
-                    className="text-[11px] font-bold text-clinic-600 hover:text-clinic-800 hover:underline flex items-center gap-0.5 ml-1"
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 ml-1"
                   >
                     <Plus className="h-3 w-3" />
                     Renovar
@@ -353,20 +411,20 @@ export function PatientDrawer({
               <Progress value={progressPercent} />
             </div>
 
-            {/* Featured Quick Action: Registrar Asistencia Hoy */}
+            {/* Botón de Acción Rápida: Registrar Asistencia Hoy */}
             <div className="pt-1">
               <Button
                 onClick={handleRegisterAttendance}
                 disabled={isRegisteringAttendance}
-                className={`w-full h-12 text-base font-bold shadow-md transition-all flex items-center justify-center gap-2 ${
+                className={`w-full h-12 text-base font-bold shadow-md transition-all flex items-center justify-center gap-2 rounded-xl ${
                   isTodayAttended
                     ? "bg-slate-800 hover:bg-slate-900 text-white"
-                    : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-emerald-600/25"
+                    : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-emerald-600/20"
                 }`}
               >
                 <Check className="h-5 w-5 stroke-[2.5]" />
                 {isRegisteringAttendance
-                  ? "Registrando..."
+                  ? "Registrando atención..."
                   : isTodayAttended
                   ? "✓ Registrar Nueva Atención Hoy"
                   : "✓ Registrar Asistencia Hoy"}
@@ -384,11 +442,11 @@ export function PatientDrawer({
               </TabsTrigger>
               <TabsTrigger
                 value="history"
-                badge={citasPrevias.length + evoluciones.length}
+                badge={citasPrevias.length}
                 className="text-xs sm:text-sm font-semibold"
               >
                 <CalendarCheck className="h-4 w-4 hidden sm:inline" />
-                Historial
+                Asistencias ({citasPrevias.length})
               </TabsTrigger>
               <TabsTrigger
                 value="plans"
@@ -396,22 +454,22 @@ export function PatientDrawer({
                 className="text-xs sm:text-sm font-semibold"
               >
                 <Package className="h-4 w-4 hidden sm:inline" />
-                Planes
+                Planes ({planes.length})
               </TabsTrigger>
             </TabsList>
 
-            {/* TAB 1: SOAP EVOLUTION */}
+            {/* TAB 1: FORMULARIO SOAP */}
             <TabsContent value="soap">
               <SoapEvolutionForm
                 pacienteId={currentPatient.id}
-                pacienteNombre={currentPatient.nombre_completo}
+                pacienteNombre={currentPatient.nombre_completo || currentPatient.full_name}
                 onEvolutionSaved={handleEvolutionSaved}
                 previousEvolutions={evoluciones}
                 isLoadingEvolutions={loadingHistory}
               />
             </TabsContent>
 
-            {/* TAB 2: ATTENDANCE & SOAP HISTORY */}
+            {/* TAB 2: HISTORIAL DE ASISTENCIAS Y EVOLUCIONES */}
             <TabsContent value="history">
               <div className="space-y-3">
                 <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
@@ -423,7 +481,7 @@ export function PatientDrawer({
                     size="sm"
                     variant="outline"
                     onClick={() => setIsCertificateOpen(true)}
-                    className="h-8 gap-1.5 text-xs font-bold text-blue-700 border-blue-200 hover:bg-blue-50"
+                    className="h-8 gap-1.5 text-xs font-bold text-blue-700 border-blue-200 hover:bg-blue-50 rounded-xl"
                   >
                     <Printer className="h-3.5 w-3.5" />
                     <span>Emitir Certificado</span>
@@ -438,7 +496,7 @@ export function PatientDrawer({
               </div>
             </TabsContent>
 
-            {/* TAB 3: PLANS */}
+            {/* TAB 3: PLANES */}
             <TabsContent value="plans">
               <PlansHistoryTab
                 planes={planes}
@@ -450,38 +508,39 @@ export function PatientDrawer({
         </SheetBody>
       </Sheet>
 
-      {/* Edit Patient Dialog */}
-      <EditPatientDialog
-        isOpen={isEditPatientOpen}
-        open={isEditPatientOpen}
-        onClose={() => setIsEditPatientOpen(false)}
-        onOpenChange={setIsEditPatientOpen}
-        patient={currentPatient}
-        onPatientUpdated={(updated) => {
-          setCurrentPatient(updated);
-          onAttendanceRegistered?.(updated.id);
-        }}
-      />
+      {/* Modales Auxiliares */}
+      {isRenewPlanOpen && (
+        <RenewPlanDialog
+          pacienteId={currentPatient.id}
+          pacienteNombre={currentPatient.nombre_completo || currentPatient.full_name}
+          open={isRenewPlanOpen}
+          onOpenChange={setIsRenewPlanOpen}
+          onPlanPurchased={handlePlanPurchased}
+        />
+      )}
 
-      {/* Dynamic Plan Sale / Renewal Dialog */}
-      <RenewPlanDialog
-        pacienteId={currentPatient.id}
-        pacienteNombre={currentPatient.nombre_completo}
-        open={isRenewPlanOpen}
-        onOpenChange={setIsRenewPlanOpen}
-        onPlanPurchased={handlePlanPurchased}
-      />
+      {isCertificateOpen && (
+        <ClinicalCertificateDialog
+          isOpen={isCertificateOpen}
+          onClose={() => setIsCertificateOpen(false)}
+          patient={currentPatient}
+          evoluciones={evoluciones}
+          citas={citasPrevias}
+        />
+      )}
 
-      {/* Clinical Certificate & Reimbursement Dialog */}
-      <ClinicalCertificateDialog
-        patient={currentPatient}
-        citas={citasPrevias}
-        citasAsistidas={citasPrevias}
-        open={isCertificateOpen}
-        isOpen={isCertificateOpen}
-        onOpenChange={setIsCertificateOpen}
-        onClose={() => setIsCertificateOpen(false)}
-      />
+      {isEditPatientOpen && (
+        <EditPatientDialog
+          isOpen={isEditPatientOpen}
+          onClose={() => setIsEditPatientOpen(false)}
+          patient={currentPatient}
+          onPatientUpdated={(updated) => {
+            setCurrentPatient(updated);
+            loadPatientData();
+            onAttendanceRegistered?.(currentPatient.id);
+          }}
+        />
+      )}
     </>
   );
 }

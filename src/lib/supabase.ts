@@ -622,33 +622,97 @@ export async function registrarAsistenciaHoy(
   pacienteId: string,
   profesional = "Klgo. Ignacio Cuevas Silva"
 ): Promise<{ success: boolean; data?: CitaAtencion; error?: string }> {
-  const today = new Date().toISOString().split("T")[0];
-  const nowTime = new Date().toLocaleTimeString("es-CL", {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const today = `${year}-${month}-${day}`;
+  const nowTime = now.toLocaleTimeString("es-CL", {
     hour: "2-digit",
     minute: "2-digit",
   });
 
   if (supabase) {
     try {
-      const { data, error } = await supabase
+      // 1. Verificar si ya existe una cita hoy para este paciente
+      const { data: existingCita } = await supabase
         .from("citas_atenciones")
-        .insert([
-          {
-            paciente_id: pacienteId,
-            fecha: today,
-            hora: nowTime,
-            profesional,
-            estado: "Asistió",
-            notas: "Asistencia registrada desde Kiromov Core",
-          },
-        ])
-        .select()
-        .single();
+        .select("*")
+        .eq("paciente_id", pacienteId)
+        .eq("fecha", today)
+        .order("hora", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (error) {
-        console.warn("Error inserting into Supabase citas_atenciones:", error.message);
-      } else if (data) {
-        return { success: true, data: data as CitaAtencion };
+      let attendedCita: any = null;
+
+      if (existingCita) {
+        // Actualizar la cita existente
+        const { data: updated, error: errUpdate } = await supabase
+          .from("citas_atenciones")
+          .update({
+            estado: "Asistió",
+            profesional,
+            notas: existingCita.notas || "Asistencia completada en box",
+          })
+          .eq("id", existingCita.id)
+          .select()
+          .single();
+
+        if (!errUpdate && updated) {
+          attendedCita = updated;
+        }
+      }
+
+      if (!attendedCita) {
+        // Insertar nueva cita asistida
+        const { data: inserted, error: errInsert } = await supabase
+          .from("citas_atenciones")
+          .insert([
+            {
+              paciente_id: pacienteId,
+              fecha: today,
+              hora: nowTime,
+              profesional,
+              estado: "Asistió",
+              motivo_consulta: "Sesión de Tratamiento Kinésico",
+              notas: "Asistencia registrada desde Kiromov Core",
+            },
+          ])
+          .select()
+          .single();
+
+        if (!errInsert && inserted) {
+          attendedCita = inserted;
+        }
+      }
+
+      // 2. Actualizar plan activo en compras_planes
+      const { data: activePlans } = await supabase
+        .from("compras_planes")
+        .select("*")
+        .eq("paciente_id", pacienteId)
+        .order("fecha_compra", { ascending: false });
+
+      if (activePlans && activePlans.length > 0) {
+        const targetPlan = activePlans.find(
+          (p) => (p.sesiones_usadas || 0) < (p.total_sesiones || 1)
+        ) || activePlans[0];
+
+        if (targetPlan) {
+          const newUsadas = (targetPlan.sesiones_usadas || 0) + 1;
+          await supabase
+            .from("compras_planes")
+            .update({
+              sesiones_usadas: newUsadas,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", targetPlan.id);
+        }
+      }
+
+      if (attendedCita) {
+        return { success: true, data: attendedCita as CitaAtencion };
       }
     } catch (err) {
       console.warn("Supabase error during attendance registration:", err);
