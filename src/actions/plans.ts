@@ -10,32 +10,58 @@ export async function getPlans(): Promise<Plan[]> {
 
   if (supabase) {
     try {
+      // 1. Consultar tabla plans
       const { data, error } = await supabase
         .from('plans')
         .select('*')
-        .order('name', { ascending: true });
+        .order('category', { ascending: false })
+        .order('price_clp', { ascending: true });
 
       if (!error && data && data.length > 0) {
-        return data as Plan[];
+        return data.map((p: any) => ({
+          id: p.id,
+          name: p.name || p.nombre_plan,
+          type: p.type || (p.sessions_count === 1 ? 'single_session' : 'plan'),
+          category: p.category || p.categoria || 'General',
+          sessions_count: p.sessions_count ?? p.total_sesiones ?? 1,
+          price_clp: Number(p.price_clp ?? p.precio_clp ?? 0),
+          description: p.description || p.descripcion,
+          is_active: p.is_active !== undefined ? p.is_active : p.activo ?? true,
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+          // alias
+          nombre_plan: p.name || p.nombre_plan,
+          categoria: p.category || p.categoria || 'General',
+          total_sesiones: p.sessions_count ?? p.total_sesiones ?? 1,
+          precio_clp: Number(p.price_clp ?? p.precio_clp ?? 0),
+          activo: p.is_active !== undefined ? p.is_active : p.activo ?? true,
+        }));
       }
 
-      // Fallback a catalogo_planes
+      // 2. Fallback a catalogo_planes
       const { data: catData } = await supabase
         .from('catalogo_planes')
         .select('*')
-        .order('nombre_plan', { ascending: true });
+        .order('categoria', { ascending: false })
+        .order('precio_clp', { ascending: true });
 
       if (catData && catData.length > 0) {
         return catData.map((c: any) => ({
           id: c.id,
           name: c.nombre_plan,
           type: (c.tipo || (c.total_sesiones === 1 ? 'single_session' : 'plan')) as any,
+          category: c.categoria || 'General',
           sessions_count: c.total_sesiones,
           price_clp: Number(c.precio_clp),
           description: c.descripcion,
           is_active: c.activo,
           created_at: c.created_at,
           updated_at: c.updated_at,
+          nombre_plan: c.nombre_plan,
+          categoria: c.categoria || 'General',
+          total_sesiones: c.total_sesiones,
+          precio_clp: Number(c.precio_clp),
+          activo: c.activo,
         }));
       }
     } catch (err) {
@@ -48,16 +74,23 @@ export async function getPlans(): Promise<Plan[]> {
     id: c.id,
     name: c.nombre_plan,
     type: (c.total_sesiones === 1 ? 'single_session' : 'plan') as any,
+    category: c.categoria || 'General',
     sessions_count: c.total_sesiones,
     price_clp: c.precio_clp,
     description: c.descripcion,
     is_active: c.activo,
+    nombre_plan: c.nombre_plan,
+    categoria: c.categoria || 'General',
+    total_sesiones: c.total_sesiones,
+    precio_clp: c.precio_clp,
+    activo: c.activo,
   }));
 }
 
 export async function createPlan(data: {
   name: string;
   type: 'single_session' | 'evaluation' | 'plan';
+  category?: string;
   sessions_count: number;
   price_clp: number;
   description?: string | null;
@@ -76,9 +109,11 @@ export async function createPlan(data: {
   }
 
   const supabase = await createClient();
+  const cleanCat = data.category || (data.type === 'evaluation' ? 'Promoción' : 'General');
   const payload = {
     name: data.name.trim(),
     type: data.type || 'plan',
+    category: cleanCat,
     sessions_count: data.sessions_count,
     price_clp: data.price_clp,
     description: data.description?.trim() || null,
@@ -99,7 +134,7 @@ export async function createPlan(data: {
         {
           id: newPlan?.id,
           nombre_plan: payload.name,
-          categoria: payload.type === 'evaluation' ? 'Promoción' : 'General',
+          categoria: cleanCat,
           tipo: payload.type,
           total_sesiones: payload.sessions_count,
           precio_clp: payload.price_clp,
@@ -139,10 +174,24 @@ export async function updatePlan(
 
   if (supabase) {
     try {
-      const updates = { ...data, updated_at: new Date().toISOString() };
+      const updates: any = { ...data, updated_at: new Date().toISOString() };
+      if (updates.nombre_plan && !updates.name) updates.name = updates.nombre_plan;
+      if (updates.categoria && !updates.category) updates.category = updates.categoria;
+      if (updates.total_sesiones && !updates.sessions_count) updates.sessions_count = updates.total_sesiones;
+      if (updates.precio_clp && !updates.price_clp) updates.price_clp = updates.precio_clp;
+
       const { data: updated, error } = await supabase
         .from('plans')
-        .update(updates)
+        .update({
+          name: updates.name,
+          type: updates.type,
+          category: updates.category,
+          sessions_count: updates.sessions_count,
+          price_clp: updates.price_clp,
+          description: updates.description,
+          is_active: updates.is_active,
+          updated_at: updates.updated_at,
+        })
         .eq('id', id)
         .select()
         .single();
@@ -152,6 +201,7 @@ export async function updatePlan(
         .from('catalogo_planes')
         .update({
           nombre_plan: updates.name,
+          categoria: updates.category,
           total_sesiones: updates.sessions_count,
           precio_clp: updates.price_clp,
           activo: updates.is_active,

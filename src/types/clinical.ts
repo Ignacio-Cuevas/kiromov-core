@@ -38,6 +38,7 @@ export interface Plan {
   updated_at?: string;
   name: string;
   type: PlanType;
+  category?: string;
   sessions_count: number;
   price_clp: number;
   description?: string | null;
@@ -45,6 +46,7 @@ export interface Plan {
 
   // alias compatible
   nombre_plan?: string;
+  categoria?: string;
   total_sesiones?: number;
   precio_clp?: number;
   activo?: boolean;
