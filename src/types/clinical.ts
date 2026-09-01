@@ -62,6 +62,8 @@ export interface Sale {
   total_amount_clp: number;
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
+  receipt_number?: string | null;
+  numero_boleta?: string | null;
   notes?: string | null;
 
   // Relaciones
@@ -79,5 +81,7 @@ export interface PatientPlan {
   plan_name: string;
   total_sessions: number;
   used_sessions: number;
+  receipt_number?: string | null;
+  numero_boleta?: string | null;
   status: PatientPlanStatus;
 }

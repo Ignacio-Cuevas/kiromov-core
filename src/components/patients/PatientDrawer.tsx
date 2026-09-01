@@ -45,7 +45,7 @@ import {
   FileText,
   Printer,
   Edit2,
-  Clock,
+  Receipt,
   AlertTriangle,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -101,6 +101,7 @@ export function PatientDrawer({
   const [isRegisteringAttendance, setIsRegisteringAttendance] = useState(false);
   const [isRenewPlanOpen, setIsRenewPlanOpen] = useState(false);
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
+  const [selectedBoletaForCert, setSelectedBoletaForCert] = useState<string | null>(null);
   const [isEditPatientOpen, setIsEditPatientOpen] = useState(false);
 
   // 1. Cargar Datos del Paciente desde Supabase (Citas, Planes, SOAP)
@@ -181,17 +182,19 @@ export function PatientDrawer({
     sesionesRestantes,
     progressPercent,
     computedEstadoPlan,
+    activePlan,
   } = useMemo(() => {
     // Total de sesiones asistidas/completadas contabilizadas en citas_atenciones
     const countAttended = citasPrevias.filter((c) => isAttendedStatus(c.estado)).length;
 
     // Total de sesiones compradas en planes
-    let totalPurchased = planes.reduce((acc, p) => acc + (p.total_sesiones || 0), 0);
+    let totalPurchased = planes.reduce((acc, p) => acc + (p.total_sesiones || p.sesiones_totales || 0), 0);
     if (totalPurchased === 0 && currentPatient?.total_sesiones) {
       totalPurchased = currentPatient.total_sesiones;
     }
 
-    // Si aún así no hay planes registrados pero hay atenciones, se establece la base
+    const firstActivePlan = planes.find((p) => p.estado === "activo") || planes[0] || null;
+
     const finalTotal = totalPurchased > 0 ? totalPurchased : countAttended > 0 ? countAttended : 0;
     const remaining = Math.max(0, finalTotal - countAttended);
     const percent = finalTotal > 0 ? Math.min(100, Math.round((countAttended / finalTotal) * 100)) : 0;
@@ -213,6 +216,7 @@ export function PatientDrawer({
       sesionesRestantes: remaining,
       progressPercent: percent,
       computedEstadoPlan: estadoPlan,
+      activePlan: firstActivePlan,
     };
   }, [citasPrevias, planes, currentPatient?.total_sesiones]);
 
@@ -313,7 +317,10 @@ export function PatientDrawer({
 
                 <button
                   type="button"
-                  onClick={() => setIsCertificateOpen(true)}
+                  onClick={() => {
+                    setSelectedBoletaForCert(activePlan?.numero_boleta || null);
+                    setIsCertificateOpen(true);
+                  }}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:text-blue-800 transition-colors border border-blue-200 shadow-2xs"
                   title="Generar certificado médico para reembolso"
                 >
@@ -382,12 +389,20 @@ export function PatientDrawer({
             {/* Tarjeta de Consumo de Sesiones Real */}
             <div className="mt-2 rounded-2xl bg-white p-3.5 border border-slate-200 shadow-xs space-y-2">
               <div className="flex items-center justify-between text-xs font-medium">
-                <span className="text-slate-600">
-                  Consumo de Sesiones:{" "}
-                  <strong className="text-slate-900 font-extrabold text-sm">
-                    {sesionesConsumidas} / {totalSesiones}
-                  </strong>
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-600">
+                    Consumo de Sesiones:{" "}
+                    <strong className="text-slate-900 font-extrabold text-sm">
+                      {sesionesConsumidas} / {totalSesiones}
+                    </strong>
+                  </span>
+                  {activePlan?.numero_boleta && (
+                    <span className="text-[10px] font-bold text-blue-900 bg-blue-100/70 border border-blue-200 px-2 py-0.5 rounded-md flex items-center gap-1 font-mono">
+                      <Receipt className="h-3 w-3" />
+                      Boleta N°: {activePlan.numero_boleta}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <span
                     className={
@@ -480,7 +495,10 @@ export function PatientDrawer({
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setIsCertificateOpen(true)}
+                    onClick={() => {
+                      setSelectedBoletaForCert(activePlan?.numero_boleta || null);
+                      setIsCertificateOpen(true);
+                    }}
                     className="h-8 gap-1.5 text-xs font-bold text-blue-700 border-blue-200 hover:bg-blue-50 rounded-xl"
                   >
                     <Printer className="h-3.5 w-3.5" />
@@ -502,6 +520,10 @@ export function PatientDrawer({
                 planes={planes}
                 isLoading={loadingHistory}
                 onOpenRenewModal={() => setIsRenewPlanOpen(true)}
+                onEmitCertificate={(plan) => {
+                  setSelectedBoletaForCert(plan?.numero_boleta || null);
+                  setIsCertificateOpen(true);
+                }}
               />
             </TabsContent>
           </Tabs>
@@ -522,10 +544,14 @@ export function PatientDrawer({
       {isCertificateOpen && (
         <ClinicalCertificateDialog
           isOpen={isCertificateOpen}
-          onClose={() => setIsCertificateOpen(false)}
+          onClose={() => {
+            setIsCertificateOpen(false);
+            setSelectedBoletaForCert(null);
+          }}
           patient={currentPatient}
           evoluciones={evoluciones}
           citas={citasPrevias}
+          numeroBoleta={selectedBoletaForCert}
         />
       )}
 

@@ -12,6 +12,8 @@ export async function createSale(data: {
   total_amount_clp: number;
   payment_method: 'transfer' | 'card' | 'cash' | 'agreement';
   payment_status: 'paid' | 'pending' | 'partial';
+  receipt_number?: string | null;
+  numero_boleta?: string | null;
   notes?: string | null;
 }): Promise<{ success: boolean; data?: Sale; error?: string }> {
   if (!data.patient_id) {
@@ -27,6 +29,7 @@ export async function createSale(data: {
   }
 
   const supabase = await createClient();
+  const boletaClean = data.numero_boleta?.trim() || data.receipt_number?.trim() || null;
 
   const salePayload = {
     patient_id: data.patient_id,
@@ -36,6 +39,7 @@ export async function createSale(data: {
     total_amount_clp: Number(data.total_amount_clp) || 0,
     payment_method: data.payment_method || 'transfer',
     payment_status: data.payment_status || 'paid',
+    receipt_number: boletaClean,
     notes: data.notes?.trim() || null,
   };
 
@@ -57,6 +61,7 @@ export async function createSale(data: {
             plan_name: salePayload.concept,
             total_sessions: salePayload.sessions_quantity,
             used_sessions: 0,
+            receipt_number: boletaClean,
             status: 'active',
           },
         ]);
@@ -75,19 +80,31 @@ export async function createSale(data: {
         partial: 'Parcial / Cuotas',
       };
 
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
+
       await supabase.from('compras_planes').insert([
         {
           id: newSale?.id,
           paciente_id: salePayload.patient_id,
+          plan_id: salePayload.plan_id,
           catalogo_plan_id: salePayload.plan_id,
           nombre_plan: salePayload.concept,
           total_sesiones: salePayload.sessions_quantity,
+          sesiones_totales: salePayload.sessions_quantity,
+          sesiones_usadas: 0,
           precio_base: salePayload.total_amount_clp,
           valor_total: salePayload.total_amount_clp,
           total_final_clp: salePayload.total_amount_clp,
+          monto_clp: salePayload.total_amount_clp,
+          numero_boleta: boletaClean,
           medio_pago: medioPagoMap[salePayload.payment_method] || 'Transferencia',
+          metodo_pago: medioPagoMap[salePayload.payment_method] || 'Transferencia',
           estado_pago: estadoPagoMap[salePayload.payment_status] || 'Pagado',
-          fecha_compra: new Date().toISOString().split('T')[0],
+          fecha_compra: todayStr,
           estado: 'activo',
           notas: salePayload.notes,
         },
@@ -100,15 +117,13 @@ export async function createSale(data: {
         revalidatePath('/agenda');
         return { success: true, data: newSale as Sale };
       }
-      if (saleError) {
-        return { success: false, error: saleError.message };
-      }
+      if (saleError) return { success: false, error: saleError.message };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   }
 
-  const localSale: Sale = {
+  const localNew: Sale = {
     ...salePayload,
     id: 'sale-' + Date.now(),
     created_at: new Date().toISOString(),
@@ -117,10 +132,10 @@ export async function createSale(data: {
   revalidatePath('/finanzas');
   revalidatePath('/pacientes');
   revalidatePath('/');
-  return { success: true, data: localSale };
+  return { success: true, data: localNew };
 }
 
-export async function getSales(limit = 50): Promise<Sale[]> {
+export async function getSales(): Promise<Sale[]> {
   const supabase = await createClient();
 
   if (supabase) {
@@ -129,44 +144,23 @@ export async function getSales(limit = 50): Promise<Sale[]> {
         .from('sales')
         .select(`
           *,
-          patients (
+          patients:patient_id (
+            id,
             full_name,
-            rut
+            rut,
+            phone
+          ),
+          plans:plan_id (
+            id,
+            name,
+            price_clp,
+            sessions_count
           )
         `)
-        .order('created_at', { ascending: false })
-        .limit(limit);
+        .order('created_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
-        return data.map((s: any) => ({
-          ...s,
-          patient_name: s.patients?.full_name,
-          patient_rut: s.patients?.rut,
-        }));
-      }
-
-      // Fallback a compras_planes
-      const { data: compData } = await supabase
-        .from('compras_planes')
-        .select('*, pacientes(nombre_completo, rut)')
-        .order('fecha_compra', { ascending: false })
-        .limit(limit);
-
-      if (compData && compData.length > 0) {
-        return compData.map((c: any) => ({
-          id: c.id,
-          created_at: c.created_at || c.fecha_compra,
-          patient_id: c.paciente_id,
-          plan_id: c.catalogo_plan_id,
-          concept: c.nombre_plan,
-          sessions_quantity: c.total_sesiones,
-          total_amount_clp: Number(c.total_final_clp ?? c.valor_total),
-          payment_method: (c.medio_pago === 'Débito / Transbank' ? 'card' : 'transfer') as any,
-          payment_status: (c.estado_pago === 'Pendiente de Pago' ? 'pending' : 'paid') as any,
-          notes: c.notas,
-          patient_name: c.pacientes?.nombre_completo,
-          patient_rut: c.pacientes?.rut,
-        }));
+        return data as Sale[];
       }
     } catch (err) {
       console.warn('Error en getSales server action:', err);

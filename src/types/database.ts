@@ -130,19 +130,26 @@ export interface CompraPlan {
   id: string;
   paciente_id: string;
   catalogo_plan_id?: string | null;
+  plan_id?: string | null;
   nombre_plan: string;
   total_sesiones: number;
+  sesiones_totales?: number;
+  sesiones_usadas?: number;
   precio_base?: number;
   descuento_clp?: number;
   codigo_cupon?: string | null;
   valor_total: number;
   total_final_clp?: number;
+  monto_clp?: number;
+  numero_boleta?: string | null;
   medio_pago?: MedioPago;
+  metodo_pago?: string;
   estado_pago?: EstadoPago;
   fecha_compra: string;
   estado: "activo" | "finalizado" | "cancelado";
   notas?: string | null;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface VentaPlanDetallada extends CompraPlan {

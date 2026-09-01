@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Printer, CheckCircle2 } from 'lucide-react';
 
 interface ClinicalCertificateDialogProps {
   isOpen?: boolean;
@@ -10,6 +11,7 @@ interface ClinicalCertificateDialogProps {
   patient: {
     nombre_completo: string;
     rut?: string;
+    numero_boleta?: string | null;
   };
   citasAsistidas?: Array<{
     fecha: string;
@@ -20,6 +22,7 @@ interface ClinicalCertificateDialogProps {
     estado: string;
   }>;
   evoluciones?: any[];
+  numeroBoleta?: string | null;
 }
 
 const LOGO_URL = "https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:logo.png";
@@ -33,6 +36,7 @@ export function ClinicalCertificateDialog({
   patient,
   citasAsistidas,
   citas,
+  numeroBoleta: initialBoleta,
 }: ClinicalCertificateDialogProps) {
   const isDialogOpen = isOpen ?? open ?? false;
 
@@ -48,21 +52,28 @@ export function ClinicalCertificateDialog({
 
   const [diagnostico, setDiagnostico] = useState(initialDiagnostico);
   const [codigoPrestacion, setCodigoPrestacion] = useState('Código Fonasa 06-01-105 (Kinesiterapia)');
+  const [boleta, setBoleta] = useState(initialBoleta || (patient as any)?.numero_boleta || '');
   const [observacion, setObservacion] = useState('Paciente completa plan terapéutico con adecuada respuesta clínica y tolerancia funcional.');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if ((patient as any)?.diagnostico_medico || (patient as any)?.diagnostico_principal) {
       setDiagnostico((patient as any).diagnostico_medico || (patient as any).diagnostico_principal);
     }
-  }, [patient]);
+    if (initialBoleta) {
+      setBoleta(initialBoleta);
+    }
+  }, [patient, initialBoleta]);
 
   if (!isDialogOpen) return null;
 
   const citasList = citasAsistidas || citas || [];
 
   const fechas = citasList
-    .filter((c) => c.estado === 'Asistió' || (c.estado as string) === 'Atendido')
+    .filter((c) => {
+      const st = (c.estado || '').toLowerCase();
+      return st === 'asistió' || st === 'asistio' || st === 'atendido' || st === 'completada';
+    })
     .map((c) => {
       const parts = c.fecha.split('-');
       if (parts.length === 3) {
@@ -138,7 +149,7 @@ export function ClinicalCertificateDialog({
             align-items: center;
           }
           .logo-img {
-            max-height: 72px;
+            max-height: 65px;
             width: auto;
             object-fit: contain;
           }
@@ -146,54 +157,58 @@ export function ClinicalCertificateDialog({
             text-align: right;
           }
           .clinic-name {
-            font-size: 17px;
-            font-weight: 900;
+            font-size: 15px;
+            font-weight: 800;
             color: #0369a1;
             letter-spacing: 0.5px;
-            text-transform: uppercase;
           }
           .clinic-sub {
-            font-size: 11px;
+            font-size: 11.5px;
+            font-weight: 600;
             color: #475569;
-            font-weight: 700;
-            margin-top: 1px;
           }
           .clinic-contact {
             font-size: 10px;
             color: #64748b;
-            margin-top: 2px;
+            margin-top: 3px;
             line-height: 1.3;
           }
+          /* TITULO */
           .doc-title {
             text-align: center;
-            font-size: 15px;
-            font-weight: 900;
+            font-size: 16px;
+            font-weight: 800;
             color: #0f172a;
-            margin-bottom: 18px;
+            letter-spacing: 1px;
             text-transform: uppercase;
-            letter-spacing: 0.8px;
+            margin-bottom: 18px;
           }
+          /* DATOS DEL PACIENTE */
           .patient-box {
             background: #f8fafc;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #0284c7;
             padding: 12px 16px;
-            margin-bottom: 16px;
+            border-radius: 6px;
+            margin-bottom: 18px;
             font-size: 12.5px;
-            line-height: 1.7;
+            line-height: 1.6;
           }
           .content {
             font-size: 13px;
+            color: #334155;
             text-align: justify;
             margin-bottom: 16px;
-            line-height: 1.75;
+            line-height: 1.6;
           }
+          /* TABLA/GRILLA DE FECHAS */
           .dates-title {
-            font-size: 11.5px;
-            font-weight: 800;
-            color: #334155;
-            margin-bottom: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 8px;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
           }
           .dates-grid {
             display: flex;
@@ -286,6 +301,7 @@ export function ClinicalCertificateDialog({
         <div class="patient-box">
           <div><strong>Paciente:</strong> ${patient.nombre_completo}</div>
           <div><strong>RUT:</strong> ${patient.rut || 'No registrado'}</div>
+          ${boleta ? `<div><strong>Documento Tributario:</strong> Boleta Electrónica N° ${boleta}</div>` : ''}
           <div><strong>Diagnóstico Kinésico:</strong> ${diagnostico}</div>
           <div><strong>Prestación / Código:</strong> ${codigoPrestacion}</div>
         </div>
@@ -348,67 +364,80 @@ export function ClinicalCertificateDialog({
 
         <div className="space-y-3 text-sm">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 uppercase">Diagnóstico Clínico</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Diagnóstico Médico / Hipótesis Kinésica:
+            </label>
             <input
               type="text"
               value={diagnostico}
               onChange={(e) => setDiagnostico(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 uppercase">Código Prestación / Fonasa / Isapre</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              N° de Boleta / Documento Tributario (Para Reembolso Isapre/Seguro):
+            </label>
+            <input
+              type="text"
+              placeholder="Ej: 14582"
+              value={boleta}
+              onChange={(e) => setBoleta(e.target.value)}
+              className="w-full px-3 py-2 border rounded-xl text-sm font-mono font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Prestación / Código de Reembolso:
+            </label>
             <input
               type="text"
               value={codigoPrestacion}
               onChange={(e) => setCodigoPrestacion(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 uppercase">Observaciones / Evolución Final</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Observaciones Clínicas:
+            </label>
             <textarea
               rows={2}
               value={observacion}
               onChange={(e) => setObservacion(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none resize-none"
             />
           </div>
 
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <span className="text-xs font-bold text-slate-500 uppercase block mb-1">Sesiones que se incluirán ({totalSesiones}):</span>
+          <div className="bg-slate-50 p-3 rounded-xl border text-xs text-slate-600">
+            <span className="font-semibold block mb-1">Fechas registradas a certificar ({totalSesiones}):</span>
             <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-              {fechas.length === 0 ? (
-                <span className="text-xs text-amber-600">Este paciente no registra atenciones con estado 'Asistió'.</span>
-              ) : (
-                fechas.map((f, i) => (
-                  <span key={i} className="text-xs bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-600 font-medium">
-                    {f}
-                  </span>
-                ))
-              )}
+              {fechas.map((f, i) => (
+                <span key={i} className="bg-white border px-2 py-0.5 rounded text-[11px] font-mono">
+                  {f}
+                </span>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-3 border-t">
+        <div className="flex items-center justify-end gap-2 pt-2 border-t">
           <button
-            type="button"
             onClick={handleClose}
-            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium"
+            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
           >
-            Cerrar
+            Cancelar
           </button>
           <button
-            type="button"
             onClick={handlePrint}
-            disabled={totalSesiones === 0 || isGenerating}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-lg text-sm font-medium shadow-sm transition-colors flex items-center gap-2"
+            disabled={isGenerating || totalSesiones === 0}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 disabled:opacity-50"
           >
-            <span>🖨️</span>
-            <span>{isGenerating ? 'Preparando...' : 'Imprimir / Guardar PDF (1 pág)'}</span>
+            <Printer className="h-4 w-4" />
+            <span>{isGenerating ? 'Generando...' : 'Imprimir / Guardar PDF'}</span>
           </button>
         </div>
       </div>
