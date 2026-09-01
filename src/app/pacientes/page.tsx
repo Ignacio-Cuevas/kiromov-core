@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header } from '@/components/dashboard/Header';
 import { PatientModal } from '@/components/patients/PatientModal';
 import { SaleModal } from '@/components/sales/SaleModal';
+import { PayPlanModal } from '@/components/patients/PayPlanModal';
 import { PatientDrawer } from '@/components/patients/PatientDrawer';
 import { createClient } from '@/utils/supabase/client';
 import { fetchVistaResumenPacientes } from '@/lib/supabase';
@@ -27,6 +28,7 @@ import {
   PackageCheck,
   AlertTriangle,
   Clock,
+  CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -79,86 +81,190 @@ export default function PatientsPage() {
   const [patientToEdit, setPatientToEdit] = useState<any | null>(null);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
   const [patientTargetSale, setPatientTargetSale] = useState<any | null>(null);
+  const [isPayPlanOpen, setIsPayPlanOpen] = useState(false);
+  const [planToPay, setPlanToPay] = useState<any | null>(null);
+  const [patientNameToPay, setPatientNameToPay] = useState<string>('');
   const [selectedPatientForDrawer, setSelectedPatientForDrawer] = useState<any | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // 1. Cargar Datos desde Supabase vista_resumen_pacientes
+  // 1. Cargar Datos con reconciliación en tiempo real (vista_resumen_pacientes + compras_planes + citas_atenciones)
   const loadData = useCallback(async (showToast = false) => {
     try {
       if (showToast) setIsRefreshing(true);
 
-      let data: any[] | null = null;
+      let vistaData: any[] = [];
+      let pacientesData: any[] = [];
+      let comprasData: any[] = [];
+      let citasData: any[] = [];
 
       if (supabase) {
         try {
-          const { data: vistaData, error } = await supabase
-            .from('vista_resumen_pacientes')
-            .select('*')
-            .order('nombre_completo', { ascending: true });
+          const [vRes, pRes, cpRes, caRes] = await Promise.all([
+            supabase.from('vista_resumen_pacientes').select('*'),
+            supabase.from('pacientes').select('*').order('nombre_completo', { ascending: true }),
+            supabase.from('compras_planes').select('*').order('fecha_compra', { ascending: false }),
+            supabase.from('citas_atenciones').select('*'),
+          ]);
 
-          if (!error && vistaData && vistaData.length > 0) {
-            data = vistaData;
+          if (!vRes.error && vRes.data && vRes.data.length > 0) {
+            vistaData = vRes.data;
+          }
+          if (!pRes.error && pRes.data && pRes.data.length > 0) {
+            pacientesData = pRes.data;
+          }
+          if (!cpRes.error && cpRes.data && cpRes.data.length > 0) {
+            comprasData = cpRes.data;
+          }
+          if (!caRes.error && caRes.data && caRes.data.length > 0) {
+            citasData = caRes.data;
           }
         } catch (err) {
-          console.warn('Error al consultar vista_resumen_pacientes:', err);
+          console.warn('Error al consultar datos en paralelo:', err);
         }
       }
 
-      if (!data) {
-        data = await fetchVistaResumenPacientes();
-      }
+      const baseList =
+        vistaData.length > 0
+          ? vistaData
+          : pacientesData.length > 0
+          ? pacientesData
+          : await fetchVistaResumenPacientes();
 
-      // Normalizar campos para compatibilidad completa
-      const normalized = (data || []).map((p) => {
-        const fullName = p.nombre_completo || p.full_name || 'Paciente Sin Nombre';
-        const rutVal = p.rut || '';
-        const phoneVal = p.telefono || p.phone || '';
-        const emailVal = p.email || '';
-        const insuranceVal =
-          p.prevision || p.prevision_salud || p.health_insurance || 'Particular';
-        const medicalNotes =
-          p.diagnostico_principal ||
-          p.diagnostico_medico ||
-          p.motivo_consulta ||
-          p.medical_notes ||
-          '';
+      // Mapa de citas asistidas reales por paciente
+      const realAttendedMap = new Map<string, number>();
+      citasData.forEach((c: any) => {
+        const st = (c.estado || '').toLowerCase().trim();
+        if (
+          st === 'asistió' ||
+          st === 'asistio' ||
+          st === 'atendido' ||
+          st === 'completada' ||
+          st === 'completado' ||
+          st === 'inasistencia (descuenta sesión)'
+        ) {
+          realAttendedMap.set(
+            c.paciente_id,
+            (realAttendedMap.get(c.paciente_id) || 0) + 1
+          );
+        }
+      });
 
-        const totalSes = Number(p.sesiones_totales ?? p.total_sesiones ?? p.total_sessions ?? 0);
-        const usedSes = Number(p.sesiones_usadas ?? p.sesiones_consumidas ?? p.used_sessions ?? 0);
-        const remainingSes =
-          p.sesiones_restantes !== undefined
-            ? Number(p.sesiones_restantes)
-            : Math.max(0, totalSes - usedSes);
+      // Mapa de compras_planes por paciente
+      const planesByPatientMap = new Map<string, any[]>();
+      comprasData.forEach((cp: any) => {
+        const list = planesByPatientMap.get(cp.paciente_id) || [];
+        list.push(cp);
+        planesByPatientMap.set(cp.paciente_id, list);
+      });
+
+      const finalPatients = baseList.map((p: any) => {
+        const patientId = p.id || p.paciente_id;
+        const patientPlans = planesByPatientMap.get(patientId) || [];
+        const activePlan =
+          patientPlans.find((pl: any) => pl.estado === 'activo') ||
+          patientPlans[0] ||
+          null;
+
+        // Calcular totales de sesiones
+        const realAttendedCount =
+          realAttendedMap.get(patientId) ??
+          Number(p.sesiones_usadas ?? p.sesiones_consumidas ?? p.used_sessions ?? 0);
+
+        let totalPurchased = patientPlans.reduce(
+          (sum: number, pl: any) =>
+            sum + Number(pl.total_sesiones || pl.sesiones_totales || 0),
+          0
+        );
+
+        if (totalPurchased === 0) {
+          totalPurchased = Number(
+            p.sesiones_totales ?? p.total_sesiones ?? p.total_sessions ?? 0
+          );
+        }
+
+        const finalTotal =
+          totalPurchased > 0
+            ? totalPurchased
+            : realAttendedCount > 0
+            ? realAttendedCount
+            : 0;
+        const remaining = Math.max(0, finalTotal - realAttendedCount);
+        const percent =
+          finalTotal > 0
+            ? Math.min(100, Math.round((realAttendedCount / finalTotal) * 100))
+            : 0;
+
+        // Determinar estado_plan normalizado
+        let estadoPlan: string = 'sin_plan';
+        if (finalTotal === 0) {
+          estadoPlan = 'sin_plan';
+        } else if (remaining <= 0) {
+          estadoPlan = 'finalizado';
+        } else if (remaining === 1) {
+          estadoPlan = 'por_renovar';
+        } else {
+          estadoPlan = 'vigente';
+        }
+
+        // Detectar si tiene cobro pendiente
+        const pendingPlanObj = patientPlans.find((pl: any) => {
+          const st = (pl.estado_pago || '').toLowerCase().trim();
+          return st.includes('pendiente') || st === 'pending' || st === 'unpaid';
+        });
 
         return {
-          ...p,
-          id: p.id,
-          nombre_completo: fullName,
-          full_name: fullName,
-          rut: rutVal,
-          telefono: phoneVal,
-          phone: phoneVal,
-          email: emailVal,
-          prevision: insuranceVal,
-          prevision_salud: insuranceVal,
-          health_insurance: insuranceVal,
-          diagnostico_principal: medicalNotes,
-          medical_notes: medicalNotes,
-          sesiones_totales: totalSes,
-          total_sesiones: totalSes,
-          total_sessions: totalSes,
-          sesiones_usadas: usedSes,
-          sesiones_consumidas: usedSes,
-          used_sessions: usedSes,
-          sesiones_restantes: remainingSes,
-          remaining_sessions: remainingSes,
-          estado_plan: p.estado_plan,
+          id: patientId,
+          codigo_paciente: p.codigo_paciente || 'PAC-CLINIC',
+          nombre_completo: p.nombre_completo || p.full_name || 'Paciente Sin Nombre',
+          full_name: p.nombre_completo || p.full_name || 'Paciente Sin Nombre',
+          rut: p.rut || '',
+          telefono: p.telefono || p.phone || '',
+          phone: p.telefono || p.phone || '',
+          email: p.email || '',
+          prevision:
+            p.prevision || p.prevision_salud || p.health_insurance || 'Particular',
+          prevision_salud:
+            p.prevision || p.prevision_salud || p.health_insurance || 'Particular',
+          health_insurance:
+            p.prevision || p.prevision_salud || p.health_insurance || 'Particular',
+          diagnostico_principal:
+            p.diagnostico_principal ||
+            p.diagnostico_medico ||
+            p.motivo_consulta ||
+            p.medical_notes ||
+            '',
+          medical_notes:
+            p.diagnostico_principal ||
+            p.diagnostico_medico ||
+            p.motivo_consulta ||
+            p.medical_notes ||
+            '',
+          plan_id: activePlan?.id || p.plan_id || (finalTotal > 0 ? 'active-plan' : null),
+          nombre_plan:
+            activePlan?.nombre_plan ||
+            p.nombre_plan ||
+            (finalTotal > 0 ? 'Plan de Kinesiología' : null),
+          sesiones_totales: finalTotal,
+          total_sesiones: finalTotal,
+          total_sessions: finalTotal,
+          sesiones_usadas: realAttendedCount,
+          sesiones_consumidas: realAttendedCount,
+          used_sessions: realAttendedCount,
+          sesiones_restantes: remaining,
+          remaining_sessions: remaining,
+          percent,
+          estado_plan: estadoPlan,
+          has_pending_payment: !!pendingPlanObj,
+          pending_plan: pendingPlanObj || null,
+          active_plan: activePlan,
+          planes: patientPlans,
         };
       });
 
-      setPacientes(normalized);
+      setPacientes(finalPatients);
       if (showToast) toast.success('Directorio de pacientes actualizado');
     } catch (err) {
+      console.error('Error en loadData:', err);
       toast.error('Error al cargar pacientes');
     } finally {
       setIsLoading(false);
@@ -238,6 +344,16 @@ export default function PatientsPage() {
   const handleOpenSale = (p: any) => {
     setPatientTargetSale(p);
     setIsSaleModalOpen(true);
+  };
+
+  const handleOpenPayPlan = (p: any) => {
+    if (p.pending_plan) {
+      setPlanToPay(p.pending_plan);
+      setPatientNameToPay(p.nombre_completo);
+      setIsPayPlanOpen(true);
+    } else {
+      handleOpenSale(p);
+    }
   };
 
   const handleOpenDrawer = (p: any) => {
@@ -492,7 +608,7 @@ export default function PatientsPage() {
             )}
           </div>
         ) : viewMode === 'table' ? (
-          /* Table View con consumo de vista_resumen_pacientes */
+          /* Table View con consumo exacto de campos */
           <div className="w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-xs">
             <Table className="w-full">
               <TableHeader>
@@ -577,24 +693,39 @@ export default function PatientsPage() {
 
                       {/* Estado del Plan (Insignias) */}
                       <TableCell className="min-w-[160px]">
-                        {planCat === 'vigente' && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            ● Plan Vigente
-                          </span>
-                        )}
-                        {planCat === 'por_renovar' && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                            ⚠️ Por Renovar (1 rest.)
-                          </span>
-                        )}
-                        {planCat === 'finalizado' && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                            Finalizado
-                          </span>
-                        )}
-                        {planCat === 'sin_plan' && (
-                          <span className="text-slate-400 text-xs italic">Sin Plan Activo</span>
-                        )}
+                        <div className="space-y-1">
+                          {planCat === 'vigente' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              ● Plan Vigente
+                            </span>
+                          )}
+                          {planCat === 'por_renovar' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                              ⚠️ Por Renovar (1 rest.)
+                            </span>
+                          )}
+                          {planCat === 'finalizado' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                              Finalizado
+                            </span>
+                          )}
+                          {planCat === 'sin_plan' && (
+                            <span className="text-slate-400 text-xs italic">Sin Plan Activo</span>
+                          )}
+
+                          {p.has_pending_payment && (
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPayPlan(p)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 transition-colors"
+                              >
+                                <AlertCircle className="h-3 w-3 text-amber-600" />
+                                <span>⚠️ Pago Pendiente</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
 
                       {/* Acciones */}
@@ -610,15 +741,27 @@ export default function PatientsPage() {
                             <span>Ficha</span>
                           </Button>
 
-                          <Button
-                            size="sm"
-                            onClick={() => handleOpenSale(p)}
-                            className="h-8 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 font-semibold text-xs gap-1 rounded-xl shadow-2xs shrink-0"
-                            title="Vender o asignar sesiones"
-                          >
-                            <ShoppingCart className="h-3.5 w-3.5 shrink-0" />
-                            <span>Venta</span>
-                          </Button>
+                          {p.has_pending_payment ? (
+                            <Button
+                              size="sm"
+                              onClick={() => handleOpenPayPlan(p)}
+                              className="h-8 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs gap-1 rounded-xl shadow-2xs shrink-0"
+                              title="Cobrar plan adeudado"
+                            >
+                              <CreditCard className="h-3.5 w-3.5 shrink-0" />
+                              <span>Cobrar</span>
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => handleOpenSale(p)}
+                              className="h-8 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 font-semibold text-xs gap-1 rounded-xl shadow-2xs shrink-0"
+                              title="Vender o asignar sesiones"
+                            >
+                              <ShoppingCart className="h-3.5 w-3.5 shrink-0" />
+                              <span>Venta</span>
+                            </Button>
+                          )}
 
                           <Link
                             href={`/agenda?pacienteId=${p.id}`}
@@ -730,24 +873,37 @@ export default function PatientsPage() {
                       {hasPlan && <Progress value={percent} className="h-2" />}
 
                       {/* Badge de Estado del Plan */}
-                      <div className="pt-1">
-                        {planCat === 'vigente' && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-100/80 text-emerald-800 border border-emerald-200">
-                            ● Plan Vigente
-                          </span>
-                        )}
-                        {planCat === 'por_renovar' && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-100/80 text-amber-800 border border-amber-200">
-                            ⚠️ Por Renovar (1 rest.)
-                          </span>
-                        )}
-                        {planCat === 'finalizado' && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-200 text-slate-700">
-                            Finalizado
-                          </span>
-                        )}
-                        {planCat === 'sin_plan' && (
-                          <span className="text-slate-400 text-xs italic">Sin Plan Activo</span>
+                      <div className="pt-1 flex flex-wrap items-center justify-between gap-1">
+                        <div>
+                          {planCat === 'vigente' && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-100/80 text-emerald-800 border border-emerald-200">
+                              ● Plan Vigente
+                            </span>
+                          )}
+                          {planCat === 'por_renovar' && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-100/80 text-amber-800 border border-amber-200">
+                              ⚠️ Por Renovar (1 rest.)
+                            </span>
+                          )}
+                          {planCat === 'finalizado' && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-200 text-slate-700">
+                              Finalizado
+                            </span>
+                          )}
+                          {planCat === 'sin_plan' && (
+                            <span className="text-slate-400 text-xs italic">Sin Plan Activo</span>
+                          )}
+                        </div>
+
+                        {p.has_pending_payment && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPayPlan(p)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200"
+                          >
+                            <AlertCircle className="h-3 w-3 text-amber-600" />
+                            <span>⚠️ Cobro Pendiente</span>
+                          </button>
                         )}
                       </div>
                     </div>
@@ -765,15 +921,27 @@ export default function PatientsPage() {
                       <span>Ficha</span>
                     </Button>
 
-                    <Button
-                      size="sm"
-                      onClick={() => handleOpenSale(p)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1 rounded-xl shadow-2xs"
-                      title="Vender o asignar sesiones a este paciente"
-                    >
-                      <ShoppingCart className="h-3.5 w-3.5" />
-                      <span>Venta</span>
-                    </Button>
+                    {p.has_pending_payment ? (
+                      <Button
+                        size="sm"
+                        onClick={() => handleOpenPayPlan(p)}
+                        className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs gap-1 rounded-xl shadow-2xs"
+                        title="Cobrar plan adeudado"
+                      >
+                        <CreditCard className="h-3.5 w-3.5" />
+                        <span>Cobrar</span>
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => handleOpenSale(p)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1 rounded-xl shadow-2xs"
+                        title="Vender o asignar sesiones a este paciente"
+                      >
+                        <ShoppingCart className="h-3.5 w-3.5" />
+                        <span>Venta</span>
+                      </Button>
+                    )}
 
                     <Link
                       href={`/agenda?pacienteId=${p.id}`}
@@ -817,6 +985,21 @@ export default function PatientsPage() {
         initialPatient={patientTargetSale}
         onSaleCompleted={handleSaleCompleted}
       />
+
+      {/* Pay Plan Modal */}
+      {isPayPlanOpen && planToPay && (
+        <PayPlanModal
+          open={isPayPlanOpen}
+          onOpenChange={setIsPayPlanOpen}
+          onClose={() => {
+            setIsPayPlanOpen(false);
+            setPlanToPay(null);
+          }}
+          plan={planToPay}
+          patientName={patientNameToPay}
+          onSuccess={() => loadData(true)}
+        />
+      )}
 
       {/* Patient Clinical Drawer */}
       <PatientDrawer
