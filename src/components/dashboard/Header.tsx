@@ -24,8 +24,8 @@ import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 
 interface HeaderProps {
-  searchQuery: string;
-  onSearchChange: (val: string) => void;
+  searchQuery?: string;
+  onSearchChange?: (val: string) => void;
   isSupabaseOnline?: boolean;
 }
 
@@ -140,11 +140,11 @@ export function Header({
                   ? "Buscar tarifas..."
                   : "Buscar por Nombre o RUT..."
               }
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
+              value={searchQuery || ""}
+              onChange={(e) => onSearchChange?.(e.target.value)}
               className="pl-9 pr-8 h-10 w-full rounded-xl border-slate-200 bg-slate-50 text-sm focus:bg-white transition-all shadow-2xs"
             />
-            {searchQuery && (
+            {searchQuery && onSearchChange && (
               <button
                 type="button"
                 onClick={() => onSearchChange("")}
