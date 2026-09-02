@@ -97,17 +97,34 @@ function FinanzasContent() {
     if (!supabase || !settlingPlan) return;
     setSavingSettle(true);
     try {
-      const { error } = await supabase.from('compras_planes').update({
+      const payload: any = {
         estado_pago: 'pagado',
-        medio_pago: settleForm.metodo_pago,
+        metodo_pago: settleForm.metodo_pago || 'transferencia',
         numero_boleta: settleForm.boleta?.trim() || null,
         updated_at: new Date().toISOString()
-      }).eq('id', settlingPlan.id);
-      if (error) throw error;
-      toast.success('¡Cobro registrado exitosamente!');
+      };
+
+      const { data, error } = await supabase
+        .from('compras_planes')
+        .update(payload)
+        .eq('id', settlingPlan.id);
+
+      if (error) {
+        console.error('Error detallado de Supabase:', error);
+        toast.error(`Error: ${error.message}`);
+        setSavingSettle(false);
+        return;
+      }
+
+      toast.success('¡Cobro registrado y boleta asociada exitosamente!');
       setSettlingPlan(null);
       loadData();
-    } catch (err) { toast.error('Error registrando cobro'); } finally { setSavingSettle(false); }
+    } catch (err: any) {
+      console.error('Excepción al registrar cobro:', err);
+      toast.error(err.message || 'Error inesperado al registrar el cobro');
+    } finally {
+      setSavingSettle(false);
+    }
   };
 
   return (
