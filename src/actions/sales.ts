@@ -91,7 +91,7 @@ export async function createSale(data: {
 
       // 2. Sincronizar en tabla sales si existe
       try {
-        const { data: newSale } = await supabase
+        const { data: newSale, error: saleError } = await supabase
           .from('sales')
           .insert([
             {
@@ -108,10 +108,15 @@ export async function createSale(data: {
           ])
           .select()
           .single();
+          
+        if (saleError) {
+          console.error('Error insertando sale:', saleError);
+          throw new Error(saleError.message);
+        }
 
         // 3. Sincronizar en patient_plans si aplica
         if (newSale?.id && sessionsQty > 0) {
-          await supabase.from('patient_plans').insert([
+          const { error: ppError } = await supabase.from('patient_plans').insert([
             {
               patient_id: data.patient_id,
               sale_id: newSale.id,
@@ -122,6 +127,10 @@ export async function createSale(data: {
               status: 'active',
             },
           ]);
+          if (ppError) {
+            console.error('Error insertando patient_plans:', ppError);
+            throw new Error(ppError.message);
+          }
         }
       } catch (salesErr) {
         console.warn('Tabla sales no disponible o error secundario:', salesErr);

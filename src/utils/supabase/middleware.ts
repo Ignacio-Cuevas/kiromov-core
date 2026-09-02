@@ -25,7 +25,12 @@ export const updateSession = async (request: NextRequest) => {
     });
 
     if (!supabaseUrl || !supabaseKey || supabaseUrl.includes("tu_supabase_url")) {
-      // En modo local sin credenciales configuradas, permitir navegación
+      if (!isPublicRoute) {
+        const loginUrl = request.nextUrl.clone();
+        loginUrl.pathname = "/login";
+        loginUrl.searchParams.set('error', 'session_error');
+        return NextResponse.redirect(loginUrl);
+      }
       return supabaseResponse;
     }
 
@@ -85,10 +90,12 @@ export const updateSession = async (request: NextRequest) => {
 
     return supabaseResponse;
   } catch {
-    return NextResponse.next({
-      request: {
-        headers: request.headers,
-      },
-    });
+    if (!isPublicRoute) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set('error', 'session_error');
+      return NextResponse.redirect(loginUrl);
+    }
+    return NextResponse.next({ request: { headers: request.headers } });
   }
 };

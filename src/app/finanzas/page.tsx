@@ -84,7 +84,11 @@ function FinanzasContent() {
       fecha: new Date().toISOString().split('T')[0], responsable: 'Klgo. Ignacio Cuevas'
     };
     try {
-      await supabase.from('egresos_caja').insert([nuevoEgreso]);
+      const { error } = await supabase.from('egresos_caja').insert([nuevoEgreso]);
+      if (error) {
+        console.error('Error en Supabase:', error);
+        throw new Error(error.message);
+      }
       toast.success('Egreso guardado');
       setShowEgresoModal(false);
       setEgresoForm({ concepto: '', categoria: 'Insumos Clínicos', monto: '', formaPago: 'Débito' });

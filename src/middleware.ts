@@ -5,7 +5,10 @@ export async function middleware(request: NextRequest) {
   try {
     return await updateSession(request);
   } catch {
-    return NextResponse.next();
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.searchParams.set('error', 'session_error');
+    return NextResponse.redirect(loginUrl);
   }
 }
 

@@ -14,6 +14,13 @@ const supabase =
     : null;
 
 export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get('x-api-key') || req.headers.get('authorization');
+  const secretKey = process.env.CALENDAR_WEBHOOK_SECRET;
+
+  if (!secretKey || authHeader !== secretKey) {
+    return NextResponse.json({ error: 'No autorizado: Token de webhook inválido o ausente' }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     let { nombre_completo, email, telefono, fecha, hora, motivo, google_event_id } = body;
