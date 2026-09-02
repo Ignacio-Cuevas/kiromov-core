@@ -37,15 +37,7 @@ export function ReimbursementCertificate({
   const [planNombreEditable, setPlanNombreEditable] = useState('');
 
   // Helper para obtener URLs públicas de Supabase Storage
-  const getStorageAssetUrl = (fileName: string) => {
-    if (!supabase) return '';
-    const { data } = supabase.storage.from('branding').getPublicUrl(fileName);
-    return data?.publicUrl || '';
-  };
-
-  const logoUrl = getStorageAssetUrl('logo.png');
-  const timbreUrl = getStorageAssetUrl('timbre.png');
-
+  
   useEffect(() => {
     if (!isOpen || !patient?.id) return;
 
@@ -190,13 +182,14 @@ export function ReimbursementCertificate({
               {/* Encabezado con Logo Oficial de Supabase */}
               <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
                 <div className="flex items-center gap-4">
-                  {logoUrl && (
-                    <img 
-                      src={logoUrl} 
-                      alt="Kiromov Centro Clínico" 
-                      className="h-16 w-auto object-contain print:h-16"
-                    />
-                  )}
+                  <img 
+  src="/branding/logo.png" 
+  alt="Kiromov Centro Clínico" 
+  className="h-16 w-auto object-contain print:h-16"
+  onError={(e) => {
+    (e.target as HTMLImageElement).src = `${process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://nxlabwiewewwkwemtvfj.supabase.co'}/storage/v1/object/public/branding/logo.png`;
+  }}
+/>
                   <div>
                     <h1 className="text-xl font-bold tracking-tight text-slate-900 font-sans leading-none mb-1">KIROMOV CENTRO CLÍNICO</h1>
                     <p className="text-xs text-slate-700 font-sans font-medium mt-1">Terapia Manual Ortopédica & Rehabilitación Funcional</p>
@@ -391,15 +384,14 @@ export function ReimbursementCertificate({
                 <div className="text-center font-sans">
                   {/* Imagen del Timbre Clínico desde Supabase */}
                   <div className="h-20 flex items-center justify-center mb-1 relative">
-                    {timbreUrl ? (
-                      <img 
-                        src={timbreUrl} 
-                        alt="Timbre Profesional SIS N° 396889" 
-                        className="absolute h-28 w-auto object-contain mix-blend-multiply opacity-90 -top-4 pointer-events-none"
-                      />
-                    ) : (
-                      <span className="text-[11px] text-slate-300 italic">Firma y Timbre</span>
-                    )}
+                    <img 
+  src="/branding/timbre.png" 
+  alt="Timbre Profesional SIS N° 396889" 
+  className="absolute h-28 w-auto object-contain mix-blend-multiply opacity-90 -top-4 pointer-events-none"
+  onError={(e) => {
+    (e.target as HTMLImageElement).src = `${process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://nxlabwiewewwkwemtvfj.supabase.co'}/storage/v1/object/public/branding/timbre.png`;
+  }}
+/>
                   </div>
 
                   <div className="w-56 border-b-2 border-slate-900 mb-1 mx-auto relative z-10" />
@@ -417,44 +409,66 @@ export function ReimbursementCertificate({
         </div>
 
         {/* Global CSS for Print Mode overrides */}
-        <style dangerouslySetInnerHTML={{__html: `
-          @media print {
-            @page { 
-              size: letter portrait; 
-              margin: 10mm 12mm 10mm 12mm; 
-            }
-            body * {
-              visibility: hidden;
-            }
-            body {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            .no-print {
-              display: none !important;
-            }
-            /* aislar el documento impreso */
-            #documento-certificado, #documento-certificado * {
-              visibility: visible;
-            }
-            #documento-certificado {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100% !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              box-shadow: none !important;
-              border: none !important;
-            }
-            /* Ajustes para inputs editables en impresion */
-            input, textarea {
-              border: none !important;
-              background: transparent !important;
-              resize: none !important;
-            }
-          }
-        `}} />
+        <style jsx global>{`
+  @media print {
+    /* 1. Resetear html y body */
+    html, body {
+      height: auto !important;
+      overflow: visible !important;
+      background: white !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    /* 2. Neutralizar el overlay fijo del modal para que no empuje el contenido a la página 2 */
+    .fixed, 
+    div[role="dialog"],
+    .backdrop-blur-sm {
+      position: static !important;
+      background: none !important;
+      backdrop-filter: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      overflow: visible !important;
+      height: auto !important;
+      max-height: none !important;
+    }
+
+    /* 3. Ocultar todos los botones y barras de la web */
+    header,
+    nav,
+    .print\:hidden,
+    button {
+      display: none !important;
+    }
+
+    /* 4. Configurar el certificado para que inicie en el margen superior de la Página 1 */
+    @page {
+      size: letter portrait;
+      margin: 10mm 15mm 10mm 15mm;
+    }
+
+    #documento-certificado {
+      display: block !important;
+      position: static !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+      page-break-inside: avoid !important;
+      page-break-after: avoid !important;
+    }
+
+    /* Ajustes para inputs editables en impresion */
+    input, textarea {
+      border: none !important;
+      background: transparent !important;
+      resize: none !important;
+    }
+  }
+`}</style>
       </div>
     </div>
   );
