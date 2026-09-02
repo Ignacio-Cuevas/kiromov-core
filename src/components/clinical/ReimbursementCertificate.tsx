@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Printer, CheckCircle2 } from 'lucide-react';
 
-interface ClinicalCertificateDialogProps {
+interface ReimbursementCertificateProps {
   isOpen?: boolean;
   open?: boolean;
   onClose?: () => void;
@@ -28,7 +28,7 @@ interface ClinicalCertificateDialogProps {
 const LOGO_URL = "https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:logo.png";
 const TIMBRE_URL = "https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:timbre.png";
 
-export function ClinicalCertificateDialog({
+export function ReimbursementCertificate({
   isOpen,
   open,
   onClose,
@@ -37,7 +37,7 @@ export function ClinicalCertificateDialog({
   citasAsistidas,
   citas,
   numeroBoleta: initialBoleta,
-}: ClinicalCertificateDialogProps) {
+}: ReimbursementCertificateProps) {
   const isDialogOpen = isOpen ?? open ?? false;
 
   const handleClose = () => {
@@ -445,4 +445,4 @@ export function ClinicalCertificateDialog({
   );
 }
 
-export default ClinicalCertificateDialog;
+export default ReimbursementCertificate;

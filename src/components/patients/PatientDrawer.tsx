@@ -16,8 +16,10 @@ import { AttendanceHistoryTab } from "./AttendanceHistoryTab";
 import { PlansHistoryTab } from "./PlansHistoryTab";
 import { RenewPlanDialog } from "./RenewPlanDialog";
 import { PayPlanModal } from "./PayPlanModal";
-import { ClinicalCertificateDialog } from "./ClinicalCertificateDialog";
 import { EditPatientDialog } from "./EditPatientDialog";
+import { ReimbursementCertificate } from "@/components/clinical/ReimbursementCertificate";
+import { SOAPModal } from "@/components/clinical/SOAPModal";
+import { SoapTimelineAccordion } from "./SoapTimelineAccordion";
 import {
   VistaResumenPaciente,
   CitaAtencion,
@@ -108,6 +110,7 @@ export function PatientDrawer({
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   const [selectedBoletaForCert, setSelectedBoletaForCert] = useState<string | null>(null);
   const [isEditPatientOpen, setIsEditPatientOpen] = useState(false);
+  const [isSOAPModalOpen, setIsSOAPModalOpen] = useState(false);
 
   // 1. Cargar Datos del Paciente desde Supabase (Citas, Planes, SOAP)
   const loadPatientData = useCallback(async () => {
@@ -506,13 +509,18 @@ export function PatientDrawer({
             </TabsList>
 
             {/* TAB 1: FORMULARIO SOAP */}
-            <TabsContent value="soap">
-              <SoapEvolutionForm
-                pacienteId={currentPatient.id}
-                pacienteNombre={currentPatient.nombre_completo || currentPatient.full_name}
-                onEvolutionSaved={handleEvolutionSaved}
-                previousEvolutions={evoluciones}
-                isLoadingEvolutions={loadingHistory}
+            <TabsContent value="soap" className="space-y-4">
+              <div className="flex justify-end">
+                <Button 
+                  onClick={() => setIsSOAPModalOpen(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-9 px-4 rounded-xl shadow-sm"
+                >
+                  + Nueva Evolución SOAP
+                </Button>
+              </div>
+              <SoapTimelineAccordion
+                evoluciones={evoluciones}
+                isLoading={loadingHistory}
               />
             </TabsContent>
 
@@ -596,7 +604,7 @@ export function PatientDrawer({
       )}
 
       {isCertificateOpen && (
-        <ClinicalCertificateDialog
+        <ReimbursementCertificate
           isOpen={isCertificateOpen}
           onClose={() => {
             setIsCertificateOpen(false);
@@ -619,6 +627,16 @@ export function PatientDrawer({
             loadPatientData();
             onAttendanceRegistered?.(currentPatient.id);
           }}
+        />
+      )}
+
+      {isSOAPModalOpen && (
+        <SOAPModal
+          isOpen={isSOAPModalOpen}
+          onClose={() => setIsSOAPModalOpen(false)}
+          pacienteId={currentPatient.id}
+          pacienteNombre={currentPatient.nombre_completo || currentPatient.full_name}
+          onEvolutionSaved={handleEvolutionSaved}
         />
       )}
     </>

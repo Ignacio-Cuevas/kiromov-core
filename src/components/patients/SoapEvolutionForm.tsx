@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { PainScaleSelector } from "./PainScaleSelector";
 import { PainMapCanvas } from "./PainMapCanvas";
-import { SoapTimelineAccordion } from "./SoapTimelineAccordion";
 import { EvolucionSOAP } from "@/types/database";
 import { guardarEvolucionSOAP } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -423,12 +422,6 @@ export function SoapEvolutionForm({
           </div>
         </form>
       </div>
-
-      {/* Interactive Timeline Accordion of Previous Evolutions */}
-      <SoapTimelineAccordion
-        evoluciones={previousEvolutions}
-        isLoading={isLoadingEvolutions}
-      />
     </div>
   );
 }
