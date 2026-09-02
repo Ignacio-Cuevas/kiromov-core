@@ -134,7 +134,7 @@ function FinanzasContent() {
         
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Finanzas & Caja</h1>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Finanzas & Caja</h1>
             <p className="text-sm text-slate-500">Gestión de ingresos, egresos y cuentas por cobrar.</p>
           </div>
           <div className="flex items-center gap-2 bg-slate-200/80 p-1 rounded-xl">
@@ -163,11 +163,11 @@ function FinanzasContent() {
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="border-b border-slate-200 flex overflow-x-auto">
-            <button onClick={() => setActiveTab('transacciones')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'transacciones' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}>Transacciones / Ventas</button>
-            <button onClick={() => setActiveTab('por_cobrar')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'por_cobrar' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}>Cuentas por Cobrar {cuentasPendientes.length > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">{cuentasPendientes.length}</span>}</button>
-            <button onClick={() => setActiveTab('egresos')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'egresos' ? 'border-rose-500 text-rose-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}>Egresos de Caja</button>
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
+          <div className="border-b border-slate-200/80 flex overflow-x-auto">
+            <button onClick={() => setActiveTab('transacciones')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'transacciones' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>Transacciones / Ventas</button>
+            <button onClick={() => setActiveTab('por_cobrar')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'por_cobrar' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>Cuentas por Cobrar {cuentasPendientes.length > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">{cuentasPendientes.length}</span>}</button>
+            <button onClick={() => setActiveTab('egresos')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'egresos' ? 'border-rose-500 text-rose-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>Egresos de Caja</button>
           </div>
 
           <div className="p-0">
@@ -188,7 +188,7 @@ function FinanzasContent() {
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm whitespace-nowrap">
-                      <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 text-xs uppercase tracking-wider font-semibold">
+                      <thead className="bg-slate-50/50 text-slate-500 border-b border-slate-200/80 text-xs uppercase tracking-wider font-semibold">
                         <tr>
                           <th className="py-3 px-4">Fecha</th>
                           <th className="py-3 px-4">Paciente</th>
@@ -289,7 +289,7 @@ function FinanzasContent() {
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm whitespace-nowrap">
-                      <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 text-xs uppercase tracking-wider font-semibold">
+                      <thead className="bg-slate-50/50 text-slate-500 border-b border-slate-200/80 text-xs uppercase tracking-wider font-semibold">
                         <tr>
                           <th className="py-3 px-4">Fecha</th>
                           <th className="py-3 px-4">Concepto</th>
@@ -335,12 +335,12 @@ function FinanzasContent() {
         <DialogBody className="space-y-4 pt-4">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700">Concepto / Descripción</label>
-            <Input required placeholder="Ej: Insumos de punción seca..." value={egresoForm.concepto} onChange={e => setEgresoForm({...egresoForm, concepto: e.target.value})} className="bg-slate-50" />
+            <Input required placeholder="Ej: Insumos de punción seca..." value={egresoForm.concepto} onChange={e => setEgresoForm({...egresoForm, concepto: e.target.value})} className="bg-slate-50/50" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">Categoría</label>
-              <select value={egresoForm.categoria} onChange={e => setEgresoForm({...egresoForm, categoria: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm h-10 outline-none">
+              <select value={egresoForm.categoria} onChange={e => setEgresoForm({...egresoForm, categoria: e.target.value})} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10 outline-none">
                 <option value="Insumos Clínicos">Insumos Clínicos</option>
                 <option value="Servicios Básicos">Servicios Básicos</option>
                 <option value="Arriendo">Arriendo</option>
@@ -351,12 +351,12 @@ function FinanzasContent() {
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">Monto CLP</label>
-              <Input type="number" required min="100" placeholder="Ej: 25000" value={egresoForm.monto} onChange={e => setEgresoForm({...egresoForm, monto: e.target.value})} className="bg-slate-50 font-bold" />
+              <Input type="number" required min="100" placeholder="Ej: 25000" value={egresoForm.monto} onChange={e => setEgresoForm({...egresoForm, monto: e.target.value})} className="bg-slate-50/50 font-bold" />
             </div>
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700">Medio de Pago</label>
-            <select value={egresoForm.formaPago} onChange={e => setEgresoForm({...egresoForm, formaPago: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm h-10 outline-none">
+            <select value={egresoForm.formaPago} onChange={e => setEgresoForm({...egresoForm, formaPago: e.target.value})} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10 outline-none">
               <option value="Débito">Débito / Transbank</option>
               <option value="Transferencia Bancaria">Transferencia Bancaria</option>
               <option value="Efectivo">Efectivo</option>
@@ -387,7 +387,7 @@ function FinanzasContent() {
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700">Medio de Pago Recibido</label>
-            <select value={settleForm.metodo_pago} onChange={e => setSettleForm({...settleForm, metodo_pago: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm h-10 outline-none">
+            <select value={settleForm.metodo_pago} onChange={e => setSettleForm({...settleForm, metodo_pago: e.target.value})} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10 outline-none">
               <option value="Transferencia Bancaria">Transferencia Bancaria</option>
               <option value="Débito / Crédito">Débito / Crédito (Transbank)</option>
               <option value="Efectivo">Efectivo</option>
@@ -396,7 +396,7 @@ function FinanzasContent() {
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700">N° de Boleta Tributaria (Opcional)</label>
-            <Input placeholder="Ej: 14592" value={settleForm.boleta} onChange={e => setSettleForm({...settleForm, boleta: e.target.value})} className="bg-slate-50 font-mono" />
+            <Input placeholder="Ej: 14592" value={settleForm.boleta} onChange={e => setSettleForm({...settleForm, boleta: e.target.value})} className="bg-slate-50/50 font-mono" />
           </div>
         </DialogBody>
         <DialogFooter>
@@ -411,7 +411,7 @@ function FinanzasContent() {
 
 export default function FinanzasPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600"/></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-slate-50/50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600"/></div>}>
       <FinanzasContent />
     </Suspense>
   );

@@ -1,3 +1,4 @@
+import { Header } from "@/components/layout/Header";
 import "./globals.css";
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
@@ -15,6 +16,7 @@ export default function RootLayout({
   return (
     <html lang="es" className="h-full">
       <body className="min-h-full flex flex-col antialiased text-slate-900 bg-slate-50 selection:bg-clinic-500 selection:text-white">
+        <Header />
         {children}
         <Toaster position="top-right" richColors closeButton />
       </body>

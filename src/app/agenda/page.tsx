@@ -263,7 +263,7 @@ function AgendaContent() {
     if (!p) return null;
     
     const s = cita.estado?.toLowerCase() || 'pendiente';
-    let stateColors = 'bg-slate-50 text-slate-600 border-slate-200';
+    let stateColors = 'bg-slate-50/50 text-slate-600 border-slate-200/80';
     let stateLabel = 'Pendiente';
     if (s === 'en_sala') { stateColors = 'bg-amber-50 text-amber-700 border-amber-200'; stateLabel = 'En Sala'; }
     else if (['asistio', 'asistió', 'atendido'].includes(s)) { stateColors = 'bg-emerald-50 text-emerald-700 border-emerald-200'; stateLabel = 'Asistió'; }
@@ -291,8 +291,8 @@ function AgendaContent() {
     }
 
     return (
-      <div key={cita.id} className="flex flex-col md:flex-row bg-white border border-slate-200 rounded-2xl hover:shadow-md transition-shadow overflow-hidden group mb-3">
-        <div className="bg-slate-50 p-4 md:w-32 flex flex-row md:flex-col items-center justify-between md:justify-center border-b md:border-b-0 md:border-r border-slate-100">
+      <div key={cita.id} className="flex flex-col md:flex-row bg-white border border-slate-200/80 rounded-2xl hover:shadow-md transition-shadow overflow-hidden group mb-3">
+        <div className="bg-slate-50/50 p-4 md:w-32 flex flex-row md:flex-col items-center justify-between md:justify-center border-b md:border-b-0 md:border-r border-slate-100">
           <span className="text-2xl font-black text-slate-900 tracking-tight">{cita.hora?.substring(0,5)}</span>
           <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border mt-1 ${stateColors}`}>{stateLabel}</span>
         </div>
@@ -323,7 +323,7 @@ function AgendaContent() {
           <Button variant="outline" onClick={() => { setSelectedPatientForDrawer(p); setIsDrawerOpen(true); }} className="h-9 px-3 border-blue-200 bg-white text-blue-700 hover:bg-blue-50 font-bold rounded-xl text-xs shadow-sm flex-shrink-0">
             <Stethoscope className="w-4 h-4 mr-1.5" /> Ficha & SOAP →
           </Button>
-          <div className="flex items-center gap-1 pl-2 border-l border-slate-200 ml-1">
+          <div className="flex items-center gap-1 pl-2 border-l border-slate-200/80 ml-1">
             <button onClick={() => {
               setEditingCita(cita);
               setEditForm({ fecha: cita.fecha, hora: cita.hora?.substring(0,5), motivo: cita.motivo_consulta || '', profesional: cita.profesional || '' });
@@ -358,14 +358,14 @@ function AgendaContent() {
 
     return (
         <div className="overflow-x-auto min-h-[400px] bg-slate-50/50">
-            <div className="flex divide-x divide-slate-200 border-b border-slate-200 min-w-[900px]">
+            <div className="flex divide-x divide-slate-200 border-b border-slate-200/80 min-w-[900px]">
                 {dias.map((dia, idx) => {
                     const isToday = getFormattedLocalDate(dia) === getFormattedLocalDate(new Date());
                     const diaStr = getFormattedLocalDate(dia);
                     const citasDia = citas.filter(c => c.fecha === diaStr);
                     return (
                         <div key={idx} className={`flex-1 min-w-[220px] ${isToday ? 'bg-blue-50/30' : ''}`}>
-                            <div className={`p-3 text-center border-b border-slate-200 sticky top-0 bg-white shadow-sm z-10 ${isToday ? 'text-blue-700 bg-blue-50' : 'text-slate-700'}`}>
+                            <div className={`p-3 text-center border-b border-slate-200/80 sticky top-0 bg-white shadow-sm z-10 ${isToday ? 'text-blue-700 bg-blue-50' : 'text-slate-700'}`}>
                                 <p className="text-[10px] font-bold uppercase tracking-widest">{dia.toLocaleDateString('es-CL', { weekday: 'short' })}</p>
                                 <p className="text-xl font-black">{dia.getDate()}</p>
                             </div>
@@ -402,14 +402,14 @@ function AgendaContent() {
 
     return (
         <div className="p-4 bg-white min-h-[500px]">
-            <div className="grid grid-cols-7 border-t border-l border-slate-200">
+            <div className="grid grid-cols-7 border-t border-l border-slate-200/80">
                 {weekDays.map(wd => (
-                    <div key={wd} className="p-2 border-b border-r border-slate-200 text-center bg-slate-50 text-[10px] font-bold uppercase text-slate-500 tracking-wider">
+                    <div key={wd} className="p-2 border-b border-r border-slate-200/80 text-center bg-slate-50/50 text-[10px] font-bold uppercase text-slate-500 tracking-wider">
                         {wd}
                     </div>
                 ))}
                 {daysArray.map((dia, idx) => {
-                    if (!dia) return <div key={idx} className="border-b border-r border-slate-200 bg-slate-50/50 min-h-[100px]"></div>;
+                    if (!dia) return <div key={idx} className="border-b border-r border-slate-200/80 bg-slate-50/50 min-h-[100px]"></div>;
                     
                     const diaStr = getFormattedLocalDate(dia);
                     const isToday = diaStr === getFormattedLocalDate(new Date());
@@ -424,7 +424,7 @@ function AgendaContent() {
                                 setFechaBase(dia);
                                 setVista('dia');
                             }}
-                            className={`p-1 border-b border-r border-slate-200 min-h-[100px] cursor-pointer hover:bg-slate-50 transition-colors ${isToday ? 'bg-blue-50/20' : ''}`}
+                            className={`p-1 border-b border-r border-slate-200/80 min-h-[100px] cursor-pointer hover:bg-slate-50/50 transition-colors ${isToday ? 'bg-blue-50/20' : ''}`}
                         >
                             <div className="text-right p-1 mb-1">
                                 <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'text-slate-600'}`}>{dia.getDate()}</span>
@@ -464,13 +464,13 @@ function AgendaContent() {
         {/* Barra de Navegación de Fecha */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
           <div className="flex items-center gap-2">
-            <button onClick={() => changeDate(-1)} className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 transition-colors">
+            <button onClick={() => changeDate(-1)} className="p-2 border border-slate-200/80 rounded-xl hover:bg-slate-50/50 text-slate-600 transition-colors">
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <button onClick={setToday} className="px-4 py-2 border border-slate-200 rounded-xl hover:bg-slate-50 font-semibold text-slate-700 text-sm transition-colors">
+            <button onClick={setToday} className="px-4 py-2 border border-slate-200/80 rounded-xl hover:bg-slate-50/50 font-semibold text-slate-700 text-sm transition-colors">
               Hoy
             </button>
-            <button onClick={() => changeDate(1)} className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 transition-colors">
+            <button onClick={() => changeDate(1)} className="p-2 border border-slate-200/80 rounded-xl hover:bg-slate-50/50 text-slate-600 transition-colors">
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
@@ -479,7 +479,7 @@ function AgendaContent() {
             <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">{formattedTitleDate}</h2>
           </div>
           
-          <div className="flex items-center gap-2 border border-slate-200 p-1 rounded-xl bg-slate-50/50">
+          <div className="flex items-center gap-2 border border-slate-200/80 p-1 rounded-xl bg-slate-50/50">
             <button onClick={() => setVista('dia')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${vista === 'dia' ? 'bg-white shadow-sm text-blue-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-900'}`}>Día</button>
             <button onClick={() => setVista('semana')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${vista === 'semana' ? 'bg-white shadow-sm text-blue-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-900'}`}>Semana</button>
             <button onClick={() => setVista('mes')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${vista === 'mes' ? 'bg-white shadow-sm text-blue-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-900'}`}>Mes</button>
@@ -488,16 +488,16 @@ function AgendaContent() {
 
         {/* KPIs del Rango */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Citados</span><span className="text-2xl font-bold text-slate-900 mt-1">{kpis.citadosHoy}</span></div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pendientes</span><span className="text-2xl font-bold text-slate-400 mt-1">{kpis.pendientes}</span></div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Confirmadas</span><span className="text-2xl font-bold text-indigo-600 mt-1">{kpis.confirmadas}</span></div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">En Box / Sala</span><span className="text-2xl font-bold text-amber-600 mt-1">{kpis.enSala}</span></div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Atendidos</span><span className="text-2xl font-bold text-emerald-600 mt-1">{kpis.asistio}</span></div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Citados</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.citadosHoy}</span></div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pendientes</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.pendientes}</span></div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Confirmadas</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.confirmadas}</span></div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">En Box / Sala</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.enSala}</span></div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Atendidos</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.asistio}</span></div>
         </div>
 
         {/* Contenedor Principal Agenda */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
+          <div className="p-4 bg-slate-50/50 border-b border-slate-200/80 flex justify-between items-center">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
               <CalendarDays className="w-5 h-5 text-slate-500" /> Citas Programadas
             </h3>
@@ -524,16 +524,16 @@ function AgendaContent() {
         <DialogHeader><DialogTitle>Agendar Nueva Cita</DialogTitle><DialogDescription>Selecciona un paciente y un horario para agendar.</DialogDescription></DialogHeader>
         <DialogBody className="space-y-4 pt-4">
           <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Paciente</label>
-            <div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><Input placeholder="Buscar por nombre o RUT..." value={pacienteSearch} onChange={e => setPacienteSearch(e.target.value)} className="pl-9 bg-slate-50" /></div>
-            <select value={newCita.pacienteId} onChange={e => setNewCita({ ...newCita, pacienteId: e.target.value })} className="w-full mt-2 p-2.5 bg-white border border-slate-200 rounded-xl text-sm" size={4}>
+            <div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><Input placeholder="Buscar por nombre o RUT..." value={pacienteSearch} onChange={e => setPacienteSearch(e.target.value)} className="pl-9 bg-slate-50/50" /></div>
+            <select value={newCita.pacienteId} onChange={e => setNewCita({ ...newCita, pacienteId: e.target.value })} className="w-full mt-2 p-2.5 bg-white border border-slate-200/80 rounded-xl text-sm" size={4}>
               {pacientesOptions.map(p => <option key={p.id} value={p.id}>{p.nombre_completo} - {formatRut(p.rut)}</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Fecha</label><Input type="date" value={newCita.fecha} onChange={e => setNewCita({...newCita, fecha: e.target.value})} className="bg-slate-50" /></div>
-            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Hora</label><select value={newCita.hora} onChange={e => setNewCita({...newCita, hora: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm h-10">{timeBlocks.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Fecha</label><Input type="date" value={newCita.fecha} onChange={e => setNewCita({...newCita, fecha: e.target.value})} className="bg-slate-50/50" /></div>
+            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Hora</label><select value={newCita.hora} onChange={e => setNewCita({...newCita, hora: e.target.value})} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10">{timeBlocks.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
           </div>
-          <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Motivo de Consulta</label><Input value={newCita.motivo} onChange={e => setNewCita({...newCita, motivo: e.target.value})} className="bg-slate-50" /></div>
+          <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Motivo de Consulta</label><Input value={newCita.motivo} onChange={e => setNewCita({...newCita, motivo: e.target.value})} className="bg-slate-50/50" /></div>
         </DialogBody>
         <DialogFooter><Button variant="outline" onClick={() => setShowNewCitaModal(false)}>Cancelar</Button><Button onClick={handleCreateCita} disabled={savingCita} className="bg-blue-600 hover:bg-blue-700 text-white">{savingCita ? 'Guardando...' : 'Agendar Cita'}</Button></DialogFooter>
       </Dialog>
@@ -543,10 +543,10 @@ function AgendaContent() {
         <DialogHeader><DialogTitle>Editar Horario de Cita</DialogTitle><DialogDescription>Modifica la fecha, hora o profesional asignado.</DialogDescription></DialogHeader>
         <DialogBody className="space-y-4 pt-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Fecha</label><Input type="date" value={editForm.fecha} onChange={e => setEditForm({...editForm, fecha: e.target.value})} className="bg-slate-50" /></div>
-            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Hora</label><select value={editForm.hora} onChange={e => setEditForm({...editForm, hora: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm h-10">{timeBlocks.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Fecha</label><Input type="date" value={editForm.fecha} onChange={e => setEditForm({...editForm, fecha: e.target.value})} className="bg-slate-50/50" /></div>
+            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Hora</label><select value={editForm.hora} onChange={e => setEditForm({...editForm, hora: e.target.value})} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10">{timeBlocks.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
           </div>
-          <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Motivo</label><Input value={editForm.motivo} onChange={e => setEditForm({...editForm, motivo: e.target.value})} className="bg-slate-50" /></div>
+          <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Motivo</label><Input value={editForm.motivo} onChange={e => setEditForm({...editForm, motivo: e.target.value})} className="bg-slate-50/50" /></div>
         </DialogBody>
         <DialogFooter><Button variant="outline" onClick={() => setEditingCita(null)}>Cancelar</Button><Button onClick={handleUpdateCita} disabled={savingEdit} className="bg-blue-600 hover:bg-blue-700 text-white">{savingEdit ? 'Actualizando...' : 'Guardar Cambios'}</Button></DialogFooter>
       </Dialog>
@@ -562,7 +562,7 @@ function AgendaContent() {
 
 export default function AgendaPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600"/></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-slate-50/50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600"/></div>}>
       <AgendaContent />
     </Suspense>
   );

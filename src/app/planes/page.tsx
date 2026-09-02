@@ -244,7 +244,7 @@ export default function PlanesPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex flex-col bg-slate-50/50">
       {/* Top Header */}
       <Header
         searchQuery={searchQuery}
@@ -282,7 +282,7 @@ export default function PlanesPage() {
               size="sm"
               onClick={() => loadPlanes(true)}
               disabled={isRefreshing}
-              className="gap-2 bg-white text-slate-700 hover:bg-slate-50 border-slate-200 rounded-xl"
+              className="gap-2 bg-white text-slate-700 hover:bg-slate-50/50 border-slate-200/80 rounded-xl"
             >
               <RefreshCw
                 className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin text-blue-600" : ""}`}
@@ -303,7 +303,7 @@ export default function PlanesPage() {
         </div>
 
         {/* 2. Barra de Filtros por Categoría Dinámicos */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs font-semibold text-slate-500 mr-1 flex items-center gap-1">
               <Filter className="h-3.5 w-3.5" />
@@ -317,7 +317,7 @@ export default function PlanesPage() {
               className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition-colors ${
                 selectedCategory === null
                   ? "bg-slate-900 text-white shadow-xs"
-                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                  : "bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-100"
               }`}
             >
               Todos ({totalCount})
@@ -332,7 +332,7 @@ export default function PlanesPage() {
                 className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition-colors ${
                   selectedCategory === cat.key
                     ? "bg-blue-600 text-white shadow-xs"
-                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    : "bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-100"
                 }`}
               >
                 {cat.label} ({cat.count})
@@ -353,14 +353,14 @@ export default function PlanesPage() {
 
         {/* 3. Grid de Planes y Tarjetas */}
         {isLoading ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-12 text-center shadow-xs">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-t-transparent mb-3" />
             <p className="text-sm font-semibold text-slate-700">
               Cargando catálogo de tarifas desde Supabase...
             </p>
           </div>
         ) : filteredPlanes.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-xs space-y-3">
+          <div className="rounded-2xl border border-dashed border-slate-200/80 bg-white p-12 text-center shadow-xs space-y-3">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
               <FolderOpen className="h-6 w-6" />
             </div>
@@ -395,7 +395,7 @@ export default function PlanesPage() {
                   key={plan.id}
                   className={`rounded-2xl border bg-white p-5 shadow-xs transition-all hover:shadow-md flex flex-col justify-between space-y-4 ${
                     plan.activo
-                      ? "border-slate-200 hover:border-slate-300"
+                      ? "border-slate-200/80 hover:border-slate-300"
                       : "border-slate-200/60 bg-slate-50/70 opacity-75"
                   }`}
                 >
@@ -444,7 +444,7 @@ export default function PlanesPage() {
 
                     {/* Métricas: Sesiones & Precio Total Formateado */}
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
-                      <div className="rounded-xl bg-slate-50 p-2.5">
+                      <div className="rounded-xl bg-slate-50/50 p-2.5">
                         <span className="text-slate-500 block text-[11px] font-medium">Sesiones</span>
                         <span className="text-base font-bold text-slate-900">
                           {plan.total_sesiones} ses.
@@ -482,7 +482,7 @@ export default function PlanesPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => handleOpenEdit(plan)}
-                      className="h-8 gap-1.5 text-xs font-semibold border-slate-200 hover:bg-slate-50 rounded-xl"
+                      className="h-8 gap-1.5 text-xs font-semibold border-slate-200/80 hover:bg-slate-50/50 rounded-xl"
                     >
                       <Edit2 className="h-3 w-3 text-slate-500" />
                       <span>Editar</span>

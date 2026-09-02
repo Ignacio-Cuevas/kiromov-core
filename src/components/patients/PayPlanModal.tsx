@@ -126,10 +126,10 @@ export function PayPlanModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
       <div className="relative w-full max-w-lg flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
         {/* Header Fijo */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 sticky top-0 z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-amber-50 p-2.5 text-amber-600 border border-amber-200 shrink-0">
               <CreditCard className="h-5 w-5" />
@@ -244,7 +244,7 @@ export function PayPlanModal({
           </div>
 
           {/* Footer Fijo */}
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50 sticky bottom-0 z-10">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/80 sticky bottom-0 z-10">
             <button
               type="button"
               onClick={handleClose}
