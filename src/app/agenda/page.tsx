@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { PatientDrawer } from '@/components/patients/PatientDrawer';
-import { markAppointmentAttended } from '@/actions/appointments';
+import { markAppointmentAttended, markAppointmentNoShow } from '@/actions/appointments';
 import { formatRut } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -188,6 +188,18 @@ function AgendaContent() {
   }, [fechaBase, vista]);
 
   // Actions
+    const handleRegistrarInasistencia = async (citaId: string, pacienteId: string) => {
+    if (!confirm('¿Marcar como No Asistió? Se descontará 1 sesión del plan del paciente si aplica.')) return;
+    const toastId = toast.loading('Registrando inasistencia...');
+    try {
+      const res = await markAppointmentNoShow(citaId, pacienteId);
+      if (res.success) {
+        toast.success(res.message, { id: toastId });
+        loadAgenda();
+      } else toast.error(res.error || 'Error', { id: toastId });
+    } catch (err) { toast.error('Ocurrió un error inesperado', { id: toastId }); }
+  };
+
   const handleRegistrarAsistencia = async (citaId: string, pacienteId: string) => {
     const toastId = toast.loading('Registrando asistencia...');
     try {
@@ -310,7 +322,12 @@ function AgendaContent() {
                 <div className="text-[10px] text-slate-500 truncate">{cita.motivo_consulta}</div>
                 <div className="flex flex-wrap gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     {s === 'pendiente' && <button onClick={() => handleMarcarConfirmada(cita.id)} className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[9px] font-bold py-1 rounded">Confir.</button>}
-                    {!['asistio', 'asistió', 'atendido'].includes(s) && s !== 'cancelada' && <button onClick={() => handleRegistrarAsistencia(cita.id, p.id)} className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[9px] font-bold py-1 rounded">Asistió</button>}
+                    {!['asistio', 'asistió', 'atendido', 'no_asistio'].includes(s) && s !== 'cancelada' && (
+                      <>
+                        <button onClick={() => handleRegistrarAsistencia(cita.id, p.id)} className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[9px] font-bold py-1 rounded">Asistió</button>
+                        <button onClick={() => handleRegistrarInasistencia(cita.id, p.id)} className="flex-1 bg-orange-50 hover:bg-orange-100 text-orange-700 text-[9px] font-bold py-1 rounded" title="Cobrar Sesión">No Asis.</button>
+                      </>
+                    )}
                     <button onClick={() => { setSelectedPatientForDrawer(p); setIsDrawerOpen(true); }} className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[9px] font-bold py-1 rounded">Ficha</button>
                     {cleanPhone && <a href={generarMensajeConfirmacion(cita)} target="_blank" rel="noreferrer" className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[9px] font-bold py-1 rounded text-center">Wsp</a>}
                 </div>
@@ -338,10 +355,15 @@ function AgendaContent() {
               <CheckCircle2 className="w-4 h-4 mr-1.5" /> Confirmar Cita
             </Button>
           )}
-          {!['asistio', 'asistió', 'atendido'].includes(s) && s !== 'cancelada' && (
-            <Button onClick={() => handleRegistrarAsistencia(cita.id, p.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs h-9 shadow-sm flex-shrink-0">
-              <CheckCircle2 className="w-4 h-4 mr-1.5" /> Registrar Asistencia
-            </Button>
+          {!['asistio', 'asistió', 'atendido', 'no_asistio'].includes(s) && s !== 'cancelada' && (
+            <div className="flex gap-2">
+              <Button onClick={() => handleRegistrarAsistencia(cita.id, p.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs h-9 shadow-sm flex-shrink-0">
+                <CheckCircle2 className="w-4 h-4 mr-1.5" /> Registrar Asistencia
+              </Button>
+              <Button onClick={() => handleRegistrarInasistencia(cita.id, p.id)} variant="outline" className="border-orange-200 text-orange-700 hover:bg-orange-50 font-bold rounded-xl text-xs h-9 shadow-sm flex-shrink-0">
+                🚫 No Asistió
+              </Button>
+            </div>
           )}
           {cleanPhone && (
             <a href={generarMensajeConfirmacion(cita)} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center h-9 px-3 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded-xl font-bold text-xs shadow-sm flex-shrink-0 transition-colors">

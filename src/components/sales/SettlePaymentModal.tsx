@@ -37,6 +37,7 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
           metodo_pago: paymentMethod,
           numero_boleta: boletaClean,
           notas: notes.trim() ? notes.trim() : null,
+          observaciones: notes.trim() ? notes.trim() : null,
           fecha_compra: new Date().toISOString().split('T')[0] // Set fecha as today or leave old? The prompt says "Fecha de Pago" so today makes sense
         })
         .eq('id', planEnUso.id);
