@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Header } from "@/components/dashboard/Header";
 import { PlanEditDialog } from "@/components/plans/PlanEditDialog";
 import { PlanCatalogo, CategoriaPlan } from "@/types/database";
 import { createClient } from "@/utils/supabase/client";
@@ -246,11 +245,7 @@ export default function PlanesPage() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50/50">
       {/* Top Header */}
-      <Header
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        isSupabaseOnline={true}
-      />
+      
 
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
         {/* Navigation & Header */}

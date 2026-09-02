@@ -4,7 +4,6 @@ import React, { useEffect, useState, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import { RegisterSaleDialog } from '@/components/finanzas/RegisterSaleDialog';
-import { Header } from '@/components/dashboard/Header';
 import { formatCLP, formatRut } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -129,7 +128,7 @@ function FinanzasContent() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
-      <Header />
+      
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 space-y-6">
         
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

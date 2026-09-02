@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'reac
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { Header } from '@/components/dashboard/Header';
 import { PatientDrawer } from '@/components/patients/PatientDrawer';
 import { markAppointmentAttended } from '@/actions/appointments';
 import { formatRut } from '@/lib/utils';
@@ -458,7 +457,7 @@ function AgendaContent() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
-      <Header />
+      
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 space-y-6">
         
         {/* Barra de Navegación de Fecha */}
