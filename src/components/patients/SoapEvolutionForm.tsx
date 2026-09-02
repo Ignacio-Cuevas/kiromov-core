@@ -148,23 +148,22 @@ export function SoapEvolutionForm({
 
     setIsSaving(true);
     const today = new Date().toISOString().split("T")[0];
-    const numDiscapacidad = parseFloat(discapacidadPct);
 
     try {
-      const payload = {
+      const payload: any = {
         paciente_id: pacienteId,
         fecha: today,
-        nivel_dolor_ena: Number(enaDolor) || 0,
+        nivel_dolor_ena: parseInt(String(enaDolor), 10) || 0,
         s_subjetivo: subjetivo.trim() || "Sin observaciones subjetivas reportadas.",
         o_objetivo: objetivo.trim() || (selectedFindings.length > 0 ? selectedFindings.join(", ") : "Evaluación física sin hallazgos agudos."),
         a_analisis: analisis.trim() || `Evolución clínica favorable. Pronóstico estimado: ${pronosticoCalculado.sesiones}.`,
         p_plan: plan.trim() || "Continuar con plan terapéutico establecido.",
+        pronostico_sesiones: String(pronosticoCalculado.sesiones || '').trim(),
+        cuestionario_usado: cuestionario || null,
+        discapacidad_funcional: String(discapacidadPct || '') || null,
         mapa_dolor: mapaDolor || null,
         profesional: "Klgo. Ignacio Cuevas Silva",
-        hallazgos_frecuentes: selectedFindings,
-        cuestionario_funcional: cuestionario || null,
-        discapacidad_funcional_pct: !isNaN(numDiscapacidad) ? numDiscapacidad : null,
-        pronostico_sesiones_estimadas: pronosticoCalculado.sesiones,
+        hallazgos_frecuentes: selectedFindings
       };
 
       const { data, error } = await supabase
@@ -174,22 +173,24 @@ export function SoapEvolutionForm({
         .single();
 
       if (error) {
-        if (error.message.includes('mapa_dolor')) {
-          console.warn('Fallback a schema legacy (mapa_dolor_svg / subjetivo)');
-          const legacyPayload = {
+        // Fallback robusto en caso de que las columnas legacy sigan siendo requeridas
+        if (error.message.includes('column') || error.message.includes('type')) {
+          console.warn('Fallback a schema alternativo de Supabase:', error.message);
+          const numDiscapacidad = parseFloat(discapacidadPct);
+          const legacyPayload: any = {
             paciente_id: pacienteId,
             fecha: today,
-            ena_dolor: Number(enaDolor) || 0,
+            ena_dolor: parseInt(String(enaDolor), 10) || 0,
             subjetivo: payload.s_subjetivo,
             objetivo: payload.o_objetivo,
             analisis: payload.a_analisis,
             plan: payload.p_plan,
             mapa_dolor_svg: payload.mapa_dolor,
-            profesional: "Klgo. Ignacio Cuevas Silva",
-            hallazgos_frecuentes: selectedFindings,
-            cuestionario_funcional: cuestionario || null,
+            profesional: payload.profesional,
+            hallazgos_frecuentes: payload.hallazgos_frecuentes,
+            cuestionario_funcional: payload.cuestionario_usado,
             discapacidad_funcional_pct: !isNaN(numDiscapacidad) ? numDiscapacidad : null,
-            pronostico_sesiones_estimadas: pronosticoCalculado.sesiones,
+            pronostico_sesiones_estimadas: payload.pronostico_sesiones,
           };
           const res = await supabase.from('evoluciones_soap').insert([legacyPayload]).select().single();
           if (res.error) throw res.error;

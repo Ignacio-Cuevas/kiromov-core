@@ -125,9 +125,9 @@ export function SoapTimelineAccordion({
 
           const mapa_dolor = evolucion.mapa_dolor_svg || (evolucion as any).mapa_dolor;
           const hallazgos = evolucion.hallazgos_frecuentes || [];
-          const cuestionario = evolucion.cuestionario_funcional;
-          const discapacidadPct = evolucion.discapacidad_funcional_pct;
-          const pronostico = evolucion.pronostico_sesiones_estimadas;
+          const cuestionario = evolucion.cuestionario_funcional || (evolucion as any).cuestionario_usado;
+          const discapacidadPct = evolucion.discapacidad_funcional_pct ?? (evolucion as any).discapacidad_funcional;
+          const pronostico = evolucion.pronostico_sesiones_estimadas || (evolucion as any).pronostico_sesiones;
 
           return (
             <div key={key} className="relative">
