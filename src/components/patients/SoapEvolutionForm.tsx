@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PainScaleSelector } from "./PainScaleSelector";
 import { PainMapCanvas } from "./PainMapCanvas";
 import { EvolucionSOAP } from "@/types/database";
-import { guardarEvolucionSOAP } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import {
   Stethoscope,
@@ -129,6 +129,11 @@ export function SoapEvolutionForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!supabase) {
+      toast.error("Error de conexión con la base de datos.");
+      return;
+    }
+
     if (
       !subjetivo.trim() &&
       !objetivo.trim() &&
@@ -146,44 +151,61 @@ export function SoapEvolutionForm({
     const numDiscapacidad = parseFloat(discapacidadPct);
 
     try {
-      const result = await guardarEvolucionSOAP({
+      const payload = {
         paciente_id: pacienteId,
         fecha: today,
+        nivel_dolor_ena: Number(enaDolor) || 0,
+        s_subjetivo: subjetivo.trim() || "Sin observaciones subjetivas reportadas.",
+        o_objetivo: objetivo.trim() || (selectedFindings.length > 0 ? selectedFindings.join(", ") : "Evaluación física sin hallazgos agudos."),
+        a_analisis: analisis.trim() || `Evolución clínica favorable. Pronóstico estimado: ${pronosticoCalculado.sesiones}.`,
+        p_plan: plan.trim() || "Continuar con plan terapéutico establecido.",
+        mapa_dolor: mapaDolor || null,
         profesional: "Klgo. Ignacio Cuevas Silva",
-        subjetivo: subjetivo.trim() || "Sin observaciones subjetivas reportadas.",
-        objetivo: objetivo.trim() || (selectedFindings.length > 0 ? selectedFindings.join(", ") : "Evaluación física sin hallazgos agudos."),
-        ena_dolor: enaDolor,
-        analisis: analisis.trim() || `Evolución clínica favorable. Pronóstico estimado: ${pronosticoCalculado.sesiones}.`,
-        plan: plan.trim() || "Continuar con plan terapéutico establecido.",
-        mapa_dolor_svg: mapaDolor,
         hallazgos_frecuentes: selectedFindings,
         cuestionario_funcional: cuestionario || null,
         discapacidad_funcional_pct: !isNaN(numDiscapacidad) ? numDiscapacidad : null,
         pronostico_sesiones_estimadas: pronosticoCalculado.sesiones,
-      });
+      };
 
-      if (result.success && result.data) {
-        toast.success("Evolución SOAP guardada con éxito", {
-          description: `Registrada para ${pacienteNombre} por Klgo. Ignacio Cuevas Silva`,
-        });
+      const { data, error } = await supabase
+        .from('evoluciones_soap')
+        .insert([payload])
+        .select()
+        .single();
 
-        // Reset form
-        setSubjetivo("");
-        setObjetivo("");
-        setEnaDolor(3);
-        setAnalisis("");
-        setPlan("");
-        setSelectedFindings([]);
-        setMapaDolor(null);
-        setCuestionario("");
-        setDiscapacidadPct("");
-
-        onEvolutionSaved?.(result.data);
+      if (error) {
+        if (error.message.includes('mapa_dolor')) {
+          console.warn('Fallback a schema legacy (mapa_dolor_svg / subjetivo)');
+          const legacyPayload = {
+            paciente_id: pacienteId,
+            fecha: today,
+            ena_dolor: Number(enaDolor) || 0,
+            subjetivo: payload.s_subjetivo,
+            objetivo: payload.o_objetivo,
+            analisis: payload.a_analisis,
+            plan: payload.p_plan,
+            mapa_dolor_svg: payload.mapa_dolor,
+            profesional: "Klgo. Ignacio Cuevas Silva",
+            hallazgos_frecuentes: selectedFindings,
+            cuestionario_funcional: cuestionario || null,
+            discapacidad_funcional_pct: !isNaN(numDiscapacidad) ? numDiscapacidad : null,
+            pronostico_sesiones_estimadas: pronosticoCalculado.sesiones,
+          };
+          const res = await supabase.from('evoluciones_soap').insert([legacyPayload]).select().single();
+          if (res.error) throw res.error;
+          
+          toast.success("Evolución clínica guardada exitosamente");
+          if (onEvolutionSaved && res.data) onEvolutionSaved(res.data as any);
+        } else {
+          throw error;
+        }
       } else {
-        toast.error("Error al guardar la nota SOAP: " + (result.error || "Intente nuevamente"));
+        toast.success("Evolución clínica guardada exitosamente");
+        if (onEvolutionSaved && data) onEvolutionSaved(data as any);
       }
-    } catch (error) {
-      toast.error("Ocurrió un error inesperado al guardar la nota clínica.");
+    } catch (err: any) {
+      console.error('Excepción al guardar SOAP:', err);
+      toast.error(err.message || "Error al guardar la nota clínica");
     } finally {
       setIsSaving(false);
     }

@@ -154,6 +154,33 @@ export function PainMapCanvas({
     drawBackground();
   }, [activeInitial]);
 
+  const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+  
+    const rect = canvas.getBoundingClientRect();
+    
+    // Factores de escala entre el tamaño interno del canvas y su tamaño renderizado por CSS
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+  
+    let clientX = 0;
+    let clientY = 0;
+  
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+  
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
+  };
+
   // Manejo de trazos (Mouse y Touch para Tablet)
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (readOnly) return;
@@ -163,12 +190,7 @@ export function PainMapCanvas({
     if (!ctx) return;
 
     setIsDrawing(true);
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
-    const x = ((clientX - rect.left) / rect.width) * canvas.width;
-    const y = ((clientY - rect.top) / rect.height) * canvas.height;
+    const { x, y } = getCoordinates(e);
 
     // Dibujar punto de impacto
     ctx.beginPath();
@@ -187,12 +209,7 @@ export function PainMapCanvas({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
-    const x = ((clientX - rect.left) / rect.width) * canvas.width;
-    const y = ((clientY - rect.top) / rect.height) * canvas.height;
+    const { x, y } = getCoordinates(e);
 
     ctx.lineTo(x, y);
     ctx.strokeStyle = color;

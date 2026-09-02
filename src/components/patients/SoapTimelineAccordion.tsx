@@ -123,7 +123,7 @@ export function SoapTimelineAccordion({
             evolucion.ena ??
             null;
 
-          const mapa_dolor = evolucion.mapa_dolor_svg;
+          const mapa_dolor = evolucion.mapa_dolor_svg || (evolucion as any).mapa_dolor;
           const hallazgos = evolucion.hallazgos_frecuentes || [];
           const cuestionario = evolucion.cuestionario_funcional;
           const discapacidadPct = evolucion.discapacidad_funcional_pct;
