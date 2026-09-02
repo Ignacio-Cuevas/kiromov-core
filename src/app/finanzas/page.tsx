@@ -1,540 +1,401 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
-import { fetchHistorialVentas, fetchEgresosCaja, crearEgresoCaja } from '@/lib/supabase';
 import { RegisterSaleDialog } from '@/components/finanzas/RegisterSaleDialog';
-import { formatCLP } from '@/lib/utils';
-import { ShoppingCart, Plus, ArrowDownRight, ArrowUpRight, Wallet } from 'lucide-react';
+import { Header } from '@/components/dashboard/Header';
+import { formatCLP, formatRut } from '@/lib/utils';
+import { toast } from 'sonner';
+import {
+  Dialog, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Wallet, ArrowDownRight, ArrowUpRight, Plus, Loader2, CreditCard, Search, Clock, CheckCircle2
+} from 'lucide-react';
 
-type PeriodoFiltro = 'mes' | 'semestre' | 'ano' | 'todo';
+type PeriodoFiltro = 'mes' | 'todo';
 
-export default function FinanzasPage() {
+function FinanzasContent() {
   const supabase = createClient();
   const [compras, setCompras] = useState<any[]>([]);
   const [egresos, setEgresos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filtro de período seleccionado
   const [periodo, setPeriodo] = useState<PeriodoFiltro>('mes');
+  const [activeTab, setActiveTab] = useState<'transacciones' | 'por_cobrar' | 'egresos'>('transacciones');
 
-  // Modal nuevo egreso
-  const [showModal, setShowModal] = useState(false);
-  const [concepto, setConcepto] = useState('');
-  const [categoria, setCategoria] = useState('Insumos');
-  const [monto, setMonto] = useState('');
-  const [formaPago, setFormaPago] = useState('Débito');
-  const [saving, setSaving] = useState(false);
-
-  // Modal nueva venta
   const [isRegisterSaleOpen, setIsRegisterSaleOpen] = useState(false);
 
-  async function loadData() {
+  // Nuevo Egreso Modal
+  const [showEgresoModal, setShowEgresoModal] = useState(false);
+  const [egresoForm, setEgresoForm] = useState({ concepto: '', categoria: 'Insumos Clínicos', monto: '', formaPago: 'Débito' });
+  const [savingEgreso, setSavingEgreso] = useState(false);
+
+  // Settle Payment Modal
+  const [settlingPlan, setSettlingPlan] = useState<any | null>(null);
+  const [settleForm, setSettleForm] = useState({ metodo_pago: 'Transferencia Bancaria', boleta: '' });
+  const [savingSettle, setSavingSettle] = useState(false);
+
+  const loadData = async () => {
+    if (!supabase) return;
     setLoading(true);
-    let cList: any[] = [];
-    let eList: any[] = [];
-
-    if (supabase) {
-      try {
-        const { data: cData } = await supabase
-          .from('compras_planes')
-          .select('*, pacientes(nombre_completo, rut)')
-          .order('fecha_compra', { ascending: false });
-
-        const { data: eData } = await supabase
-          .from('egresos_caja')
-          .select('*')
-          .order('fecha', { ascending: false });
-
-        if (cData && cData.length > 0) cList = cData;
-        if (eData && eData.length > 0) eList = eData;
-      } catch (err) {
-        console.warn('Supabase fetch exception:', err);
-      }
+    try {
+      const { data: cData } = await supabase.from('compras_planes').select('*, pacientes(nombre_completo, rut)').order('fecha_compra', { ascending: false });
+      const { data: eData } = await supabase.from('egresos_caja').select('*').order('fecha', { ascending: false });
+      setCitas(cData || []);
+      setCompras(cData || []);
+      setEgresos(eData || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    if (cList.length === 0) {
-      cList = await fetchHistorialVentas();
-    }
-    if (eList.length === 0) {
-      eList = await fetchEgresosCaja();
-    }
+  const setCitas = (d: any) => {};
 
-    setCompras(cList);
-    setEgresos(eList);
-    setLoading(false);
-  }
+  useEffect(() => { loadData(); }, []);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Función para determinar si una fecha está dentro del período seleccionado
-  function estaEnPeriodo(fechaStr: string) {
-    if (!fechaStr) return false;
-    if (periodo === 'todo') return true;
-
+  const estaEnPeriodo = (fechaStr: string) => {
+    if (!fechaStr || periodo === 'todo') return true;
     const fecha = new Date(fechaStr);
     const hoy = new Date();
+    return fecha.getFullYear() === hoy.getFullYear() && fecha.getMonth() === hoy.getMonth();
+  };
 
-    if (periodo === 'mes') {
-      return (
-        fecha.getFullYear() === hoy.getFullYear() &&
-        fecha.getMonth() === hoy.getMonth()
-      );
-    }
+  const comprasFiltradas = useMemo(() => compras.filter(c => estaEnPeriodo(c.fecha_compra)), [compras, periodo]);
+  const egresosFiltrados = useMemo(() => egresos.filter(e => estaEnPeriodo(e.fecha)), [egresos, periodo]);
 
-    if (periodo === 'semestre') {
-      const mesActual = hoy.getMonth();
-      const esPrimerSemestre = mesActual < 6;
-      const mesFecha = fecha.getMonth();
-      const fechaPrimerSemestre = mesFecha < 6;
+  const totalIngresos = useMemo(() => comprasFiltradas.filter(t => t.estado_pago?.toLowerCase() === 'pagado').reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.total_final_clp || curr.valor_total) || 0), 0), [comprasFiltradas]);
+  const cuentasPendientes = useMemo(() => comprasFiltradas.filter(t => ['pendiente', 'pendiente de pago'].includes(t.estado_pago?.toLowerCase() || '')), [comprasFiltradas]);
+  const totalPorCobrar = useMemo(() => cuentasPendientes.reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.total_final_clp || curr.valor_total) || 0), 0), [cuentasPendientes]);
+  const totalEgresos = useMemo(() => egresosFiltrados.reduce((acc, curr) => acc + (Number(curr.monto_clp) || 0), 0), [egresosFiltrados]);
+  const balanceNeto = totalIngresos - totalEgresos;
 
-      return (
-        fecha.getFullYear() === hoy.getFullYear() &&
-        esPrimerSemestre === fechaPrimerSemestre
-      );
-    }
-
-    if (periodo === 'ano') {
-      return fecha.getFullYear() === hoy.getFullYear();
-    }
-
-    return true;
-  }
-
-  // Filtrar compras y egresos según el período
-  const comprasFiltradas = useMemo(() => {
-    return compras.filter((c) => estaEnPeriodo(c.fecha_compra));
-  }, [compras, periodo]);
-
-  const egresosFiltrados = useMemo(() => {
-    return egresos.filter((e) => estaEnPeriodo(e.fecha));
-  }, [egresos, periodo]);
-
-  // Cálculos dinámicos
-  const totalIngresos = useMemo(() => {
-    return comprasFiltradas.reduce((acc, curr) => {
-      const val = curr.total_final_clp ?? curr.valor_total ?? 0;
-      return acc + (Number(val) || 0);
-    }, 0);
-  }, [comprasFiltradas]);
-
-  const totalEgresos = useMemo(() => {
-    return egresosFiltrados.reduce((acc, curr) => acc + (Number(curr.monto_clp) || 0), 0);
-  }, [egresosFiltrados]);
-
-  const flujoNeto = totalIngresos - totalEgresos;
-
-  // Cuentas por cobrar (compras en estado 'Pendiente de Pago')
-  const cuentasPorCobrar = useMemo(() => {
-    return comprasFiltradas
-      .filter((c) => c.estado_pago === 'Pendiente de Pago')
-      .reduce((acc, curr) => acc + (Number(curr.total_final_clp ?? curr.valor_total) || 0), 0);
-  }, [comprasFiltradas]);
-
-  // Etiqueta del período
-  const etiquetaPeriodo = useMemo(() => {
-    const hoy = new Date();
-    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    
-    if (periodo === 'mes') {
-      return `${meses[hoy.getMonth()]} ${hoy.getFullYear()}`;
-    }
-    if (periodo === 'semestre') {
-      const sem = hoy.getMonth() < 6 ? '1° Semestre' : '2° Semestre';
-      return `${sem} ${hoy.getFullYear()}`;
-    }
-    if (periodo === 'ano') {
-      return `Año ${hoy.getFullYear()}`;
-    }
-    return 'Historial Completo';
-  }, [periodo]);
-
-  async function handleAddEgreso(e: React.FormEvent) {
+  const handleAddEgreso = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!concepto || !monto) return;
-    setSaving(true);
-
+    if (!supabase || !egresoForm.concepto || !egresoForm.monto) return;
+    setSavingEgreso(true);
     const nuevoEgreso = {
-      concepto,
-      categoria: categoria as any,
-      monto_clp: parseInt(monto, 10),
-      medio_pago: (formaPago === 'Débito' ? 'Débito / Transbank' : 'Transferencia') as any,
-      fecha: new Date().toISOString().split('T')[0],
-      responsable: 'Klgo. Ignacio Cuevas Silva',
+      concepto: egresoForm.concepto, categoria: egresoForm.categoria,
+      monto_clp: parseInt(egresoForm.monto, 10), medio_pago: egresoForm.formaPago,
+      fecha: new Date().toISOString().split('T')[0], responsable: 'Klgo. Ignacio Cuevas'
     };
+    try {
+      await supabase.from('egresos_caja').insert([nuevoEgreso]);
+      toast.success('Egreso guardado');
+      setShowEgresoModal(false);
+      setEgresoForm({ concepto: '', categoria: 'Insumos Clínicos', monto: '', formaPago: 'Débito' });
+      loadData();
+    } catch (err) { toast.error('Error guardando egreso'); } finally { setSavingEgreso(false); }
+  };
 
-    if (supabase) {
-      try {
-        await supabase.from('egresos_caja').insert([nuevoEgreso]);
-      } catch (err) {
-        console.warn('Error guardando egreso en Supabase:', err);
-      }
-    } else {
-      await crearEgresoCaja(nuevoEgreso);
-    }
-
-    setShowModal(false);
-    setConcepto('');
-    setMonto('');
-    setSaving(false);
-    loadData();
-  }
+  const handleSettlePayment = async () => {
+    if (!supabase || !settlingPlan) return;
+    setSavingSettle(true);
+    try {
+      const { error } = await supabase.from('compras_planes').update({
+        estado_pago: 'pagado',
+        medio_pago: settleForm.metodo_pago,
+        numero_boleta: settleForm.boleta?.trim() || null,
+        updated_at: new Date().toISOString()
+      }).eq('id', settlingPlan.id);
+      if (error) throw error;
+      toast.success('¡Cobro registrado exitosamente!');
+      setSettlingPlan(null);
+      loadData();
+    } catch (err) { toast.error('Error registrando cobro'); } finally { setSavingSettle(false); }
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header Global */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between shadow-xs">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-3 font-bold text-lg text-slate-800 group">
-            <img 
-              src="https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:logo.png" 
-              alt="Kiromov Centro Clínico" 
-              className="h-8 w-auto object-contain transition-transform group-hover:scale-105" 
-            />
-            <span className="text-blue-700 tracking-tight flex items-center gap-1.5">
-              <span>KIROMOV</span>
-              <span className="text-slate-400 font-normal text-xs bg-slate-100 px-2 py-0.5 rounded-md">Core</span>
-            </span>
-          </Link>
-          <nav className="flex items-center gap-2">
-            <Link href="/" className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">
-              📋 Pacientes
-            </Link>
-            <Link href="/agenda" className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">
-              📅 Agenda
-            </Link>
-            <Link href="/finanzas" className="px-3 py-1.5 rounded-lg text-sm font-semibold text-blue-700 bg-blue-50">
-              📊 Finanzas & Caja
-            </Link>
-            <Link href="/planes" className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">
-              ⚙️ Tarifas & Planes
-            </Link>
-          </nav>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
-            Klgo. Ignacio Cuevas
-          </div>
-          <button
-            type="button"
-            onClick={async () => {
-              if (supabase) await supabase.auth.signOut();
-              window.location.href = '/login';
-            }}
-            className="text-xs font-bold text-slate-500 hover:text-rose-700 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-2.5 py-1.5 rounded-full transition-colors"
-            title="Cerrar sesión"
-          >
-            🚪 Salir
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Top bar con Título y Selector de Períodos */}
+    <div className="min-h-screen bg-slate-50/50 pb-20">
+      <Header />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 space-y-6">
+        
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Finanzas & Balance de Caja</h1>
-            <p className="text-sm text-slate-500">
-              Mostrando período: <span className="font-semibold text-slate-700 capitalize">{etiquetaPeriodo}</span>
-            </p>
+            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Finanzas & Caja</h1>
+            <p className="text-sm text-slate-500">Gestión de ingresos, egresos y cuentas por cobrar.</p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Segmented Control de Períodos */}
-            <div className="bg-slate-200/80 p-1 rounded-xl flex items-center gap-1 text-xs font-medium">
-              <button
-                onClick={() => setPeriodo('mes')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  periodo === 'mes' ? 'bg-white text-blue-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Este Mes
-              </button>
-              <button
-                onClick={() => setPeriodo('semestre')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  periodo === 'semestre' ? 'bg-white text-blue-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Semestre
-              </button>
-              <button
-                onClick={() => setPeriodo('ano')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  periodo === 'ano' ? 'bg-white text-blue-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Este Año
-              </button>
-              <button
-                onClick={() => setPeriodo('todo')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  periodo === 'todo' ? 'bg-white text-blue-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Histórico
-              </button>
-            </div>
-
-            {/* Botón Nueva Venta */}
-            <button
-              onClick={() => setIsRegisterSaleOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
-            >
-              <ShoppingCart className="h-4 w-4" />
-              <span>+ Registrar Venta</span>
-            </button>
-
-            {/* Botón Registrar Gasto */}
-            <button
-              onClick={() => setShowModal(true)}
-              className="bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold px-4 py-2 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
-            >
-              <span>+</span>
-              <span>Registrar Gasto</span>
-            </button>
+          <div className="flex items-center gap-2 bg-slate-200/80 p-1 rounded-xl">
+            <button onClick={() => setPeriodo('mes')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${periodo === 'mes' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-900'}`}>Mes Actual</button>
+            <button onClick={() => setPeriodo('todo')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${periodo === 'todo' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-900'}`}>Todo el Historial</button>
           </div>
         </div>
 
-        {/* KPIs Dinámicos */}
+        {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Ingresos Totales</span>
-            <div className="text-2xl font-extrabold text-slate-800 mt-1">
-              {formatCLP(totalIngresos)}
-            </div>
-            <span className="text-xs text-slate-500 mt-1 block font-medium">{comprasFiltradas.length} ventas en período</span>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><ArrowUpRight className="w-4 h-4 text-emerald-500"/> Ingresos Reales</span>
+            <span className="text-2xl font-black text-emerald-600 mt-2">{formatCLP(totalIngresos)}</span>
           </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Egresos / Gastos</span>
-            <div className="text-2xl font-extrabold text-rose-600 mt-1">
-              {formatCLP(totalEgresos)}
-            </div>
-            <span className="text-xs text-slate-500 mt-1 block font-medium">{egresosFiltrados.length} gastos registrados</span>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><Clock className="w-4 h-4 text-amber-500"/> Por Cobrar ({cuentasPendientes.length})</span>
+            <span className="text-2xl font-black text-amber-600 mt-2">{formatCLP(totalPorCobrar)}</span>
           </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Flujo Neto</span>
-            <div className={`text-2xl font-extrabold mt-1 ${flujoNeto >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {formatCLP(flujoNeto)}
-            </div>
-            <span className={`text-xs font-bold mt-1 inline-block px-2 py-0.5 rounded ${flujoNeto >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-              {flujoNeto >= 0 ? '✓ Superávit Operacional' : '⚠️ Déficit en Período'}
-            </span>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><ArrowDownRight className="w-4 h-4 text-rose-500"/> Egresos del Mes</span>
+            <span className="text-2xl font-black text-rose-600 mt-2">{formatCLP(totalEgresos)}</span>
           </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Cuentas por Cobrar</span>
-            <div className="text-2xl font-extrabold text-amber-600 mt-1">
-              {formatCLP(cuentasPorCobrar)}
-            </div>
-            <span className="text-xs text-slate-500 mt-1 block font-medium">Saldos pendientes de pago</span>
+          <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm flex flex-col">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5"><Wallet className="w-4 h-4 text-slate-300"/> Balance Neto</span>
+            <span className="text-2xl font-black text-white mt-2">{formatCLP(balanceNeto)}</span>
           </div>
         </div>
 
-        {/* Tablas de Ingresos y Egresos */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Listado de Ventas / Ingresos */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-                <ArrowUpRight className="h-5 w-5 text-emerald-600" />
-                Ventas y Planes ({comprasFiltradas.length})
-              </h3>
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
-                {formatCLP(totalIngresos)}
-              </span>
-            </div>
-
-            {loading ? (
-              <p className="text-xs text-slate-400 py-6 text-center">Cargando ventas...</p>
-            ) : comprasFiltradas.length === 0 ? (
-              <p className="text-xs text-slate-400 py-6 text-center">No hay ventas registradas en este período.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-500 border-b">
-                    <tr>
-                      <th className="py-2.5 px-3">Fecha</th>
-                      <th className="py-2.5 px-3">Paciente / Detalle</th>
-                      <th className="py-2.5 px-3">Medio</th>
-                      <th className="py-2.5 px-3 text-right">Monto</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {comprasFiltradas.map((c: any) => (
-                      <tr key={c.id} className="hover:bg-slate-50/70">
-                        <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">{c.fecha_compra}</td>
-                        <td className="py-2.5 px-3">
-                          <div className="font-bold text-slate-800">
-                            {c.pacientes?.nombre_completo || c.paciente_nombre || 'Paciente'}
-                          </div>
-                          <div className="text-[11px] text-slate-500">{c.nombre_plan} ({c.total_sesiones} ses.)</div>
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-semibold">
-                            {c.medio_pago || 'Transferencia'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-extrabold text-emerald-700">
-                          {formatCLP(c.total_final_clp ?? c.valor_total)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="border-b border-slate-200 flex overflow-x-auto">
+            <button onClick={() => setActiveTab('transacciones')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'transacciones' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}>Transacciones / Ventas</button>
+            <button onClick={() => setActiveTab('por_cobrar')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'por_cobrar' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}>Cuentas por Cobrar {cuentasPendientes.length > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">{cuentasPendientes.length}</span>}</button>
+            <button onClick={() => setActiveTab('egresos')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'egresos' ? 'border-rose-500 text-rose-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}>Egresos de Caja</button>
           </div>
 
-          {/* Listado de Egresos / Gastos */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-                <ArrowDownRight className="h-5 w-5 text-rose-600" />
-                Egresos y Gastos ({egresosFiltrados.length})
-              </h3>
-              <span className="text-xs font-semibold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full">
-                {formatCLP(totalEgresos)}
-              </span>
-            </div>
-
+          <div className="p-0">
             {loading ? (
-              <p className="text-xs text-slate-400 py-6 text-center">Cargando egresos...</p>
-            ) : egresosFiltrados.length === 0 ? (
-              <p className="text-xs text-slate-400 py-6 text-center">No hay egresos registrados en este período.</p>
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <Loader2 className="w-8 h-8 animate-spin mb-3 text-blue-600" />
+                <p className="text-sm font-medium">Cargando registros...</p>
+              </div>
+            ) : activeTab === 'transacciones' ? (
+              <div>
+                <div className="p-4 border-b border-slate-100 flex justify-end bg-slate-50/50">
+                  <Button onClick={() => setIsRegisterSaleOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm h-9">
+                    <Plus className="w-4 h-4 mr-1.5" /> Registrar Venta
+                  </Button>
+                </div>
+                {comprasFiltradas.length === 0 ? (
+                  <p className="text-sm text-slate-400 py-12 text-center">No hay transacciones registradas.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm whitespace-nowrap">
+                      <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 text-xs uppercase tracking-wider font-semibold">
+                        <tr>
+                          <th className="py-3 px-4">Fecha</th>
+                          <th className="py-3 px-4">Paciente</th>
+                          <th className="py-3 px-4">Detalle</th>
+                          <th className="py-3 px-4">Estado</th>
+                          <th className="py-3 px-4 text-right">Monto CLP</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {comprasFiltradas.map((c) => {
+                          const pagado = c.estado_pago?.toLowerCase() === 'pagado';
+                          const montoNum = Number(c.monto_clp || c.total_final_clp || c.valor_total) || 0;
+                          return (
+                            <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="py-3 px-4 text-slate-500 text-xs">{c.fecha_compra}</td>
+                              <td className="py-3 px-4">
+                                <div className="font-bold text-slate-900">{c.pacientes?.nombre_completo || c.paciente_nombre || 'Paciente'}</div>
+                                <div className="text-[10px] text-slate-400 font-mono">{formatRut(c.pacientes?.rut) || ''}</div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="font-medium text-slate-700 text-xs">{c.nombre_plan}</div>
+                                <div className="text-[10px] text-slate-400">{c.medio_pago || 'Medio no especificado'} {c.numero_boleta ? `• Bol #${c.numero_boleta}` : ''}</div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold ${pagado ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
+                                  {pagado ? 'Pagado' : 'Pendiente'}
+                                </span>
+                              </td>
+                              <td className={`py-3 px-4 text-right font-black ${pagado ? 'text-emerald-700' : 'text-amber-600'}`}>
+                                {formatCLP(montoNum)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : activeTab === 'por_cobrar' ? (
+              <div>
+                {cuentasPendientes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                    <CheckCircle2 className="w-12 h-12 mb-3 text-emerald-400" />
+                    <p className="text-base font-bold text-slate-700">¡Todo al día!</p>
+                    <p className="text-sm mt-1 text-slate-500">No hay cuentas por cobrar en este período.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm whitespace-nowrap">
+                      <thead className="bg-amber-50 text-amber-700 border-b border-amber-100 text-xs uppercase tracking-wider font-bold">
+                        <tr>
+                          <th className="py-3 px-4">Fecha Origen</th>
+                          <th className="py-3 px-4">Paciente</th>
+                          <th className="py-3 px-4">Plan Adeudado</th>
+                          <th className="py-3 px-4 text-right">Monto Deuda</th>
+                          <th className="py-3 px-4 text-right">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {cuentasPendientes.map((c) => {
+                          const montoNum = Number(c.monto_clp || c.total_final_clp || c.valor_total) || 0;
+                          return (
+                            <tr key={c.id} className="hover:bg-amber-50/30 transition-colors">
+                              <td className="py-3 px-4 text-slate-500 text-xs">{c.fecha_compra}</td>
+                              <td className="py-3 px-4">
+                                <div className="font-bold text-slate-900">{c.pacientes?.nombre_completo || c.paciente_nombre || 'Paciente'}</div>
+                                <div className="text-[10px] text-slate-400 font-mono">{formatRut(c.pacientes?.rut) || ''}</div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="font-medium text-slate-700 text-xs">{c.nombre_plan}</div>
+                              </td>
+                              <td className="py-3 px-4 text-right font-black text-amber-600 text-lg">
+                                {formatCLP(montoNum)}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <Button onClick={() => setSettlingPlan(c)} className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm h-8">
+                                  <CreditCard className="w-3.5 h-3.5 mr-1.5" /> Registrar Cobro
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-500 border-b">
-                    <tr>
-                      <th className="py-2.5 px-3">Fecha</th>
-                      <th className="py-2.5 px-3">Concepto / Categoría</th>
-                      <th className="py-2.5 px-3">Medio</th>
-                      <th className="py-2.5 px-3 text-right">Monto</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {egresosFiltrados.map((e: any) => (
-                      <tr key={e.id} className="hover:bg-slate-50/70">
-                        <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">{e.fecha}</td>
-                        <td className="py-2.5 px-3">
-                          <div className="font-bold text-slate-800">{e.concepto}</div>
-                          <div className="text-[11px] text-slate-500">{e.categoria}</div>
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-semibold">
-                            {e.medio_pago || 'Débito'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-extrabold text-rose-700">
-                          {formatCLP(e.monto_clp)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div>
+                <div className="p-4 border-b border-slate-100 flex justify-end bg-slate-50/50">
+                  <Button onClick={() => setShowEgresoModal(true)} className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm h-9">
+                    <Plus className="w-4 h-4 mr-1.5" /> Nuevo Egreso
+                  </Button>
+                </div>
+                {egresosFiltrados.length === 0 ? (
+                  <p className="text-sm text-slate-400 py-12 text-center">No hay egresos registrados.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm whitespace-nowrap">
+                      <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 text-xs uppercase tracking-wider font-semibold">
+                        <tr>
+                          <th className="py-3 px-4">Fecha</th>
+                          <th className="py-3 px-4">Concepto</th>
+                          <th className="py-3 px-4">Categoría</th>
+                          <th className="py-3 px-4">Medio</th>
+                          <th className="py-3 px-4 text-right">Monto CLP</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {egresosFiltrados.map((e) => (
+                          <tr key={e.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3 px-4 text-slate-500 text-xs">{e.fecha}</td>
+                            <td className="py-3 px-4 font-bold text-slate-900">{e.concepto}</td>
+                            <td className="py-3 px-4">
+                              <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md text-[10px] font-bold">
+                                {e.categoria}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-xs text-slate-500 font-medium">{e.medio_pago || 'Débito'}</td>
+                            <td className="py-3 px-4 text-right font-black text-rose-600">
+                              {formatCLP(e.monto_clp)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       </main>
 
-      {/* Modal Registrar Gasto */}
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in-50 zoom-in-95">
-            <h3 className="text-lg font-bold text-slate-800">Registrar Nuevo Gasto de Caja</h3>
-            <form onSubmit={handleAddEgreso} className="space-y-3.5">
-              <div>
-                <label className="text-xs font-bold text-slate-700 uppercase">Concepto / Descripción</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej: Insumos de punción seca, cinta kinesiotape..."
-                  value={concepto}
-                  onChange={(e) => setConcepto(e.target.value)}
-                  className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+      {/* Modals */}
+      <RegisterSaleDialog open={isRegisterSaleOpen} onOpenChange={setIsRegisterSaleOpen} onSaleRegistered={loadData} />
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 uppercase">Categoría</label>
-                  <select
-                    value={categoria}
-                    onChange={(e) => setCategoria(e.target.value)}
-                    className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white"
-                  >
-                    <option value="Insumos Clínicos">Insumos Clínicos</option>
-                    <option value="Servicios Básicos">Servicios Básicos</option>
-                    <option value="Arriendo">Arriendo</option>
-                    <option value="Marketing">Marketing / Publicidad</option>
-                    <option value="Equipamiento">Equipamiento</option>
-                    <option value="Otros">Otros</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-700 uppercase">Monto CLP</label>
-                  <input
-                    type="number"
-                    required
-                    min="100"
-                    step="1000"
-                    placeholder="Ej: 25000"
-                    value={monto}
-                    onChange={(e) => setMonto(e.target.value)}
-                    className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white font-bold"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 uppercase">Medio de Pago</label>
-                <select
-                  value={formaPago}
-                  onChange={(e) => setFormaPago(e.target.value)}
-                  className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white"
-                >
-                  <option value="Débito">Débito / Transbank</option>
-                  <option value="Transferencia">Transferencia Bancaria</option>
-                  <option value="Efectivo">Efectivo</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm disabled:bg-slate-300"
-                >
-                  {saving ? 'Guardando...' : 'Guardar Gasto'}
-                </button>
-              </div>
-            </form>
+      <Dialog open={showEgresoModal} onOpenChange={setShowEgresoModal}>
+        <DialogHeader>
+          <DialogTitle>Registrar Egreso de Caja</DialogTitle>
+          <DialogDescription>Añade un nuevo gasto operativo a la clínica.</DialogDescription>
+        </DialogHeader>
+        <DialogBody className="space-y-4 pt-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700">Concepto / Descripción</label>
+            <Input required placeholder="Ej: Insumos de punción seca..." value={egresoForm.concepto} onChange={e => setEgresoForm({...egresoForm, concepto: e.target.value})} className="bg-slate-50" />
           </div>
-        </div>
-      )}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">Categoría</label>
+              <select value={egresoForm.categoria} onChange={e => setEgresoForm({...egresoForm, categoria: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm h-10 outline-none">
+                <option value="Insumos Clínicos">Insumos Clínicos</option>
+                <option value="Servicios Básicos">Servicios Básicos</option>
+                <option value="Arriendo">Arriendo</option>
+                <option value="Marketing">Marketing / Publicidad</option>
+                <option value="Equipamiento">Equipamiento</option>
+                <option value="Otros">Otros</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">Monto CLP</label>
+              <Input type="number" required min="100" placeholder="Ej: 25000" value={egresoForm.monto} onChange={e => setEgresoForm({...egresoForm, monto: e.target.value})} className="bg-slate-50 font-bold" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700">Medio de Pago</label>
+            <select value={egresoForm.formaPago} onChange={e => setEgresoForm({...egresoForm, formaPago: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm h-10 outline-none">
+              <option value="Débito">Débito / Transbank</option>
+              <option value="Transferencia Bancaria">Transferencia Bancaria</option>
+              <option value="Efectivo">Efectivo</option>
+            </select>
+          </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowEgresoModal(false)}>Cancelar</Button>
+          <Button onClick={handleAddEgreso} disabled={savingEgreso} className="bg-rose-600 hover:bg-rose-700 text-white font-bold">{savingEgreso ? 'Guardando...' : 'Guardar Egreso'}</Button>
+        </DialogFooter>
+      </Dialog>
 
-      {/* Modal Registrar Venta */}
-      <RegisterSaleDialog
-        open={isRegisterSaleOpen}
-        onOpenChange={setIsRegisterSaleOpen}
-        onSaleRegistered={loadData}
-      />
+      <Dialog open={!!settlingPlan} onOpenChange={(open) => !open && setSettlingPlan(null)}>
+        <DialogHeader>
+          <DialogTitle className="text-amber-600">Registrar Cobro Pendiente</DialogTitle>
+          <DialogDescription>Confirma el pago del plan adeudado para actualizar el saldo.</DialogDescription>
+        </DialogHeader>
+        <DialogBody className="space-y-4 pt-4">
+          <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 flex justify-between items-center">
+            <div>
+              <p className="text-xs font-bold text-amber-700 uppercase">{settlingPlan?.pacientes?.nombre_completo}</p>
+              <p className="text-sm font-medium text-amber-900 mt-1">{settlingPlan?.nombre_plan}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-amber-600 font-bold uppercase">Monto a Cobrar</p>
+              <p className="text-2xl font-black text-amber-600">{formatCLP(Number(settlingPlan?.monto_clp || settlingPlan?.total_final_clp || settlingPlan?.valor_total) || 0)}</p>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700">Medio de Pago Recibido</label>
+            <select value={settleForm.metodo_pago} onChange={e => setSettleForm({...settleForm, metodo_pago: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm h-10 outline-none">
+              <option value="Transferencia Bancaria">Transferencia Bancaria</option>
+              <option value="Débito / Crédito">Débito / Crédito (Transbank)</option>
+              <option value="Efectivo">Efectivo</option>
+              <option value="Convenio">Convenio</option>
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700">N° de Boleta Tributaria (Opcional)</label>
+            <Input placeholder="Ej: 14592" value={settleForm.boleta} onChange={e => setSettleForm({...settleForm, boleta: e.target.value})} className="bg-slate-50 font-mono" />
+          </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setSettlingPlan(null)}>Cancelar</Button>
+          <Button onClick={handleSettlePayment} disabled={savingSettle} className="bg-slate-900 hover:bg-slate-800 text-white font-bold">{savingSettle ? 'Procesando...' : 'Confirmar Pago'}</Button>
+        </DialogFooter>
+      </Dialog>
+
     </div>
+  );
+}
+
+export default function FinanzasPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600"/></div>}>
+      <FinanzasContent />
+    </Suspense>
   );
 }
