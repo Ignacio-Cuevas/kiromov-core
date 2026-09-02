@@ -34,29 +34,39 @@ function FinanzasContent() {
   // Modal Settle
   const [settlingPlan, setSettlingPlan] = useState<any>(null);
 
-  const getRangoFechas = (tipo: PeriodoFiltro) => {
+  const getRangoFechas = (tipo: string) => {
     const ahora = new Date();
-    let inicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-    let fin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+    const year = ahora.getFullYear();
+    const month = ahora.getMonth();
 
-    if (tipo === 'mes_anterior') {
-      inicio = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1);
-      fin = new Date(ahora.getFullYear(), ahora.getMonth(), 0, 23, 59, 59);
-    } else if (tipo === 'este_semestre') {
-      const semestre = ahora.getMonth() < 6 ? 0 : 6;
-      inicio = new Date(ahora.getFullYear(), semestre, 1);
-      fin = new Date(ahora.getFullYear(), semestre + 6, 0, 23, 59, 59);
-    } else if (tipo === 'este_ano') {
-      inicio = new Date(ahora.getFullYear(), 0, 1);
-      fin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59);
-    } else if (tipo === 'todo') {
-      inicio = new Date(2000, 0, 1);
-      fin = new Date(2100, 11, 31);
+    if (tipo === 'este_mes') {
+      return {
+        inicio: new Date(year, month, 1, 0, 0, 0),
+        fin: new Date(year, month + 1, 0, 23, 59, 59, 999)
+      };
     }
-
-    return { 
-      inicio: inicio.toISOString().split('T')[0], 
-      fin: fin.toISOString().split('T')[0] 
+    if (tipo === 'mes_anterior') {
+      return {
+        inicio: new Date(year, month - 1, 1, 0, 0, 0),
+        fin: new Date(year, month, 0, 23, 59, 59, 999)
+      };
+    }
+    if (tipo === 'este_semestre') {
+      const semestre = month < 6 ? 0 : 6;
+      return {
+        inicio: new Date(year, semestre, 1, 0, 0, 0),
+        fin: new Date(year, semestre + 6, 0, 23, 59, 59, 999)
+      };
+    }
+    if (tipo === 'este_ano') {
+      return {
+        inicio: new Date(year, 0, 1, 0, 0, 0),
+        fin: new Date(year, 11, 31, 23, 59, 59, 999)
+      };
+    }
+    return {
+      inicio: new Date(2020, 0, 1),
+      fin: new Date(2030, 11, 31)
     };
   };
 
@@ -128,36 +138,60 @@ function FinanzasContent() {
   // Filtrado dinámico por fecha
   const asistenciasFiltradas = useMemo(() => {
     const { inicio, fin } = getRangoFechas(periodo);
-    return citas.filter(c => {
-      const fecha = (c.fecha || c.created_at || '').split('T')[0];
-      return fecha >= inicio && fecha <= fin;
+    return citas.filter(a => {
+      const fechaRaw = a.fecha || a.created_at;
+      if (!fechaRaw) return false;
+      
+      // Manejo estricto de string para evitar desfases de UTC si es YYYY-MM-DD
+      const f = fechaRaw.includes('T') ? new Date(fechaRaw) : new Date(`${fechaRaw}T12:00:00Z`);
+      return f >= inicio && f <= fin;
     });
   }, [citas, periodo]);
 
   const transaccionesFiltradas = useMemo(() => {
     const { inicio, fin } = getRangoFechas(periodo);
-    return compras.filter(c => {
-      const fecha = (c.fecha_compra || c.created_at || '').split('T')[0];
-      return fecha >= inicio && fecha <= fin;
+    return compras.filter((t) => {
+      const fechaRaw = t.fecha_compra || t.created_at || t.fecha;
+      if (!fechaRaw) return false;
+      const f = fechaRaw.includes('T') ? new Date(fechaRaw) : new Date(`${fechaRaw}T12:00:00Z`);
+      return f >= inicio && f <= fin;
     });
   }, [compras, periodo]);
 
   const egresosFiltrados = useMemo(() => {
     const { inicio, fin } = getRangoFechas(periodo);
-    return egresos.filter(e => {
-      const fecha = (e.fecha || e.created_at || '').split('T')[0];
-      return fecha >= inicio && fecha <= fin;
+    return egresos.filter((e) => {
+      const fechaRaw = e.fecha || e.created_at;
+      if (!fechaRaw) return false;
+      const f = fechaRaw.includes('T') ? new Date(fechaRaw) : new Date(`${fechaRaw}T12:00:00Z`);
+      return f >= inicio && f <= fin;
     });
   }, [egresos, periodo]);
 
-  // KPIs calculados
-  const ingresosPagados = useMemo(() => transaccionesFiltradas.filter(c => c.estado_pago === 'pagado').reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.valor_total) || 0), 0), [transaccionesFiltradas]);
-  const egresosTotales = useMemo(() => egresosFiltrados.reduce((acc, curr) => acc + (Number(curr.monto_clp) || 0), 0), [egresosFiltrados]);
-  const flujoNeto = ingresosPagados - egresosTotales;
-  
-  const pendientes = useMemo(() => transaccionesFiltradas.filter(c => c.estado_pago === 'pendiente'), [transaccionesFiltradas]);
-  const totalPorCobrar = pendientes.reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.valor_total) || 0), 0);
-  const cantidadDeudores = pendientes.length;
+  // KPIs
+  const kpisCalculados = useMemo(() => {
+    const ingresos = transaccionesFiltradas
+      .filter((t) => t.estado_pago === 'pagado')
+      .reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.valor_total) || 0), 0);
+
+    const porCobrar = transaccionesFiltradas
+      .filter((t) => t.estado_pago === 'pendiente')
+      .reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.valor_total) || 0), 0);
+
+    const deudoresCount = transaccionesFiltradas
+      .filter((t) => t.estado_pago === 'pendiente').length;
+
+    const totalEgresos = egresosFiltrados
+      .reduce((acc, curr) => acc + (Number(curr.monto_clp) || 0), 0);
+
+    const flujoNeto = ingresos - totalEgresos;
+
+    return { ingresos, porCobrar, deudoresCount, totalEgresos, flujoNeto };
+  }, [transaccionesFiltradas, egresosFiltrados]);
+
+  // Arrays derivados para las tabs de "Quién Debe"
+  const pendientes = useMemo(() => transaccionesFiltradas.filter(t => t.estado_pago === 'pendiente'), [transaccionesFiltradas]);
+
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
@@ -191,29 +225,29 @@ function FinanzasContent() {
               <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"><TrendingUp className="w-4 h-4"/></div>
               <h3 className="text-xs font-bold text-slate-500 uppercase">Ingresos Reales</h3>
             </div>
-            <p className="text-2xl font-black text-slate-800">{formatCLP(ingresosPagados)}</p>
+            <p className="text-2xl font-black text-slate-800">{formatCLP(kpisCalculados.ingresos)}</p>
           </div>
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600"><TrendingDown className="w-4 h-4"/></div>
               <h3 className="text-xs font-bold text-slate-500 uppercase">Egresos</h3>
             </div>
-            <p className="text-2xl font-black text-slate-800">{formatCLP(egresosTotales)}</p>
+            <p className="text-2xl font-black text-slate-800">{formatCLP(kpisCalculados.totalEgresos)}</p>
           </div>
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><DollarSign className="w-4 h-4"/></div>
               <h3 className="text-xs font-bold text-slate-500 uppercase">Flujo Neto</h3>
             </div>
-            <p className={`text-2xl font-black ${flujoNeto >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCLP(flujoNeto)}</p>
+            <p className={`text-2xl font-black ${kpisCalculados.flujoNeto >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCLP(kpisCalculados.flujoNeto)}</p>
           </div>
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-amber-200 bg-amber-50/30">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600"><CreditCard className="w-4 h-4"/></div>
               <h3 className="text-xs font-bold text-amber-700 uppercase">Por Cobrar</h3>
             </div>
-            <p className="text-2xl font-black text-amber-600">{formatCLP(totalPorCobrar)}</p>
-            <p className="text-[10px] font-bold text-amber-600/70 uppercase mt-1">{cantidadDeudores} PACIENTES PENDIENTES</p>
+            <p className="text-2xl font-black text-amber-600">{formatCLP(kpisCalculados.porCobrar)}</p>
+            <p className="text-[10px] font-bold text-amber-600/70 uppercase mt-1">{kpisCalculados.deudoresCount} PACIENTES PENDIENTES</p>
           </div>
         </div>
 
@@ -222,7 +256,7 @@ function FinanzasContent() {
           <div className="border-b border-slate-200/80 flex overflow-x-auto">
             <button onClick={() => setActiveTab('asistencias')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'asistencias' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>🗓️ Quién Asistió</button>
             <button onClick={() => setActiveTab('pagados')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'pagados' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>💰 Quién Pagó</button>
-            <button onClick={() => setActiveTab('deben')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'deben' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>⚠️ Quién Debe {cantidadDeudores > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">{cantidadDeudores}</span>}</button>
+            <button onClick={() => setActiveTab('deben')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'deben' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>⚠️ Quién Debe {kpisCalculados.deudoresCount > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">{kpisCalculados.deudoresCount}</span>}</button>
             <button onClick={() => setActiveTab('egresos')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'egresos' ? 'border-rose-500 text-rose-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>📉 Egresos</button>
           </div>
 
