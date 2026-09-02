@@ -35,7 +35,12 @@ const MECANISMOS_DOLOR = [
 ];
 
 const TECNICAS_TMO = [
-  "Movilización Articular (Gr. I-IV)", "Terapia Miofascial", "Neurodinamia", "Ejercicio Terapéutico / Control Motor"
+  "⚡ Manipulación Articular (HVLA / Thrust)",
+  "Movilización Articular (Grados I - IV)",
+  "Terapia Miofascial y Puntos Gatillo",
+  "Neurodinamia Clínica",
+  "Ejercicio Terapéutico y Control Motor",
+  "Reeducación Biomecánica y Estabilización"
 ];
 
 const HALLAZGOS_DISPONIBLES = [
@@ -180,7 +185,7 @@ export function SoapEvolutionForm({
 
       let composedPlan = plan.trim();
       if (tecnicasAplicadas.length > 0) {
-        composedPlan = `[Técnicas: ${tecnicasAplicadas.join(', ')}] ${composedPlan}`.trim();
+        composedPlan = `[Intervención TMO: ${tecnicasAplicadas.join(' + ')}] ${composedPlan}`.trim();
       }
 
       const payload: any = {
@@ -308,11 +313,7 @@ export function SoapEvolutionForm({
                         key={seg}
                         type="button"
                         onClick={() => toggleSegmento(seg)}
-                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold border transition-all ${
-                          isSelected
-                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                            : "bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50"
-                        }`}
+                        className={`text-xs px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-blue-600 text-white font-semibold shadow-sm border-blue-600" : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"}`}
                       >
                         {seg}
                       </button>
@@ -334,11 +335,7 @@ export function SoapEvolutionForm({
                         key={mec}
                         type="button"
                         onClick={() => setMecanismoDolor(isSelected ? "" : mec)}
-                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold border transition-all ${
-                          isSelected
-                            ? "bg-rose-500 text-white border-rose-500 shadow-sm"
-                            : "bg-white text-slate-700 border-slate-200 hover:border-rose-300 hover:bg-rose-50"
-                        }`}
+                        className={`text-xs px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-blue-600 text-white font-semibold shadow-sm border-blue-600" : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"}`}
                       >
                         {mec}
                       </button>
@@ -360,11 +357,7 @@ export function SoapEvolutionForm({
                         key={tec}
                         type="button"
                         onClick={() => toggleTecnica(tec)}
-                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold border transition-all ${
-                          isSelected
-                            ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                            : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50"
-                        }`}
+                        className={`text-xs px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-blue-600 text-white font-semibold shadow-sm border-blue-600" : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"}`}
                       >
                         {tec}
                       </button>
