@@ -163,10 +163,11 @@ function AgendaContent() {
   // 2. KPIs
   const kpis = useMemo(() => {
     const citadosHoy = citas.length;
+    const confirmadas = citas.filter(c => c.estado?.toLowerCase() === 'confirmada').length;
     const enSala = citas.filter(c => c.estado?.toLowerCase() === 'en_sala').length;
     const asistio = citas.filter(c => ['asistio', 'asistió', 'atendido'].includes(c.estado?.toLowerCase())).length;
     const pendientes = citas.filter(c => c.estado?.toLowerCase() === 'pendiente').length;
-    return { citadosHoy, enSala, asistio, pendientes };
+    return { citadosHoy, confirmadas, enSala, asistio, pendientes };
   }, [citas]);
 
   // Navegación Fechas
@@ -261,6 +262,31 @@ function AgendaContent() {
     }
   };
 
+  const handleMarcarConfirmada = async (citaId: string) => {
+    if (!supabase) return;
+    const { error } = await supabase
+      .from('citas_atenciones')
+      .update({ estado: 'confirmada' })
+      .eq('id', citaId);
+
+    if (error) {
+      toast.error('Error al actualizar estado');
+      return;
+    }
+    toast.success('Cita confirmada correctamente');
+    loadAgenda();
+  };
+
+  // Helper para WhatsApp
+  const generarMensajeConfirmacion = (cita: any) => {
+    const nombre = cita.pacientes?.nombre_completo?.split(' ')[0] || 'Estimado/a';
+    const fecha = cita.fecha;
+    const hora = cita.hora?.slice(0, 5) || '16:00';
+    const telefonoLimpio = cita.pacientes?.telefono ? cita.pacientes.telefono.replace(/\D/g, '').slice(-9) : '';
+    const texto = `Hola ${nombre}, te escribimos de Kiromov Centro Clínico para solicitar la confirmación de tu sesión de kinesiología programada para el ${fecha} a las ${hora} hrs (Bulnes 470, Of. 75, Chillán). Por favor respóndenos este mensaje para confirmar tu asistencia. ¡Muchas gracias!`;
+    return `https://wa.me/56${telefonoLimpio}?text=${encodeURIComponent(texto)}`;
+  };
+
   const pacientesOptions = useMemo(() => {
     if (!pacienteSearch.trim()) return pacientes.slice(0, 50);
     const q = pacienteSearch.toLowerCase();
@@ -310,10 +336,18 @@ function AgendaContent() {
         </div>
 
         {/* KPIs del Día */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Citados Hoy</span>
             <span className="text-2xl font-bold text-slate-900 mt-1">{kpis.citadosHoy}</span>
+          </div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pendientes</span>
+            <span className="text-2xl font-bold text-slate-400 mt-1">{kpis.pendientes}</span>
+          </div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Confirmadas</span>
+            <span className="text-2xl font-bold text-indigo-600 mt-1">{kpis.confirmadas}</span>
           </div>
           <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">En Box / Sala</span>
@@ -322,10 +356,6 @@ function AgendaContent() {
           <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Atendidos</span>
             <span className="text-2xl font-bold text-emerald-600 mt-1">{kpis.asistio}</span>
-          </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pendientes</span>
-            <span className="text-2xl font-bold text-blue-600 mt-1">{kpis.pendientes}</span>
           </div>
         </div>
 
@@ -365,10 +395,10 @@ function AgendaContent() {
                 let stateLabel = 'Pendiente';
                 if (s === 'en_sala') { stateColors = 'bg-amber-50 text-amber-700 border-amber-200'; stateLabel = 'En Sala'; }
                 else if (['asistio', 'asistió', 'atendido'].includes(s)) { stateColors = 'bg-emerald-50 text-emerald-700 border-emerald-200'; stateLabel = 'Asistió'; }
+                else if (s === 'confirmada') { stateColors = 'bg-indigo-50 text-indigo-700 border-indigo-200'; stateLabel = 'Confirmada'; }
                 else if (s === 'cancelada') { stateColors = 'bg-red-50 text-red-700 border-red-200 line-through'; stateLabel = 'Cancelada'; }
 
                 const cleanPhone = p.telefono ? p.telefono.replace(/\D/g, '').slice(-9) : '';
-                const wpLink = `https://wa.me/56${cleanPhone}?text=${encodeURIComponent(`Hola ${p.nombre_completo.split(' ')[0]}, te recordamos tu sesión en Kiromov Centro Clínico hoy a las ${cita.hora?.substring(0,5)} hrs.`)}`;
 
                 return (
                   <div key={cita.id} className="flex flex-col md:flex-row bg-white border border-slate-200 rounded-2xl hover:shadow-md transition-shadow overflow-hidden group">
@@ -392,6 +422,16 @@ function AgendaContent() {
 
                     {/* Acciones */}
                     <div className="p-4 border-t md:border-t-0 md:border-l border-slate-100 flex flex-row items-center gap-2 bg-slate-50/50 justify-end md:w-auto overflow-x-auto">
+                      {s === 'pendiente' && (
+                        <Button 
+                          onClick={() => handleMarcarConfirmada(cita.id)}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs h-9 shadow-sm flex-shrink-0"
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                          Confirmar Cita
+                        </Button>
+                      )}
+
                       {!['asistio', 'asistió', 'atendido'].includes(s) && s !== 'cancelada' && (
                         <Button 
                           onClick={() => handleRegistrarAsistencia(cita.id, p.id)}
@@ -403,9 +443,9 @@ function AgendaContent() {
                       )}
                       
                       {cleanPhone && (
-                        <a href={wpLink} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center h-9 px-3 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded-xl font-bold text-xs shadow-sm flex-shrink-0 transition-colors">
+                        <a href={generarMensajeConfirmacion(cita)} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center h-9 px-3 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded-xl font-bold text-xs shadow-sm flex-shrink-0 transition-colors">
                           <MessageCircle className="w-4 h-4 mr-1.5" />
-                          WhatsApp
+                          Solicitar Confirmación
                         </a>
                       )}
 
