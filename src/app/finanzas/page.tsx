@@ -63,25 +63,17 @@ function FinanzasContent() {
   const loadData = async () => {
     if (!supabase) return;
     setLoading(true);
-    const { inicio, fin } = getRangoFechas(periodo);
-
     try {
       const [resCitas, resCompras, resEgresos] = await Promise.all([
         supabase.from('citas_atenciones')
           .select('*, pacientes(nombre_completo, rut)')
           .in('estado', ['asistio', 'atendido'])
-          .gte('fecha', inicio)
-          .lte('fecha', fin)
           .order('fecha', { ascending: false }),
         supabase.from('compras_planes')
           .select('*, pacientes(nombre_completo, rut)')
-          .gte('fecha_compra', inicio)
-          .lte('fecha_compra', fin)
           .order('fecha_compra', { ascending: false }),
         supabase.from('egresos_caja')
           .select('*')
-          .gte('fecha', inicio)
-          .lte('fecha', fin)
           .order('fecha', { ascending: false })
       ]);
 
@@ -98,7 +90,7 @@ function FinanzasContent() {
 
   useEffect(() => {
     loadData();
-  }, [periodo]);
+  }, []);
 
   const handleAddEgreso = async () => {
     if (!supabase) return;
@@ -129,12 +121,37 @@ function FinanzasContent() {
     }
   };
 
+  // Filtrado dinámico por fecha
+  const asistenciasFiltradas = useMemo(() => {
+    const { inicio, fin } = getRangoFechas(periodo);
+    return citas.filter(c => {
+      const fecha = c.fecha || c.created_at;
+      return fecha >= inicio && fecha <= fin;
+    });
+  }, [citas, periodo]);
+
+  const transaccionesFiltradas = useMemo(() => {
+    const { inicio, fin } = getRangoFechas(periodo);
+    return compras.filter(c => {
+      const fecha = c.fecha_compra || c.created_at;
+      return fecha >= inicio && fecha <= fin;
+    });
+  }, [compras, periodo]);
+
+  const egresosFiltrados = useMemo(() => {
+    const { inicio, fin } = getRangoFechas(periodo);
+    return egresos.filter(e => {
+      const fecha = e.fecha || e.created_at;
+      return fecha >= inicio && fecha <= fin;
+    });
+  }, [egresos, periodo]);
+
   // KPIs calculados
-  const ingresosPagados = useMemo(() => compras.filter(c => c.estado_pago === 'pagado').reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.valor_total) || 0), 0), [compras]);
-  const egresosTotales = useMemo(() => egresos.reduce((acc, curr) => acc + (Number(curr.monto_clp) || 0), 0), [egresos]);
+  const ingresosPagados = useMemo(() => transaccionesFiltradas.filter(c => c.estado_pago === 'pagado').reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.valor_total) || 0), 0), [transaccionesFiltradas]);
+  const egresosTotales = useMemo(() => egresosFiltrados.reduce((acc, curr) => acc + (Number(curr.monto_clp) || 0), 0), [egresosFiltrados]);
   const flujoNeto = ingresosPagados - egresosTotales;
   
-  const pendientes = useMemo(() => compras.filter(c => c.estado_pago === 'pendiente'), [compras]);
+  const pendientes = useMemo(() => transaccionesFiltradas.filter(c => c.estado_pago === 'pendiente'), [transaccionesFiltradas]);
   const totalPorCobrar = pendientes.reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.valor_total) || 0), 0);
   const cantidadDeudores = pendientes.length;
 
@@ -216,7 +233,7 @@ function FinanzasContent() {
                 {/* 1. QUIÉN ASISTIÓ */}
                 {activeTab === 'asistencias' && (
                   <div className="overflow-x-auto">
-                    {citas.length === 0 ? (
+                    {asistenciasFiltradas.length === 0 ? (
                       <p className="text-sm text-slate-400 py-12 text-center">No hay asistencias en este período.</p>
                     ) : (
                       <table className="w-full text-left text-sm whitespace-nowrap">
@@ -230,7 +247,7 @@ function FinanzasContent() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {citas.map((c) => (
+                          {asistenciasFiltradas.map((c) => (
                             <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
                               <td className="py-3 px-4 font-medium text-slate-700 text-xs">{c.fecha} {c.hora?.slice(0,5)}</td>
                               <td className="py-3 px-4 font-bold text-slate-900">{c.pacientes?.nombre_completo}</td>
@@ -248,7 +265,7 @@ function FinanzasContent() {
                 {/* 2. QUIÉN PAGÓ */}
                 {activeTab === 'pagados' && (
                   <div className="overflow-x-auto">
-                    {compras.filter(c => c.estado_pago === 'pagado').length === 0 ? (
+                    {transaccionesFiltradas.filter(c => c.estado_pago === 'pagado').length === 0 ? (
                       <p className="text-sm text-slate-400 py-12 text-center">No hay pagos registrados en este período.</p>
                     ) : (
                       <table className="w-full text-left text-sm whitespace-nowrap">
@@ -262,7 +279,7 @@ function FinanzasContent() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {compras.filter(c => c.estado_pago === 'pagado').map((c) => (
+                          {transaccionesFiltradas.filter(c => c.estado_pago === 'pagado').map((c) => (
                             <tr key={c.id} className="hover:bg-emerald-50/30 transition-colors">
                               <td className="py-3 px-4 text-slate-500 text-xs">{c.fecha_compra}</td>
                               <td className="py-3 px-4 font-bold text-slate-900">{c.pacientes?.nombre_completo}</td>
@@ -334,7 +351,7 @@ function FinanzasContent() {
                         <Plus className="w-4 h-4 mr-1.5" /> Nuevo Egreso
                       </Button>
                     </div>
-                    {egresos.length === 0 ? (
+                    {egresosFiltrados.length === 0 ? (
                       <p className="text-sm text-slate-400 py-12 text-center">No hay egresos registrados en este período.</p>
                     ) : (
                       <div className="overflow-x-auto">
@@ -349,7 +366,7 @@ function FinanzasContent() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {egresos.map((e) => (
+                            {egresosFiltrados.map((e) => (
                               <tr key={e.id} className="hover:bg-slate-50/50 transition-colors">
                                 <td className="py-3 px-4 text-slate-500 text-xs">{e.fecha}</td>
                                 <td className="py-3 px-4 font-bold text-slate-900">{e.concepto}</td>

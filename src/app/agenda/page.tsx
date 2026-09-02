@@ -336,49 +336,90 @@ function AgendaContent() {
     }
 
     return (
-      <div key={cita.id} className="flex flex-col md:flex-row bg-white border border-slate-200/80 rounded-2xl hover:shadow-md transition-shadow overflow-hidden group mb-3">
-        <div className="bg-slate-50/50 p-4 md:w-32 flex flex-row md:flex-col items-center justify-between md:justify-center border-b md:border-b-0 md:border-r border-slate-100">
-          <span className="text-2xl font-black text-slate-900 tracking-tight">{cita.hora?.substring(0,5)}</span>
-          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border mt-1 ${stateColors}`}>{stateLabel}</span>
-        </div>
-        <div className="p-4 flex-1 flex flex-col justify-center">
-          <h4 className="text-lg font-bold text-slate-900 mb-0.5">{p.nombre_completo}</h4>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
-            <span className="font-mono text-xs">{formatRut(p.rut) || 'Sin RUT'}</span>
-            <span>•</span>
-            <span className="text-blue-600 font-medium truncate max-w-xs">{cita.motivo_consulta}</span>
-          </div>
-        </div>
-        <div className="p-4 border-t md:border-t-0 md:border-l border-slate-100 flex flex-row items-center gap-2 bg-slate-50/50 justify-end md:w-auto overflow-x-auto">
-          {s === 'pendiente' && (
-            <Button onClick={() => handleMarcarConfirmada(cita.id)} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs h-9 shadow-sm flex-shrink-0">
-              <CheckCircle2 className="w-4 h-4 mr-1.5" /> Confirmar Cita
-            </Button>
-          )}
-          {!['asistio', 'asistió', 'atendido', 'no_asistio'].includes(s) && s !== 'cancelada' && (
-            <div className="flex gap-2">
-              <Button onClick={() => handleRegistrarAsistencia(cita.id, p.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs h-9 shadow-sm flex-shrink-0">
-                <CheckCircle2 className="w-4 h-4 mr-1.5" /> Registrar Asistencia
-              </Button>
-              <Button onClick={() => handleRegistrarInasistencia(cita.id, p.id)} variant="outline" className="border-orange-200 text-orange-700 hover:bg-orange-50 font-bold rounded-xl text-xs h-9 shadow-sm flex-shrink-0">
-                🚫 No Asistió
-              </Button>
+      <div key={cita.id} className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3 hover:border-slate-300 transition-colors mb-3">
+        {/* Nivel 1: Datos del Paciente, Horario y Acciones de Ficha */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-3">
+            {/* Hora destacada */}
+            <span className="font-bold text-slate-900 text-base bg-slate-100 px-2.5 py-1 rounded-lg">
+              {cita.hora?.slice(0, 5)}
+            </span>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="font-bold text-slate-900 text-sm">{cita.pacientes?.nombre_completo || p.nombre_completo}</h4>
+                {/* Badge de Estado */}
+                {s === 'confirmada' && <span className="text-[11px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">✓ Confirmada</span>}
+                {s === 'pendiente' && <span className="text-[11px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">⏳ Pendiente</span>}
+                {['asistio', 'asistió', 'atendido'].includes(s) && <span className="text-[11px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">✓ Asistió</span>}
+                {s === 'no_asistio' && <span className="text-[11px] font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">⚠️ No Asistió</span>}
+                {s === 'cancelada' && <span className="text-[11px] font-semibold bg-red-50 text-red-700 px-2 py-0.5 rounded-full line-through">Cancelada</span>}
+              </div>
+              <p className="text-xs text-slate-500 font-mono mt-0.5">
+                {formatRut(p.rut) || 'Sin RUT'} • <span className="font-sans italic">{cita.motivo_consulta || 'Sesión Kinésica'}</span>
+              </p>
             </div>
-          )}
-          {cleanPhone && (
-            <a href={generarMensajeConfirmacion(cita)} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center h-9 px-3 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded-xl font-bold text-xs shadow-sm flex-shrink-0 transition-colors">
-              <MessageCircle className="w-4 h-4 mr-1.5" /> Solicitar Confirmación
-            </a>
-          )}
-          <Button variant="outline" onClick={() => { setSelectedPatientForDrawer(p); setIsDrawerOpen(true); }} className="h-9 px-3 border-blue-200 bg-white text-blue-700 hover:bg-blue-50 font-bold rounded-xl text-xs shadow-sm flex-shrink-0">
-            <Stethoscope className="w-4 h-4 mr-1.5" /> Ficha & SOAP →
-          </Button>
-          <div className="flex items-center gap-1 pl-2 border-l border-slate-200/80 ml-1">
+          </div>
+
+          {/* Acciones de gestión a la derecha */}
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button
+              onClick={() => { setSelectedPatientForDrawer(p); setIsDrawerOpen(true); }}
+              className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold flex items-center gap-1 transition-colors"
+            >
+              Ficha & SOAP →
+            </button>
             <button onClick={() => {
               setEditingCita(cita);
-              setEditForm({ fecha: cita.fecha, hora: cita.hora?.substring(0,5), motivo: cita.motivo_consulta || '', profesional: cita.profesional || '' });
-            }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-            <button onClick={() => setDeletingCita(cita)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+              setEditForm({ fecha: cita.fecha, hora: cita.hora, motivo: cita.motivo_consulta || '', profesional: cita.profesional || '' });
+            }} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg" title="Editar horario">✏️</button>
+            <button onClick={() => { setDeletingCita(cita); }} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg" title="Cancelar cita">🗑️</button>
+          </div>
+        </div>
+
+        {/* Nivel 2: Botonera Operativa de Box (Con flex-wrap sin desbordes) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Botón WhatsApp */}
+            {cleanPhone && (
+              <a
+                href={generarMensajeConfirmacion(cita)}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors"
+              >
+                💬 Solicitar Confirmación
+              </a>
+            )}
+
+            {/* Si está pendiente, opción de confirmar */}
+            {s === 'pendiente' && (
+              <button
+                onClick={() => handleMarcarConfirmada(cita.id)}
+                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shadow-sm"
+              >
+                ✓ Confirmar Cita
+              </button>
+            )}
+          </div>
+
+          {/* Acciones de Atención en Box */}
+          <div className="flex flex-wrap items-center gap-2">
+            {!['asistio', 'asistió', 'atendido', 'no_asistio'].includes(s) && s !== 'cancelada' && (
+              <>
+                <button
+                  onClick={() => handleRegistrarAsistencia(cita.id, p.id)}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
+                >
+                  ✓ Registrar Asistencia
+                </button>
+                <button
+                  onClick={() => handleRegistrarInasistencia(cita.id, p.id)}
+                  className="px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold transition-colors"
+                >
+                  🚫 No Asistió
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
