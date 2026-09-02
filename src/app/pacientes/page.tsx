@@ -219,8 +219,11 @@ export default function PacientesPage() {
                 {loading ? (
                   <tr>
                     <td colSpan={6} className="px-5 py-12 text-center text-slate-400">
-                      <div className="inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-2" />
-                      <p>Cargando directorio clínico...</p>
+                      <div className="space-y-3 px-2">
+                        {[1,2,3,4,5].map(i => (
+                          <div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse w-full"></div>
+                        ))}
+                      </div>
                     </td>
                   </tr>
                 ) : pacientesFiltrados.length === 0 ? (

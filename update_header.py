@@ -1,4 +1,4 @@
-'use client';
+content = """'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -103,3 +103,6 @@ export function Header() {
     </header>
   );
 }
+"""
+with open('src/components/layout/Header.tsx', 'w') as f:
+    f.write(content)

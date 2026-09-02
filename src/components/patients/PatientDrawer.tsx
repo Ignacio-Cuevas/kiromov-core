@@ -485,7 +485,7 @@ export function PatientDrawer({
 
         <SheetBody className="bg-slate-50/30">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3 bg-slate-200/70 p-1 rounded-xl">
+            <TabsList className="grid w-full grid-cols-3 bg-slate-200/80 p-1 rounded-xl sticky top-0 z-20 backdrop-blur-md shadow-sm">
               <TabsTrigger value="soap" badge={evoluciones.length} className="text-xs sm:text-sm font-semibold">
                 <Stethoscope className="h-4 w-4 hidden sm:inline" />
                 Evolución SOAP ({evoluciones.length})

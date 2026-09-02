@@ -43,14 +43,14 @@ export function Sheet({
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
         onClick={() => onOpenChange(false)}
       />
 
       {/* Sheet Content */}
       <div
         className={cn(
-          "relative z-50 flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl transition-transform duration-300 ease-out animate-in slide-in-from-right sm:border-l border-slate-200",
+          "relative z-50 flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out animate-in slide-in-from-right sm:border-l border-slate-200",
           side === "right" && "inset-y-0 right-0",
           className
         )}
