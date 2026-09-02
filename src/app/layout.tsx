@@ -15,7 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="h-full">
-      <body className="min-h-full flex flex-col antialiased text-slate-900 bg-slate-50 selection:bg-clinic-500 selection:text-white">
+      <body className="bg-slate-50/50 text-slate-900 antialiased flex flex-col min-h-full">
         <Header />
         {children}
         <Toaster position="top-right" richColors closeButton />
