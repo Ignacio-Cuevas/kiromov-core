@@ -1,4 +1,4 @@
-'use client';
+content = """'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Printer, X } from 'lucide-react';
@@ -8,9 +8,6 @@ interface ReimbursementCertificateProps {
   isOpen?: boolean;
   onClose?: () => void;
   patient: any;
-  evoluciones?: any;
-  citas?: any;
-  numeroBoleta?: any;
 }
 
 export function ReimbursementCertificate({
@@ -26,7 +23,6 @@ export function ReimbursementCertificate({
     if (!isOpen || !patient?.id) return;
 
     const fetchData = async () => {
-      if (!supabase) return;
       setLoading(true);
       try {
         // 1. Asistencias
@@ -196,14 +192,14 @@ export function ReimbursementCertificate({
           body * {
             visibility: hidden;
           }
-          .fixed.inset-0.z-\[100\] {
+          .fixed.inset-0.z-\\[100\\] {
             position: absolute !important;
             left: 0;
             top: 0;
             margin: 0;
             padding: 0;
           }
-          .fixed.inset-0.z-\[100\], .fixed.inset-0.z-\[100\] * {
+          .fixed.inset-0.z-\\[100\\], .fixed.inset-0.z-\\[100\\] * {
             visibility: visible;
           }
         }
@@ -213,3 +209,6 @@ export function ReimbursementCertificate({
 }
 
 export default ReimbursementCertificate;
+"""
+with open('src/components/clinical/ReimbursementCertificate.tsx', 'w') as f:
+    f.write(content)
