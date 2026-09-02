@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, Suspense } from 'react';
+import { SettlePaymentModal } from "@/components/sales/SettlePaymentModal";
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import { RegisterSaleDialog } from '@/components/finanzas/RegisterSaleDialog';
@@ -24,7 +25,7 @@ function FinanzasContent() {
   const [loading, setLoading] = useState(true);
 
   const [periodo, setPeriodo] = useState<PeriodoFiltro>('mes');
-  const [activeTab, setActiveTab] = useState<'transacciones' | 'por_cobrar' | 'egresos'>('transacciones');
+  const [activeTab, setActiveTab] = useState<'asistio' | 'ingresos' | 'pendientes' | 'egresos'>('asistio');
 
   const [isRegisterSaleOpen, setIsRegisterSaleOpen] = useState(false);
 
@@ -44,6 +45,8 @@ function FinanzasContent() {
     try {
       const { data: cData } = await supabase.from('compras_planes').select('*, pacientes(nombre_completo, rut)').order('fecha_compra', { ascending: false });
       const { data: eData } = await supabase.from('egresos_caja').select('*').order('fecha', { ascending: false });
+      const { data: citasData } = await supabase.from('citas_atenciones').select('*, pacientes(nombre_completo, rut)').in('estado', ['asistio', 'atendido']).order('fecha', { ascending: false }).limit(100);
+      if (citasData) setCitas(citasData);
       setCitas(cData || []);
       setCompras(cData || []);
       setEgresos(eData || []);
@@ -168,9 +171,10 @@ function FinanzasContent() {
 
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
           <div className="border-b border-slate-200/80 flex overflow-x-auto">
-            <button onClick={() => setActiveTab('transacciones')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'transacciones' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>Transacciones / Ventas</button>
-            <button onClick={() => setActiveTab('por_cobrar')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'por_cobrar' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>Cuentas por Cobrar {cuentasPendientes.length > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">{cuentasPendientes.length}</span>}</button>
-            <button onClick={() => setActiveTab('egresos')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'egresos' ? 'border-rose-500 text-rose-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>Egresos de Caja</button>
+            <button onClick={() => setActiveTab('asistio')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'asistio' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>🗓️ Quién Asistió</button>
+            <button onClick={() => setActiveTab('ingresos')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'ingresos' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>💰 Quién Pagó</button>
+            <button onClick={() => setActiveTab('pendientes')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'pendientes' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>⚠️ Quién Debe {cuentasPendientes.length > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">{cuentasPendientes.length}</span>}</button>
+            <button onClick={() => setActiveTab('egresos')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'egresos' ? 'border-rose-500 text-rose-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>📉 Egresos</button>
           </div>
 
           <div className="p-0">
@@ -179,7 +183,7 @@ function FinanzasContent() {
                 <Loader2 className="w-8 h-8 animate-spin mb-3 text-blue-600" />
                 <p className="text-sm font-medium">Cargando registros...</p>
               </div>
-            ) : activeTab === 'transacciones' ? (
+            ) : activeTab === 'ingresos' ? (
               <div>
                 <div className="p-4 border-b border-slate-100 flex justify-end bg-slate-50/50">
                   <Button onClick={() => setIsRegisterSaleOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm h-9">
@@ -231,7 +235,7 @@ function FinanzasContent() {
                   </div>
                 )}
               </div>
-            ) : activeTab === 'por_cobrar' ? (
+            ) : activeTab === 'pendientes' ? (
               <div>
                 {cuentasPendientes.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-slate-400">
@@ -372,41 +376,12 @@ function FinanzasContent() {
         </DialogFooter>
       </Dialog>
 
-      <Dialog open={!!settlingPlan} onOpenChange={(open) => !open && setSettlingPlan(null)}>
-        <DialogHeader>
-          <DialogTitle className="text-amber-600">Registrar Cobro Pendiente</DialogTitle>
-          <DialogDescription>Confirma el pago del plan adeudado para actualizar el saldo.</DialogDescription>
-        </DialogHeader>
-        <DialogBody className="space-y-4 pt-4">
-          <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 flex justify-between items-center">
-            <div>
-              <p className="text-xs font-bold text-amber-700 uppercase">{settlingPlan?.pacientes?.nombre_completo}</p>
-              <p className="text-sm font-medium text-amber-900 mt-1">{settlingPlan?.nombre_plan}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] text-amber-600 font-bold uppercase">Monto a Cobrar</p>
-              <p className="text-2xl font-black text-amber-600">{formatCLP(Number(settlingPlan?.monto_clp || settlingPlan?.total_final_clp || settlingPlan?.valor_total) || 0)}</p>
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">Medio de Pago Recibido</label>
-            <select value={settleForm.metodo_pago} onChange={e => setSettleForm({...settleForm, metodo_pago: e.target.value})} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10 outline-none">
-              <option value="Transferencia Bancaria">Transferencia Bancaria</option>
-              <option value="Débito / Crédito">Débito / Crédito (Transbank)</option>
-              <option value="Efectivo">Efectivo</option>
-              <option value="Convenio">Convenio</option>
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">N° de Boleta Tributaria (Opcional)</label>
-            <Input placeholder="Ej: 14592" value={settleForm.boleta} onChange={e => setSettleForm({...settleForm, boleta: e.target.value})} className="bg-slate-50/50 font-mono" />
-          </div>
-        </DialogBody>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setSettlingPlan(null)}>Cancelar</Button>
-          <Button onClick={handleSettlePayment} disabled={savingSettle} className="bg-slate-900 hover:bg-slate-800 text-white font-bold">{savingSettle ? 'Procesando...' : 'Confirmar Pago'}</Button>
-        </DialogFooter>
-      </Dialog>
+      <SettlePaymentModal 
+        isOpen={!!settlingPlan} 
+        onClose={() => setSettlingPlan(null)} 
+        planEnUso={settlingPlan}
+        onSuccess={() => { setSettlingPlan(null); loadData(); }}
+      />
 
     </div>
   );

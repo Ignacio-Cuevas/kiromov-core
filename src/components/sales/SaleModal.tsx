@@ -67,7 +67,7 @@ export function SaleModal({
   const [sessionsQuantity, setSessionsQuantity] = useState<number>(4);
   const [totalAmountCLP, setTotalAmountCLP] = useState<number>(100000);
   const [paymentMethod, setPaymentMethod] = useState<string>('transferencia');
-  const [paymentStatus, setPaymentStatus] = useState<string>('pagado');
+  const [paymentStatus, setPaymentStatus] = useState<string>('pendiente');
   const [boletaNumber, setBoletaNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);

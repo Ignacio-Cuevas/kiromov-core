@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import SaleModal from "@/components/sales/SaleModal";
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 
@@ -24,7 +25,8 @@ interface PacienteResumen {
 
 export default function PacientesPage() {
   const supabase = createClient();
-  const [pacientes, setPacientes] = useState<PacienteResumen[]>([]);
+  const [pacientes, setPacientes] = useState<any[]>([]);
+  const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filtroTab, setFiltroTab] = useState<'todos' | 'vigentes' | 'renovar' | 'finalizados'>('todos');
   const [busqueda, setBusqueda] = useState('');
@@ -106,12 +108,12 @@ export default function PacientesPage() {
             >
               ⟳ Actualizar
             </button>
-            <Link 
-              href="/agenda" 
+            <button 
+              onClick={() => setIsSaleModalOpen(true)}
               className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors shadow-sm"
             >
               + Registrar Venta
-            </Link>
+            </button>
             <button 
               className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
             >
@@ -348,7 +350,13 @@ export default function PacientesPage() {
           </div>
         </div>
 
-      </main>
+      
+      <SaleModal 
+        isOpen={isSaleModalOpen} 
+        onClose={() => setIsSaleModalOpen(false)} 
+        onSuccess={() => cargarPacientes()} 
+      />
+    </main>
     </div>
   );
 }

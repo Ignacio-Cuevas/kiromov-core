@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import SaleModal from "@/components/sales/SaleModal";
+import { SettlePaymentModal } from "@/components/sales/SettlePaymentModal";
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
@@ -48,6 +50,9 @@ function AgendaContent() {
   const [vista, setVista] = useState<VistaAgenda>('dia');
 
   const [citas, setCitas] = useState<any[]>([]);
+  const [showNoSessionsAlert, setShowNoSessionsAlert] = useState<any>(null);
+  const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
+  const [settlingPlan, setSettlingPlan] = useState<any>(null);
   const [pacientes, setPacientes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -190,24 +195,48 @@ function AgendaContent() {
       if (res.success) {
         toast.success(res.message, { id: toastId });
         loadAgenda();
+        if (!res.discountedPlan) {
+          setShowNoSessionsAlert({ pacienteId });
+        }
       } else toast.error(res.error || 'Error', { id: toastId });
     } catch (err) { toast.error('Ocurrió un error inesperado', { id: toastId }); }
   };
 
   const handleCreateCita = async () => {
     if (!supabase) return;
-    if (!newCita.pacienteId || !newCita.fecha || !newCita.hora) { toast.error('Completa los campos'); return; }
+    if (!newCita.pacienteId || !newCita.fecha || !newCita.hora) { toast.error('Completa los campos obligatorios'); return; }
+    
     setSavingCita(true);
     try {
-      const { error } = await supabase.from('citas_atenciones').insert([{
-        paciente_id: newCita.pacienteId, fecha: newCita.fecha, hora: newCita.hora,
-        profesional: newCita.profesional, motivo_consulta: newCita.motivo, estado: 'pendiente'
-      }]);
-      if (error) throw error;
-      toast.success('Cita agendada');
+      const payload = {
+         paciente_id: newCita.pacienteId,
+         fecha: newCita.fecha, 
+         hora: newCita.hora,
+         profesional: newCita.profesional,
+         motivo_consulta: newCita.motivo || 'Sesión de Tratamiento Kinésico',
+         estado: 'pendiente'
+      };
+
+      const { data, error } = await supabase
+         .from('citas_atenciones')
+         .insert([payload])
+         .select();
+
+      if (error) {
+         console.error('Error Supabase al agendar:', error);
+         toast.error(`No se pudo agendar: ${error.message}`);
+         return;
+      }
+
+      toast.success('¡Cita agendada exitosamente!');
       setShowNewCitaModal(false);
       loadAgenda();
-    } catch (err) { toast.error('Error al agendar cita'); } finally { setSavingCita(false); }
+    } catch (err: any) {
+      console.error('Excepción al agendar:', err);
+      toast.error(err.message || 'Error inesperado al agendar cita');
+    } finally {
+      setSavingCita(false); // Garantiza que el formulario nunca quede congelado
+    }
   };
 
   const handleUpdateCita = async () => {
@@ -514,7 +543,34 @@ function AgendaContent() {
               vista === 'dia' ? renderDia() : vista === 'semana' ? renderSemana() : renderMes()
           )}
         </div>
-      </main>
+      
+      <Dialog open={!!showNoSessionsAlert} onOpenChange={(open) => !open && setShowNoSessionsAlert(null)}>
+        <DialogHeader>
+          <DialogTitle className="text-amber-600">Sesiones Agotadas / Sin Plan</DialogTitle>
+          <DialogDescription>
+            El paciente ha completado sus sesiones o no tiene un plan activo.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogBody className="space-y-4 pt-4">
+          <p className="text-sm font-medium text-slate-700 text-center">
+            ¿Deseas Asignar un Nuevo Plan / Venta o tienes un Cobro Pendiente que registrar?
+          </p>
+        </DialogBody>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button variant="outline" onClick={() => setShowNoSessionsAlert(null)}>Cerrar</Button>
+          <Button onClick={() => { setIsSaleModalOpen(true); setShowNoSessionsAlert(null); }} className="bg-blue-600 hover:bg-blue-700 text-white font-bold w-full sm:w-auto">
+            + Asignar Nuevo Plan / Venta
+          </Button>
+          {/* Oculto cobrar directamente aquí porque SettlePaymentModal necesita un plan en uso, pero al menos le damos la opción de venta. */}
+        </DialogFooter>
+      </Dialog>
+
+      <SaleModal 
+        isOpen={isSaleModalOpen} 
+        onClose={() => setIsSaleModalOpen(false)} 
+        onSuccess={() => loadAgenda()} 
+      />
+</main>
 
       <PatientDrawer patient={selectedPatientForDrawer} isOpen={isDrawerOpen} onOpenChange={setIsDrawerOpen} onAttendanceRegistered={() => loadAgenda()} />
 
