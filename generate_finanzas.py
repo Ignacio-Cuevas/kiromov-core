@@ -1,11 +1,13 @@
-'use client';
+import re
+
+content = """'use client';
 
 import { Suspense, useEffect, useState, useMemo } from "react";
 import { SettlePaymentModal } from "@/components/sales/SettlePaymentModal";
 import { createClient } from "@/utils/supabase/client";
 import { formatCLP, formatRut } from "@/lib/utils";
-import { Loader2, Plus, CreditCard, TrendingUp, TrendingDown, DollarSign, CheckCircle2 } from "lucide-react";
-import { toast } from "sonner";
+import { Loader2, Plus, CreditCard, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import toast from "react-hot-toast";
 
 // Componentes UI dummy para no romper dependencias
 import { Button } from "@/components/ui/button";
@@ -15,7 +17,7 @@ import { Dialog, DialogBody, DialogDescription, DialogFooter, DialogHeader, Dial
 type PeriodoFiltro = 'este_mes' | 'mes_anterior' | 'este_semestre' | 'este_ano' | 'todo';
 type TabName = 'asistencias' | 'pagados' | 'deben' | 'egresos';
 
-function FinanzasContent() {
+export function FinanzasContent() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [periodo, setPeriodo] = useState<PeriodoFiltro>('este_mes');
@@ -433,3 +435,9 @@ export default function FinanzasPage() {
     </Suspense>
   );
 }
+"""
+
+with open('src/app/finanzas/page.tsx', 'w') as f:
+    f.write(content)
+
+print("Finanzas page completely rewritten safely.")
