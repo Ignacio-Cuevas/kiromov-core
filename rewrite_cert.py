@@ -1,4 +1,4 @@
-'use client';
+content = """'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Printer } from 'lucide-react';
@@ -264,7 +264,7 @@ export function ReimbursementCertificate({
               background: transparent !important;
             }
             /* Hide the preview padding */
-            .p-4.sm\:p-8 {
+            .p-4.sm\\:p-8 {
               padding: 0 !important;
             }
           }
@@ -275,3 +275,6 @@ export function ReimbursementCertificate({
 }
 
 export default ReimbursementCertificate;
+"""
+with open('src/components/clinical/ReimbursementCertificate.tsx', 'w') as f:
+    f.write(content)
