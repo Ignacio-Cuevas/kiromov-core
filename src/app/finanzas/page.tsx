@@ -29,7 +29,7 @@ function FinanzasContent() {
   // Modal Egresos
   const [showEgresoModal, setShowEgresoModal] = useState(false);
   const [savingEgreso, setSavingEgreso] = useState(false);
-  const [egresoForm, setEgresoForm] = useState({ concepto: '', categoria: 'Insumos Clínicos', monto: '', formaPago: 'Débito' });
+  const [egresoForm, setEgresoForm] = useState({ concepto: '', categoria: 'Insumos Clínicos', monto: '', formaPago: 'Débito', fecha: '' });
 
   // Modal Settle
   const [settlingPlan, setSettlingPlan] = useState<any>(null);
@@ -99,23 +99,27 @@ function FinanzasContent() {
       return;
     }
     setSavingEgreso(true);
-    const nuevoEgreso = {
-      concepto: egresoForm.concepto, categoria: egresoForm.categoria,
-      monto_clp: parseInt(egresoForm.monto, 10), medio_pago: egresoForm.formaPago,
-      fecha: new Date().toISOString().split('T')[0], responsable: 'Clínica'
+    const payload = {
+      concepto: egresoForm.concepto.trim(),
+      categoria: egresoForm.categoria || 'Otros',
+      medio_pago: egresoForm.formaPago || 'Débito / Transbank',
+      metodo_pago: egresoForm.formaPago || 'Débito / Transbank',
+      monto_clp: parseInt(String(egresoForm.monto).replace(/\D/g, ''), 10) || 0,
+      fecha: egresoForm.fecha || new Date().toISOString().split('T')[0],
+      responsable: 'Clínica'
     };
     try {
-      const { error } = await supabase.from('egresos_caja').insert([nuevoEgreso]);
+      const { error } = await supabase.from('egresos_caja').insert([payload]);
       if (error) {
         console.error('Error en Supabase:', error);
         throw new Error(error.message);
       }
-      toast.success('Egreso guardado');
+      toast.success('Egreso registrado exitosamente');
       setShowEgresoModal(false);
-      setEgresoForm({ concepto: '', categoria: 'Insumos Clínicos', monto: '', formaPago: 'Débito' });
+      setEgresoForm({ concepto: '', categoria: 'Insumos Clínicos', monto: '', formaPago: 'Débito', fecha: '' });
       loadData();
     } catch (err: any) { 
-      toast.error(err.message || 'Error guardando egreso'); 
+      toast.error(err.message || 'Error al guardar egreso'); 
     } finally { 
       setSavingEgreso(false); 
     }
@@ -125,7 +129,7 @@ function FinanzasContent() {
   const asistenciasFiltradas = useMemo(() => {
     const { inicio, fin } = getRangoFechas(periodo);
     return citas.filter(c => {
-      const fecha = c.fecha || c.created_at;
+      const fecha = (c.fecha || c.created_at || '').split('T')[0];
       return fecha >= inicio && fecha <= fin;
     });
   }, [citas, periodo]);
@@ -133,7 +137,7 @@ function FinanzasContent() {
   const transaccionesFiltradas = useMemo(() => {
     const { inicio, fin } = getRangoFechas(periodo);
     return compras.filter(c => {
-      const fecha = c.fecha_compra || c.created_at;
+      const fecha = (c.fecha_compra || c.created_at || '').split('T')[0];
       return fecha >= inicio && fecha <= fin;
     });
   }, [compras, periodo]);
@@ -141,7 +145,7 @@ function FinanzasContent() {
   const egresosFiltrados = useMemo(() => {
     const { inicio, fin } = getRangoFechas(periodo);
     return egresos.filter(e => {
-      const fecha = e.fecha || e.created_at;
+      const fecha = (e.fecha || e.created_at || '').split('T')[0];
       return fecha >= inicio && fecha <= fin;
     });
   }, [egresos, periodo]);
@@ -401,8 +405,12 @@ function FinanzasContent() {
             <label className="text-xs font-bold text-slate-700">Concepto / Descripción</label>
             <Input required placeholder="Ej: Insumos..." value={egresoForm.concepto} onChange={e => setEgresoForm({...egresoForm, concepto: e.target.value})} className="bg-slate-50/50" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">Fecha (Opcional)</label>
+              <Input type="date" value={egresoForm.fecha} onChange={e => setEgresoForm({...egresoForm, fecha: e.target.value})} className="bg-slate-50/50 text-sm h-10" />
+            </div>
+            <div className="space-y-1.5 col-span-2">
               <label className="text-xs font-bold text-slate-700">Categoría</label>
               <select value={egresoForm.categoria} onChange={e => setEgresoForm({...egresoForm, categoria: e.target.value})} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10 outline-none">
                 <option value="Insumos Clínicos">Insumos Clínicos</option>
