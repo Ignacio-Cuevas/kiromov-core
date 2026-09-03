@@ -18,6 +18,7 @@ import { RenewPlanDialog } from "./RenewPlanDialog";
 import { PayPlanModal } from "./PayPlanModal";
 import { EditPatientDialog } from "./EditPatientDialog";
 import { ReimbursementCertificate } from "@/components/clinical/ReimbursementCertificate";
+import { PassportModal } from "@/components/clinical/PassportModal";
 import { SOAPModal } from "@/components/clinical/SOAPModal";
 import { SoapTimelineAccordion } from "./SoapTimelineAccordion";
 import {
@@ -108,6 +109,7 @@ export function PatientDrawer({
   const [isPayPlanOpen, setIsPayPlanOpen] = useState(false);
   const [selectedPlanToPay, setSelectedPlanToPay] = useState<CompraPlan | null>(null);
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
+  const [isPassportOpen, setIsPassportOpen] = useState(false);
   const [selectedBoletaForCert, setSelectedBoletaForCert] = useState<string | null>(null);
   const [isEditPatientOpen, setIsEditPatientOpen] = useState(false);
   const [isSOAPModalOpen, setIsSOAPModalOpen] = useState(false);
@@ -328,6 +330,14 @@ export function PatientDrawer({
 
                 <button
                   type="button"
+                  onClick={() => setIsPassportOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors border border-amber-200 shadow-2xs"
+                  title="Pasaporte de Salud Articular (Alta)"
+                >
+                  <span>🏅 Pasaporte Salud</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     setSelectedBoletaForCert(activePlan?.numero_boleta || null);
                     setIsCertificateOpen(true);
@@ -336,7 +346,7 @@ export function PatientDrawer({
                   title="Generar certificado médico para reembolso"
                 >
                   <FileText className="h-3.5 w-3.5" />
-                  <span>📄 Certificado Reembolso</span>
+                  <span className="hidden sm:inline">📄 Certificado</span>
                 </button>
               </div>
             </div>
