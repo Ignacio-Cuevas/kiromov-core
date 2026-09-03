@@ -460,43 +460,87 @@ function AgendaContent() {
 
           {/* Col 2: Estado Financiero */}
           <div className="space-y-1.5 md:border-l md:border-slate-200 md:pl-3">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-              <span>💰 Financiamiento</span>
-            </div>
-            {debePago ? (
-              <div className="mt-1">
-                <span className="text-xs font-bold text-rose-700 flex items-center gap-1 mb-1.5">
-                  🔴 Debe Pago ({montoPendiente})
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              💰 Financiamiento
+            </span>
+
+            {/* CASO A: Paciente con Plan y Pagado */}
+            {p?.plan_id && p?.estado_pago === 'pagado' && (
+              <div>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  ✓ Plan Pagado
                 </span>
-                <button 
+                <p className="text-[11px] text-slate-500 mt-1">Al día {p.numero_boleta ? `(Boleta ${p.numero_boleta})` : ''}</p>
+              </div>
+            )}
+
+            {/* CASO B: Paciente con Plan y Deuda Pendiente */}
+            {p?.plan_id && p?.estado_pago === 'pendiente' && (
+              <div>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                  🔴 Debe Plan ({montoPendiente})
+                </span>
+                <button
                   onClick={() => { setSelectedPatientForDrawer(p); setIsDrawerOpen(true); }}
-                  className="px-2 py-1 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-800 text-[10px] font-bold transition-colors w-full sm:w-auto active:scale-[0.98]"
+                  className="block mt-1 text-[11px] font-semibold text-rose-600 hover:underline"
                 >
-                  💳 Cobrar Plan
+                  Registrar cobro →
                 </button>
               </div>
-            ) : (
-              <div className="mt-2 text-xs font-semibold text-slate-700 flex flex-col gap-1">
-                <span className="flex items-center gap-1 text-emerald-700">✓ Plan Pagado</span>
-                {p.numero_boleta && <span className="text-[10px] text-slate-500 font-mono">Boleta N° {p.numero_boleta}</span>}
+            )}
+
+            {/* CASO C: Paciente con Plan Finalizado */}
+            {p?.estado_plan === 'finalizado' && (
+              <div>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                  ⚠️ Plan Finalizado
+                </span>
+                <button
+                  onClick={() => { setIsSaleModalOpen(true); }}
+                  className="block mt-1 text-[11px] font-semibold text-blue-600 hover:underline"
+                >
+                  + Vender nuevo plan
+                </button>
+              </div>
+            )}
+
+            {/* CASO D: Paciente Nuevo / Sin Plan (Ej: Maiquel Goelzer Rinco) */}
+            {(!p?.plan_id || p?.estado_plan === 'sin_plan') && (
+              <div>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                  ⚪ Cobro en Box (Sin Plan)
+                </span>
+                <button
+                  onClick={() => { setIsSaleModalOpen(true); }}
+                  className="block mt-1 text-[11px] font-semibold text-blue-600 hover:underline"
+                >
+                  + Asignar plan o cobro
+                </button>
               </div>
             )}
           </div>
 
           {/* Col 3: Semáforo Clínico TMO */}
           <div className="space-y-1.5 md:border-l md:border-slate-200 md:pl-3">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-              <span>📊 Estado Clínico</span>
-            </div>
-            <div className="mt-1 flex flex-col gap-1.5">
-              <span className="text-xs font-semibold text-slate-700">Último Dolor: ENA {p.ultimo_dolor_ena != null ? p.ultimo_dolor_ena : '-'}/10</span>
-              {requiereReevaluacion(p) && (
-                <div className="bg-amber-100 text-amber-800 text-[10px] font-bold p-1.5 rounded-lg border border-amber-200 flex items-start gap-1">
-                  <span className="text-sm leading-none">⚠️</span> 
-                  <span>Requiere Reevaluación TMO</span>
-                </div>
-              )}
-            </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              📊 Estado Clínico
+            </span>
+            {p?.ultimo_dolor_ena !== undefined && p?.ultimo_dolor_ena !== null && p.ultimo_dolor_ena >= 0 ? (
+              <div className="space-y-1">
+                <p className="text-slate-700 text-xs">
+                  Último dolor: <span className="font-bold text-slate-900 font-mono">ENA {p.ultimo_dolor_ena}/10</span>
+                </p>
+                {requiereReevaluacion(p) && (
+                  <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                    ⚠️ Reevaluación TMO
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p className="text-slate-500 text-xs italic">
+                Primera Atención / Evaluación
+              </p>
+            )}
           </div>
         </div>
 
