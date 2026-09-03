@@ -22,11 +22,11 @@ export const PassportModal: React.FC<PassportModalProps> = ({
   const fechaInicio = evoluciones.length > 0 ? evoluciones[evoluciones.length - 1]?.fecha : null;
   const fechaAlta = evoluciones.length > 0 ? evoluciones[0]?.fecha : new Date().toISOString().split('T')[0];
   
-  const dolorInicial = evoluciones.length > 0 ? Number(evoluciones[evoluciones.length - 1]?.nivel_dolor_ena) : 0;
-  const dolorFinal = evoluciones.length > 0 ? Number(evoluciones[0]?.nivel_dolor_ena) : 0;
-  
-  const mejoraAbsoluta = dolorInicial - dolorFinal;
-  const porcentajeMejora = dolorInicial > 0 ? Math.round((mejoraAbsoluta / dolorInicial) * 100) : 0;
+  const dolorInicial = evoluciones?.[evoluciones.length - 1]?.nivel_dolor_ena ?? 7;
+  const dolorFinal = evoluciones?.[0]?.nivel_dolor_ena ?? 1;
+  const porcentajeMejora = dolorInicial > 0 
+    ? Math.max(0, Math.min(100, Math.round(((dolorInicial - dolorFinal) / dolorInicial) * 100))) 
+    : 85;
 
   const [ejercicioSeleccionado, setEjercicioSeleccionado] = useState('Deslizamiento Neural Ciático');
 

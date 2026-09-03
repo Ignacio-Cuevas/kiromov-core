@@ -330,7 +330,10 @@ export function PatientDrawer({
 
                 <button
                   type="button"
-                  onClick={() => setIsPassportOpen(true)}
+                  onClick={() => {
+                    console.log('Abriendo Pasaporte de Salud para:', currentPatient?.nombre_completo);
+                    setIsPassportOpen(true);
+                  }}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors border border-amber-200 shadow-2xs"
                   title="Pasaporte de Salud Articular (Alta)"
                 >
@@ -647,6 +650,16 @@ export function PatientDrawer({
           pacienteId={currentPatient.id}
           pacienteNombre={currentPatient.nombre_completo || currentPatient.full_name}
           onEvolutionSaved={handleEvolutionSaved}
+        />
+      )}
+
+      {isPassportOpen && (
+        <PassportModal 
+          isOpen={isPassportOpen}
+          onClose={() => setIsPassportOpen(false)}
+          paciente={currentPatient}
+          evoluciones={evoluciones}
+          citasAsistidas={citasPrevias.filter((c: any) => ['asistio', 'atendido'].includes(c.estado?.toLowerCase() || '')).length}
         />
       )}
     </>
