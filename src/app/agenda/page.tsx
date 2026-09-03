@@ -111,7 +111,7 @@ function AgendaContent() {
         .from('citas_atenciones')
         .select(`
           id, fecha, hora, profesional, estado, motivo_consulta, paciente_id,
-          pacientes ( id, nombre_completo, rut, telefono, email, prevision )
+          pacientes ( id, nombre_completo, rut, telefono, email, prevision, alertas_seguridad, antecedentes_morbidos )
         `)
         .gte('fecha', fechaInicioStr)
         .lte('fecha', fechaFinStr)
@@ -233,8 +233,10 @@ function AgendaContent() {
       if (res.success) {
         toast.success(res.message, { id: toastId });
         loadAgenda();
-        if (!res.discountedPlan) {
-          setShowNoSessionsAlert({ pacienteId });
+        if (res.planCompleted) {
+          setShowNoSessionsAlert({ pacienteId, reason: 'completed' });
+        } else if (!res.discountedPlan) {
+          setShowNoSessionsAlert({ pacienteId, reason: 'no_plan' });
         }
       } else toast.error(res.error || 'Error', { id: toastId });
     } catch (err) { toast.error('Ocurrió un error inesperado', { id: toastId }); }
@@ -413,6 +415,19 @@ function AgendaContent() {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h4 className="font-bold text-slate-900 text-sm sm:text-base">{cita.pacientes?.nombre_completo || p.nombre_completo}</h4>
+                {p.prevision && (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                    p.prevision.toLowerCase().includes('convenio')
+                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                      : p.prevision.toLowerCase().includes('isapre')
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      : p.prevision.toLowerCase().includes('fonasa')
+                      ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                      : 'bg-slate-100 text-slate-700'
+                  }`}>
+                    {p.prevision}
+                  </span>
+                )}
                 {s === 'confirmada' && <span className="text-[11px] font-bold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-100">✓ Confirmada</span>}
                 {s === 'pendiente' && <span className="text-[11px] font-bold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full border border-slate-200">⏳ Pendiente</span>}
                 {['asistio', 'asistió', 'atendido'].includes(s) && <span className="text-[11px] font-bold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-100">✓ Asistió</span>}
@@ -422,6 +437,12 @@ function AgendaContent() {
               <p className="text-xs text-slate-500 font-mono mt-1">
                 {formatRut(p.rut) || 'Sin RUT'} • <span className="font-sans italic">{cita.motivo_consulta || 'Sesión Kinésica'}</span>
               </p>
+              {(p.alertas_seguridad || p.antecedentes_morbidos) && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 px-3 py-1.5 rounded-xl text-xs flex flex-wrap items-center gap-1.5 mt-2 max-w-full">
+                  <span className="font-bold whitespace-nowrap">🚩 Alerta Seguridad TMO:</span>
+                  <span className="truncate">{p.alertas_seguridad || p.antecedentes_morbidos}</span>
+                </div>
+              )}
             </div>
           </div>
           
@@ -452,6 +473,13 @@ function AgendaContent() {
                 <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
                   <div className="h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%` }} />
                 </div>
+                {p.sesiones_restantes === 1 && (
+                  <div className="mt-2">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md animate-pulse">
+                      🎯 Hoy es su última sesión del plan
+                    </span>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-xs text-slate-500 italic mt-2">Sin plan activo</p>
@@ -586,7 +614,11 @@ function AgendaContent() {
             <CalendarDays className="w-12 h-12 mb-3 text-slate-300" />
             <p className="text-base font-semibold text-slate-600">No hay citas para este día</p>
           </div>
-        ) : citas.map(c => renderCardCita(c, false))}
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {citas.map(c => renderCardCita(c, false))}
+          </div>
+        )}
       </div>
     );
   };
@@ -761,22 +793,39 @@ function AgendaContent() {
       
       <Dialog open={!!showNoSessionsAlert} onOpenChange={(open) => !open && setShowNoSessionsAlert(null)}>
         <DialogHeader>
-          <DialogTitle className="text-amber-600">Sesiones Agotadas / Sin Plan</DialogTitle>
+          <DialogTitle className="text-amber-600">
+            {showNoSessionsAlert?.reason === 'completed' ? '¡Plan Completado!' : 'Sesiones Agotadas / Sin Plan'}
+          </DialogTitle>
           <DialogDescription>
-            El paciente ha completado sus sesiones o no tiene un plan activo.
+            {showNoSessionsAlert?.reason === 'completed' 
+              ? 'El paciente ha consumido su última sesión del plan.'
+              : 'El paciente no tiene un plan activo con saldo.'}
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-4 pt-4">
           <p className="text-sm font-medium text-slate-700 text-center">
-            ¿Deseas Asignar un Nuevo Plan / Venta o tienes un Cobro Pendiente que registrar?
+            {showNoSessionsAlert?.reason === 'completed' 
+              ? '¿Deseas Asignar Renovación de Plan o Emitir Certificado de Alta?'
+              : '¿Deseas Asignar un Nuevo Plan / Venta o tienes un Cobro Pendiente que registrar?'}
           </p>
         </DialogBody>
         <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button variant="outline" onClick={() => setShowNoSessionsAlert(null)}>Cerrar</Button>
+          {showNoSessionsAlert?.reason === 'completed' && (
+            <Button variant="outline" onClick={() => { 
+                const paciente = pacientes.find(p => p.id === showNoSessionsAlert.pacienteId) || citas.find(c => c.paciente_id === showNoSessionsAlert.pacienteId)?.pacientes;
+                if (paciente) {
+                  setSelectedPatientForDrawer(paciente); 
+                  setIsDrawerOpen(true); 
+                }
+                setShowNoSessionsAlert(null); 
+              }} className="border-blue-200 text-blue-700 hover:bg-blue-50">
+              Emitir Certificado
+            </Button>
+          )}
           <Button onClick={() => { setIsSaleModalOpen(true); setShowNoSessionsAlert(null); }} className="bg-blue-600 hover:bg-blue-700 text-white font-bold w-full sm:w-auto">
-            + Asignar Nuevo Plan / Venta
+            {showNoSessionsAlert?.reason === 'completed' ? '+ Asignar Renovación de Plan' : '+ Asignar Nuevo Plan / Venta'}
           </Button>
-          {/* Oculto cobrar directamente aquí porque SettlePaymentModal necesita un plan en uso, pero al menos le damos la opción de venta. */}
         </DialogFooter>
       </Dialog>
 

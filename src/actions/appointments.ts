@@ -36,10 +36,10 @@ export async function markAppointmentAttended(citaId: string, pacienteId: string
     const planActivo = planes?.find(p => (p.sesiones_usadas || 0) < (p.total_sesiones || 1));
 
     if (planActivo) {
-      // 3. Descontar 1 sesión
+      const nuevasUsadas = (planActivo.sesiones_usadas || 0) + 1;
       const { error: updatePlanError } = await supabase
         .from('compras_planes')
-        .update({ sesiones_usadas: (planActivo.sesiones_usadas || 0) + 1 })
+        .update({ sesiones_usadas: nuevasUsadas })
         .eq('id', planActivo.id);
       
       if (updatePlanError) {
@@ -47,9 +47,11 @@ export async function markAppointmentAttended(citaId: string, pacienteId: string
         return { success: true, message: 'Asistencia registrada, pero no se pudo descontar la sesión.' };
       }
 
+      const planCompleted = nuevasUsadas >= (planActivo.total_sesiones || 1);
+
       revalidatePath('/agenda');
       revalidatePath('/pacientes');
-      return { success: true, discountedPlan: true, message: 'Asistencia registrada. 1 sesión descontada del plan.' };
+      return { success: true, discountedPlan: true, planCompleted, message: 'Asistencia registrada. 1 sesión descontada del plan.' };
     }
 
     revalidatePath('/agenda');
