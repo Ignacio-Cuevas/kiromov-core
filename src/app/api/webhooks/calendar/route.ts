@@ -13,135 +13,109 @@ const supabase =
     ? createClient(supabaseUrl, supabaseKey)
     : null;
 
-export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get('x-api-key') || req.headers.get('authorization');
+interface CalendarPayload {
+  nombre_completo: string;
+  email?: string;
+  telefono?: string;
+  fecha: string; // 'YYYY-MM-DD'
+  hora: string;  // 'HH:mm:ss' o 'HH:mm'
+  motivo_consulta?: string;
+  google_event_id: string;
+}
+
+export async function POST(request: NextRequest) {
+  // 1. Validación de Seguridad
+  const authHeader = request.headers.get('x-api-key') || request.headers.get('authorization');
   const secretKey = process.env.CALENDAR_WEBHOOK_SECRET;
 
   if (!secretKey || authHeader !== secretKey) {
     return NextResponse.json({ error: 'No autorizado: Token de webhook inválido o ausente' }, { status: 401 });
   }
 
-  try {
-    const body = await req.json();
-    let { nombre_completo, email, telefono, fecha, hora, motivo, google_event_id } = body;
+  if (!supabase) {
+    return NextResponse.json({ error: 'Supabase client not initialized' }, { status: 500 });
+  }
 
-    if (!nombre_completo || !fecha || !hora) {
+  try {
+    const body = await request.json() as CalendarPayload;
+    const { nombre_completo, email, telefono, fecha, hora, motivo_consulta, google_event_id } = body;
+
+    if (!nombre_completo || !fecha || !hora || !google_event_id) {
       return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 });
     }
 
-    const cleanName = String(nombre_completo)
-      .replace(/CITA\s+KIROMOV\s*/gi, '')
-      .replace(/^[-:\s]+/, '')
-      .trim()
-      .toUpperCase();
-
     const horaNormalizada = hora.length === 5 ? hora + ':00' : hora;
 
-    if (!supabase) {
-      return NextResponse.json({
-        success: true,
-        message: 'Mock webhook sync (Supabase offline/unconfigured)',
-        cita: {
-          id: 'cita-mock-' + Date.now(),
-          paciente_id: 'paciente-mock',
-          fecha,
-          hora: horaNormalizada,
-          profesional: 'Klgo. Ignacio Cuevas Silva',
-          estado: 'Pendiente',
-          motivo_consulta: motivo || 'Cita Google Calendar',
-          google_event_id: google_event_id || null,
-        },
-      });
-    }
-
-    // 1. Buscar si el paciente ya existe de forma segura
+    // Paso A (Buscar o Crear Paciente)
     let pacienteId: string | null = null;
 
-    if (email && typeof email === 'string' && email.trim() !== '') {
-      const cleanEmail = email.trim().toLowerCase();
-      const { data: pEmail } = await supabase
+    if (email) {
+      const { data: existente } = await supabase
         .from('pacientes')
         .select('id')
-        .eq('email', cleanEmail)
+        .eq('email', email.trim().toLowerCase())
         .maybeSingle();
-      if (pEmail) pacienteId = pEmail.id;
+      if (existente) pacienteId = existente.id;
     }
 
-    if (!pacienteId && telefono && typeof telefono === 'string' && telefono.trim() !== '') {
-      const cleanPhone = telefono.replace(/\D/g, '').slice(-8);
-      if (cleanPhone.length >= 6) {
-        const { data: pTel } = await supabase
-          .from('pacientes')
-          .select('id')
-          .ilike('telefono', `%${cleanPhone}%`)
-          .maybeSingle();
-        if (pTel) pacienteId = pTel.id;
-      }
-    }
-
-    if (!pacienteId) {
-      const { data: pName } = await supabase
+    if (!pacienteId && telefono) {
+      const cleanTel = telefono.replace(/\D/g, '').slice(-9);
+      const { data: existenteTel } = await supabase
         .from('pacientes')
         .select('id')
-        .ilike('nombre_completo', `%${cleanName}%`)
+        .ilike('telefono', `%${cleanTel}%`)
         .maybeSingle();
-      if (pName) pacienteId = pName.id;
+      if (existenteTel) pacienteId = existenteTel.id;
     }
 
-    // 2. Si no existe, crear paciente
+    // Si no existe, crear la ficha del paciente nuevo:
     if (!pacienteId) {
-      const { data: newPatient, error: pErr } = await supabase
+      const { data: nuevo, error: errNuevo } = await supabase
         .from('pacientes')
-        .insert({
-          nombre_completo: cleanName,
-          email: email ? String(email).trim().toLowerCase() : null,
-          telefono: telefono ? String(telefono).trim() : null,
-        })
+        .insert([{
+          nombre_completo: nombre_completo.trim(),
+          email: email?.trim().toLowerCase() || null,
+          telefono: telefono?.trim() || null,
+          motivo_consulta: motivo_consulta?.trim() || 'Reserva desde web kiromov.cl',
+          estado: 'activo'
+        }])
         .select('id')
         .single();
-      if (pErr) throw pErr;
-      pacienteId = newPatient.id;
+
+      if (errNuevo) throw errNuevo;
+      pacienteId = nuevo.id;
     }
 
-    // 3. Upsert de la cita (actualiza si ya existe por google_event_id o fecha/hora)
-    const { data: existingCita } = await supabase
+    // Paso B (Evitar Duplicados e Insertar Cita)
+    const { data: citaExistente } = await supabase
       .from('citas_atenciones')
       .select('id')
-      .eq('paciente_id', pacienteId)
-      .eq('fecha', fecha)
-      .eq('hora', horaNormalizada)
+      .eq('google_event_id', google_event_id)
       .maybeSingle();
 
-    if (existingCita) {
-      await supabase
-        .from('citas_atenciones')
-        .update({
-          google_event_id: google_event_id || null,
-          motivo_consulta: motivo || 'Cita Google Calendar',
-        })
-        .eq('id', existingCita.id);
-      return NextResponse.json({ success: true, message: 'Cita actualizada' });
+    if (citaExistente) {
+      return NextResponse.json({ message: 'Cita ya registrada previamente' }, { status: 200 });
     }
 
-    const { data: nuevaCita, error: cErr } = await supabase
+    // Insertar en la agenda:
+    const { error: errCita } = await supabase
       .from('citas_atenciones')
-      .insert({
+      .insert([{
         paciente_id: pacienteId,
-        fecha,
+        fecha: fecha,
         hora: horaNormalizada,
         profesional: 'Klgo. Ignacio Cuevas Silva',
-        estado: 'Pendiente',
-        motivo_consulta: motivo || 'Cita Google Calendar',
-        google_event_id: google_event_id || null,
-      })
-      .select()
-      .single();
+        motivo_consulta: motivo_consulta?.trim() || 'Evaluación Kinésica Inicial (Web)',
+        estado: 'pendiente',
+        google_event_id: google_event_id
+      }]);
 
-    if (cErr) throw cErr;
+    if (errCita) throw errCita;
 
-    return NextResponse.json({ success: true, cita: nuevaCita });
+    // Respuesta
+    return NextResponse.json({ success: true, paciente_id: pacienteId });
   } catch (error: any) {
-    console.error('Error en webhook calendar:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Error procesando webhook de calendar:', error);
+    return NextResponse.json({ error: error.message || 'Error interno del servidor' }, { status: 500 });
   }
 }
