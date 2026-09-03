@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { PatientDrawer } from '@/components/patients/PatientDrawer';
 import { markAppointmentAttended, markAppointmentNoShow } from '@/actions/appointments';
+import { requiereReevaluacion } from '@/lib/clinical';
 import { formatRut } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -359,6 +360,16 @@ function AgendaContent() {
               </p>
             </div>
           </div>
+
+          {/* Alerta Clínica de Reevaluación */}
+          {requiereReevaluacion(p) && (
+            <div className="w-full mt-2 mb-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2">
+              <span className="text-amber-600 text-lg leading-none">⚠️</span>
+              <p className="text-[11px] text-amber-800 font-medium">
+                <strong className="font-bold">Alerta Clínica:</strong> Paciente en sesión {p.sesiones_usadas} con dolor persistente (ENA {p.ultimo_dolor_ena}/10). Considerar reevaluación biomecánica o cambio de técnica TMO.
+              </p>
+            </div>
+          )}
 
           {/* Acciones de gestión a la derecha */}
           <div className="flex items-center gap-2 self-end sm:self-auto">

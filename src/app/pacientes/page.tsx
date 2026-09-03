@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import SaleModal from "@/components/sales/SaleModal";
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
+import { evaluarRiesgoDesercion, requiereReevaluacion } from '@/lib/clinical';
 
 interface PacienteResumen {
   id: string;
@@ -25,6 +26,7 @@ interface PacienteResumen {
 
 export default function PacientesPage() {
   const supabase = createClient();
+  const [activeTab, setActiveTab] = useState<'todos' | 'riesgo' | 'reevaluacion'>('todos');
   const [pacientes, setPacientes] = useState<any[]>([]);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -301,25 +303,52 @@ export default function PacientesPage() {
                           )}
                         </td>
 
-                        {/* Estado del Plan */}
+                        {/* Estado del Plan / Alertas Clínicas */}
                         <td className="px-5 py-3.5 whitespace-nowrap">
                           {p.estado_plan === 'vigente' && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 mb-1">
                               ● Plan Vigente
                             </span>
                           )}
                           {p.estado_plan === 'por_renovar' && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 mb-1">
                               ⚠️ Por Renovar (1 rest.)
                             </span>
                           )}
                           {p.estado_plan === 'finalizado' && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 mb-1">
                               Finalizado
                             </span>
                           )}
                           {p.estado_plan === 'sin_plan' && (
-                            <span className="text-slate-400 text-xs">—</span>
+                            <span className="text-slate-400 text-xs mb-1 block">—</span>
+                          )}
+                          
+                          {(() => {
+                            const alerta = evaluarRiesgoDesercion(p);
+                            if (alerta.nivel) {
+                              return (
+                                <div className="mt-1">
+                                  <a 
+                                    href={`https://wa.me/56${(p.telefono || '').replace(/\D/g, '').slice(-9)}?text=${encodeURIComponent(alerta.mensajeWhatsApp)}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border hover:opacity-80 transition-opacity ${alerta.badgeClass}`}
+                                  >
+                                    {alerta.etiqueta} 💬
+                                  </a>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+
+                          {requiereReevaluacion(p) && (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
+                                ⚠️ Reevaluar TMO (ENA {p.ultimo_dolor_ena}/10)
+                              </span>
+                            </div>
                           )}
                         </td>
 
