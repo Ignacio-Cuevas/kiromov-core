@@ -286,10 +286,30 @@ function AgendaContent() {
     loadAgenda();
   };
 
+  const formatearFechaChilena = (fechaStr: string) => {
+    if (!fechaStr) return '';
+    const partes = fechaStr.split('-');
+    if (partes.length === 3) {
+      const [year, month, day] = partes;
+      return `${day}/${month}/${year}`;
+    }
+    return fechaStr;
+  };
+
+  const formatearNombre = (nombreCompleto?: string) => {
+    if (!nombreCompleto) return 'Estimado/a';
+    const primerNombre = nombreCompleto.trim().split(' ')[0];
+    return primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase();
+  };
+
   const generarMensajeConfirmacion = (cita: any) => {
-    const nombre = cita.pacientes?.nombre_completo?.split(' ')[0] || 'Estimado/a';
+    const nombre = formatearNombre(cita.pacientes?.nombre_completo);
+    const fechaCL = formatearFechaChilena(cita.fecha);
+    const hora = cita.hora?.slice(0, 5) || '16:00';
     const telefonoLimpio = cita.pacientes?.telefono ? cita.pacientes.telefono.replace(/\D/g, '').slice(-9) : '';
-    const texto = `Hola ${nombre}, te escribimos de Kiromov Centro Clínico para solicitar la confirmación de tu sesión de kinesiología programada para el ${cita.fecha} a las ${cita.hora?.slice(0,5)} hrs (Bulnes 470, Of. 75, Chillán). Por favor respóndenos este mensaje para confirmar tu asistencia. ¡Muchas gracias!`;
+
+    const texto = `Hola ${nombre}, te escribimos de Kiromov Centro Clínico para solicitar la confirmación de tu sesión de kinesiología programada para el ${fechaCL} a las ${hora} hrs (Bulnes 470, Of. 75, Chillán). Por favor respóndenos este mensaje para confirmar tu asistencia. ¡Muchas gracias!`;
+
     return `https://wa.me/56${telefonoLimpio}?text=${encodeURIComponent(texto)}`;
   };
 
