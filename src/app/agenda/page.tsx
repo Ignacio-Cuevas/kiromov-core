@@ -357,7 +357,7 @@ function AgendaContent() {
     }
 
     return (
-      <div key={cita.id} className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3 hover:border-slate-300 transition-colors mb-3">
+      <div key={cita.id} className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3 hover:border-slate-300/80 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md mb-3">
         {/* Nivel 1: Datos del Paciente, Horario y Acciones de Ficha */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-3">
@@ -416,7 +416,7 @@ function AgendaContent() {
                 href={generarMensajeConfirmacion(cita)}
                 target="_blank"
                 rel="noreferrer"
-                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors"
+                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium inline-flex items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer"
               >
                 💬 Solicitar Confirmación
               </a>
@@ -426,7 +426,7 @@ function AgendaContent() {
             {s === 'pendiente' && (
               <button
                 onClick={() => handleMarcarConfirmada(cita.id)}
-                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shadow-sm"
+                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all duration-150 active:scale-[0.98] shadow-sm"
               >
                 ✓ Confirmar Cita
               </button>
@@ -439,13 +439,13 @@ function AgendaContent() {
               <>
                 <button
                   onClick={() => handleRegistrarAsistencia(cita.id, p.id)}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer"
                 >
                   ✓ Registrar Asistencia
                 </button>
                 <button
                   onClick={() => handleRegistrarInasistencia(cita.id, p.id)}
-                  className="px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold transition-colors"
+                  className="px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold active:scale-[0.98] transition-all duration-150 cursor-pointer"
                 >
                   🚫 No Asistió
                 </button>
@@ -610,11 +610,11 @@ function AgendaContent() {
 
         {/* KPIs del Rango */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Citados</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.citadosHoy}</span></div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pendientes</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.pendientes}</span></div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Confirmadas</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.confirmadas}</span></div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">En Box / Sala</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.enSala}</span></div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Atendidos</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.asistio}</span></div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300/80"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Citados</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.citadosHoy}</span></div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300/80"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pendientes</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.pendientes}</span></div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300/80"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Confirmadas</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.confirmadas}</span></div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300/80"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">En Box / Sala</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.enSala}</span></div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300/80"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Atendidos</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.asistio}</span></div>
         </div>
 
         {/* Contenedor Principal Agenda */}

@@ -242,7 +242,7 @@ export default function PacientesPage() {
                     const pct = tienePlan ? Math.min(100, Math.round((p.sesiones_usadas / p.sesiones_totales) * 100)) : 0;
 
                     return (
-                      <tr key={p.id} className="hover:bg-slate-50/80 transition-colors group">
+                      <tr key={p.id} className="hover:bg-slate-50/90 transition-colors duration-150 group">
                         
                         {/* Paciente con Avatar */}
                         <td className="px-5 py-3.5">
@@ -291,7 +291,7 @@ export default function PacientesPage() {
                               </div>
                               <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                 <div 
-                                  className={`h-full rounded-full transition-all ${
+                                  className={`h-full rounded-full transition-all duration-500 ease-out ${
                                     p.estado_plan === 'por_renovar' ? 'bg-amber-500' : 'bg-emerald-500'
                                   }`} 
                                   style={{ width: `${pct}%` }} 

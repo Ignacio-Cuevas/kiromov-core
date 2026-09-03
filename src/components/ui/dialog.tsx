@@ -38,7 +38,7 @@ export function Dialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200">
       {/* Backdrop */}
       <div
         className="fixed inset-0 transition-opacity animate-in fade-in duration-200"
@@ -48,7 +48,7 @@ export function Dialog({
       {/* Modal Card Container with bounded max-height and flex-col layout */}
       <div
         className={cn(
-          "relative z-50 w-full max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200",
+          "relative z-50 w-full max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden transform transition-all duration-200 ease-out scale-100 animate-in fade-in zoom-in-95",
           maxWidth,
           className
         )}
