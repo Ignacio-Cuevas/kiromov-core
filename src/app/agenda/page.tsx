@@ -365,6 +365,40 @@ function AgendaContent() {
     }
   };
 
+  const getCardSemaforoStyles = (estado: string) => {
+    switch (estado?.toLowerCase()) {
+      case 'confirmada':
+        return {
+          card: 'bg-emerald-50/40 border-emerald-200/90 hover:border-emerald-300 shadow-sm',
+          hora: 'bg-emerald-100 text-emerald-950 border border-emerald-200'
+        };
+      case 'pendiente':
+        return {
+          card: 'bg-amber-50/40 border-amber-200/90 hover:border-amber-300 shadow-sm',
+          hora: 'bg-amber-100 text-amber-950 border border-amber-200'
+        };
+      case 'asistio':
+      case 'asistió':
+      case 'atendido':
+      case 'en_sala':
+        return {
+          card: 'bg-slate-50/70 border-slate-200 text-slate-600 opacity-90 shadow-none',
+          hora: 'bg-slate-200 text-slate-700 border border-slate-300'
+        };
+      case 'cancelada':
+      case 'no_asistio':
+        return {
+          card: 'bg-rose-50/40 border-rose-200/80 text-rose-900 opacity-75 shadow-none',
+          hora: 'bg-rose-100 text-rose-800 border border-rose-200'
+        };
+      default:
+        return {
+          card: 'bg-white border-slate-200 shadow-sm',
+          hora: 'bg-slate-100 text-slate-900'
+        };
+    }
+  };
+
   const renderCardCita = (cita: any, compact = false) => {
     const p = cita.pacientes;
     if (!p) return null;
@@ -403,13 +437,14 @@ function AgendaContent() {
     const pct = tienePlan ? Math.min(100, Math.round(((p.sesiones_usadas || 0) / (p.sesiones_totales || 1)) * 100)) : 0;
     const debePago = p.estado_pago === 'pendiente';
     const montoPendiente = formatCLP(p.monto_clp || 0);
+    const styles = getCardSemaforoStyles(s);
 
     return (
-      <div key={cita.id} className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-4 hover:border-slate-300/80 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md mb-3">
+      <div key={cita.id} className={`rounded-2xl border p-4 sm:p-5 space-y-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md mb-3 ${styles.card}`}>
         {/* Cabecera y acciones de gestión */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-3">
           <div className="flex items-center gap-3">
-            <span className="font-bold text-slate-900 text-lg sm:text-xl bg-slate-100 px-3 py-1.5 rounded-xl shadow-sm">
+            <span className={`font-bold text-lg sm:text-xl px-3 py-1.5 rounded-xl font-mono shadow-sm ${styles.hora}`}>
               {cita.hora?.slice(0, 5)}
             </span>
             <div>
@@ -456,7 +491,7 @@ function AgendaContent() {
         </div>
 
         {/* Grid 3 Columnas (Contexto de Box) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-white/85 p-3.5 rounded-xl border border-slate-200/60 shadow-xs text-xs backdrop-blur-xs">
           
           {/* Col 1: Tratamiento & Saldo */}
           <div className="space-y-1.5">
