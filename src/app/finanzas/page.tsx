@@ -138,12 +138,9 @@ function FinanzasContent() {
   // Filtrado dinámico por fecha
   const asistenciasFiltradas = useMemo(() => {
     const { inicio, fin } = getRangoFechas(periodo);
-    return citas.filter(a => {
-      const fechaRaw = a.fecha || a.created_at;
-      if (!fechaRaw) return false;
-      
-      // Manejo estricto de string para evitar desfases de UTC si es YYYY-MM-DD
-      const f = fechaRaw.includes('T') ? new Date(fechaRaw) : new Date(`${fechaRaw}T12:00:00Z`);
+    return citas.filter((a) => {
+      if (!a.created_at) return false;
+      const f = new Date(a.created_at);
       return f >= inicio && f <= fin;
     });
   }, [citas, periodo]);
@@ -151,9 +148,8 @@ function FinanzasContent() {
   const transaccionesFiltradas = useMemo(() => {
     const { inicio, fin } = getRangoFechas(periodo);
     return compras.filter((t) => {
-      const fechaRaw = t.fecha_compra || t.created_at || t.fecha;
-      if (!fechaRaw) return false;
-      const f = fechaRaw.includes('T') ? new Date(fechaRaw) : new Date(`${fechaRaw}T12:00:00Z`);
+      if (!t.created_at) return false;
+      const f = new Date(t.created_at);
       return f >= inicio && f <= fin;
     });
   }, [compras, periodo]);
@@ -161,33 +157,36 @@ function FinanzasContent() {
   const egresosFiltrados = useMemo(() => {
     const { inicio, fin } = getRangoFechas(periodo);
     return egresos.filter((e) => {
-      const fechaRaw = e.fecha || e.created_at;
-      if (!fechaRaw) return false;
-      const f = fechaRaw.includes('T') ? new Date(fechaRaw) : new Date(`${fechaRaw}T12:00:00Z`);
+      if (!e.created_at) return false;
+      const f = new Date(e.created_at);
       return f >= inicio && f <= fin;
     });
   }, [egresos, periodo]);
 
   // KPIs
-  const kpisCalculados = useMemo(() => {
-    const ingresos = transaccionesFiltradas
+  const ingresosPeriodo = useMemo(() => {
+    return transaccionesFiltradas
       .filter((t) => t.estado_pago === 'pagado')
       .reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.valor_total) || 0), 0);
+  }, [transaccionesFiltradas]);
 
-    const porCobrar = transaccionesFiltradas
+  const egresosPeriodo = useMemo(() => {
+    return egresosFiltrados
+      .reduce((acc, curr) => acc + (Number(curr.monto_clp) || 0), 0);
+  }, [egresosFiltrados]);
+
+  const flujoNetoPeriodo = useMemo(() => {
+    return ingresosPeriodo - egresosPeriodo;
+  }, [ingresosPeriodo, egresosPeriodo]);
+  
+  const porCobrarPeriodo = useMemo(() => {
+    return transaccionesFiltradas
       .filter((t) => t.estado_pago === 'pendiente')
       .reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.valor_total) || 0), 0);
+  }, [transaccionesFiltradas]);
 
-    const deudoresCount = transaccionesFiltradas
+  const deudoresCount = transaccionesFiltradas
       .filter((t) => t.estado_pago === 'pendiente').length;
-
-    const totalEgresos = egresosFiltrados
-      .reduce((acc, curr) => acc + (Number(curr.monto_clp) || 0), 0);
-
-    const flujoNeto = ingresos - totalEgresos;
-
-    return { ingresos, porCobrar, deudoresCount, totalEgresos, flujoNeto };
-  }, [transaccionesFiltradas, egresosFiltrados]);
 
   // Arrays derivados para las tabs de "Quién Debe"
   const pendientes = useMemo(() => transaccionesFiltradas.filter(t => t.estado_pago === 'pendiente'), [transaccionesFiltradas]);
@@ -225,29 +224,29 @@ function FinanzasContent() {
               <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"><TrendingUp className="w-4 h-4"/></div>
               <h3 className="text-xs font-bold text-slate-500 uppercase">Ingresos Reales</h3>
             </div>
-            <p className="text-2xl font-black text-slate-800">{formatCLP(kpisCalculados.ingresos)}</p>
+            <p className="text-2xl font-black text-slate-800">{formatCLP(ingresosPeriodo)}</p>
           </div>
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600"><TrendingDown className="w-4 h-4"/></div>
               <h3 className="text-xs font-bold text-slate-500 uppercase">Egresos</h3>
             </div>
-            <p className="text-2xl font-black text-slate-800">{formatCLP(kpisCalculados.totalEgresos)}</p>
+            <p className="text-2xl font-black text-slate-800">{formatCLP(egresosPeriodo)}</p>
           </div>
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><DollarSign className="w-4 h-4"/></div>
               <h3 className="text-xs font-bold text-slate-500 uppercase">Flujo Neto</h3>
             </div>
-            <p className={`text-2xl font-black ${kpisCalculados.flujoNeto >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCLP(kpisCalculados.flujoNeto)}</p>
+            <p className={`text-2xl font-black ${flujoNetoPeriodo >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCLP(flujoNetoPeriodo)}</p>
           </div>
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-amber-200 bg-amber-50/30">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600"><CreditCard className="w-4 h-4"/></div>
               <h3 className="text-xs font-bold text-amber-700 uppercase">Por Cobrar</h3>
             </div>
-            <p className="text-2xl font-black text-amber-600">{formatCLP(kpisCalculados.porCobrar)}</p>
-            <p className="text-[10px] font-bold text-amber-600/70 uppercase mt-1">{kpisCalculados.deudoresCount} PACIENTES PENDIENTES</p>
+            <p className="text-2xl font-black text-amber-600">{formatCLP(porCobrarPeriodo)}</p>
+            <p className="text-[10px] font-bold text-amber-600/70 uppercase mt-1">{deudoresCount} PACIENTES PENDIENTES</p>
           </div>
         </div>
 
@@ -256,7 +255,7 @@ function FinanzasContent() {
           <div className="border-b border-slate-200/80 flex overflow-x-auto">
             <button onClick={() => setActiveTab('asistencias')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'asistencias' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>🗓️ Quién Asistió</button>
             <button onClick={() => setActiveTab('pagados')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'pagados' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>💰 Quién Pagó</button>
-            <button onClick={() => setActiveTab('deben')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'deben' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>⚠️ Quién Debe {kpisCalculados.deudoresCount > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">{kpisCalculados.deudoresCount}</span>}</button>
+            <button onClick={() => setActiveTab('deben')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'deben' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>⚠️ Quién Debe {deudoresCount > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">{deudoresCount}</span>}</button>
             <button onClick={() => setActiveTab('egresos')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'egresos' ? 'border-rose-500 text-rose-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>📉 Egresos</button>
           </div>
 
