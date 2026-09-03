@@ -9,7 +9,7 @@ import { createClient } from '@/utils/supabase/client';
 import { PatientDrawer } from '@/components/patients/PatientDrawer';
 import { markAppointmentAttended, markAppointmentNoShow } from '@/actions/appointments';
 import { requiereReevaluacion } from '@/lib/clinical';
-import { formatRut } from '@/lib/utils';
+import { formatRut, formatCLP } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   Dialog, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter,
@@ -125,6 +125,31 @@ function AgendaContent() {
         .order('nombre_completo', { ascending: true });
 
       if (!pacError && pacData) setPacientes(pacData);
+
+      const pacIds = Array.from(new Set(citasData?.map(c => c.paciente_id).filter(Boolean)));
+      if (pacIds.length > 0) {
+        const { data: vistaData } = await supabase.from('vista_resumen_pacientes').select('*').in('id', pacIds);
+        
+        const planIds = vistaData?.map(v => v.plan_id).filter(Boolean) || [];
+        const { data: planesData } = planIds.length > 0 
+          ? await supabase.from('planes').select('id, numero_boleta, monto_clp').in('id', planIds)
+          : { data: [] };
+
+        if (vistaData) {
+          citasData?.forEach(c => {
+            const vistaP = vistaData.find(v => v.id === c.paciente_id);
+            if (vistaP && c.pacientes) {
+              const plan = planesData?.find(pl => pl.id === vistaP.plan_id);
+              c.pacientes = { 
+                ...c.pacientes, 
+                ...vistaP, 
+                numero_boleta: plan?.numero_boleta || null 
+              };
+            }
+          });
+        }
+      }
+
       setCitas(citasData || []);
     } catch (err) {
       console.error('Error cargando agenda:', err);
@@ -319,6 +344,25 @@ function AgendaContent() {
     return pacientes.filter(p => p.nombre_completo?.toLowerCase().includes(q) || p.rut?.toLowerCase().includes(q)).slice(0, 50);
   }, [pacientes, pacienteSearch]);
 
+  const getEstiloSemaforoSemanal = (estado: string) => {
+    switch (estado?.toLowerCase()) {
+      case 'confirmada':
+        return 'border-l-4 border-emerald-500 bg-emerald-50/50 text-emerald-950 hover:bg-emerald-50';
+      case 'pendiente':
+        return 'border-l-4 border-amber-500 bg-amber-50/50 text-amber-950 hover:bg-amber-50';
+      case 'asistio':
+      case 'asistió':
+      case 'atendido':
+      case 'en_sala':
+        return 'border-l-4 border-slate-300 bg-slate-50 text-slate-600 opacity-90';
+      case 'cancelada':
+      case 'no_asistio':
+        return 'border-l-4 border-rose-500 bg-rose-50/40 text-rose-900 opacity-75 line-through';
+      default:
+        return 'border-l-4 border-slate-200 bg-white text-slate-800';
+    }
+  };
+
   const renderCardCita = (cita: any, compact = false) => {
     const p = cita.pacientes;
     if (!p) return null;
@@ -333,124 +377,157 @@ function AgendaContent() {
     const cleanPhone = p.telefono ? p.telefono.replace(/\D/g, '').slice(-9) : '';
 
     if (compact) {
+        const semaforoClass = getEstiloSemaforoSemanal(s);
         return (
-            <div key={cita.id} className={`p-2 rounded-xl border mb-2 text-left bg-white shadow-sm flex flex-col hover:shadow-md transition-shadow group ${stateColors.replace('bg-', 'border-').replace('text-', '')}`}>
+            <div key={cita.id} className={`p-2 rounded-xl border mb-2 text-left shadow-sm flex flex-col hover:shadow-md transition-all group ${semaforoClass}`}>
                 <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-[11px] text-slate-900">{cita.hora?.substring(0,5)}</span>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${stateColors}`}>{stateLabel}</span>
+                    <span className="font-bold text-[11px] text-slate-900 bg-white/60 px-1.5 py-0.5 rounded-md shadow-sm">{cita.hora?.substring(0,5)}</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/80`}>{stateLabel}</span>
                 </div>
-                <div className="font-bold text-xs text-slate-800 leading-tight mb-0.5">{p.nombre_completo.split(' ')[0]} {p.nombre_completo.split(' ')[1] || ''}</div>
-                <div className="text-[10px] text-slate-500 truncate">{cita.motivo_consulta}</div>
+                <div className="font-bold text-xs leading-tight mb-0.5">{p.nombre_completo.split(' ')[0]} {p.nombre_completo.split(' ')[1] || ''}</div>
                 <div className="flex flex-wrap gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {s === 'pendiente' && <button onClick={() => handleMarcarConfirmada(cita.id)} className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[9px] font-bold py-1 rounded">Confir.</button>}
-                    {!['asistio', 'asistió', 'atendido', 'no_asistio'].includes(s) && s !== 'cancelada' && (
-                      <>
-                        <button onClick={() => handleRegistrarAsistencia(cita.id, p.id)} className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[9px] font-bold py-1 rounded">Asistió</button>
-                        <button onClick={() => handleRegistrarInasistencia(cita.id, p.id)} className="flex-1 bg-orange-50 hover:bg-orange-100 text-orange-700 text-[9px] font-bold py-1 rounded" title="Cobrar Sesión">No Asis.</button>
-                      </>
+                    {cleanPhone && <a href={generarMensajeConfirmacion(cita)} target="_blank" rel="noreferrer" className="flex-1 bg-white/80 hover:bg-white text-slate-700 text-[10px] font-bold py-1 rounded text-center shadow-sm">💬</a>}
+                    {s === 'pendiente' && <button onClick={() => handleMarcarConfirmada(cita.id)} className="flex-1 bg-white/80 hover:bg-white text-indigo-700 text-[10px] font-bold py-1 rounded shadow-sm">✓ Conf.</button>}
+                    {!['asistio', 'asistió', 'atendido', 'no_asistio', 'cancelada'].includes(s) && (
+                        <button onClick={() => handleRegistrarAsistencia(cita.id, p.id)} className="flex-1 bg-white/80 hover:bg-white text-emerald-700 text-[10px] font-bold py-1 rounded shadow-sm">✓ Asistió</button>
                     )}
-                    <button onClick={() => { setSelectedPatientForDrawer(p); setIsDrawerOpen(true); }} className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[9px] font-bold py-1 rounded">Ficha</button>
-                    {cleanPhone && <a href={generarMensajeConfirmacion(cita)} target="_blank" rel="noreferrer" className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[9px] font-bold py-1 rounded text-center">Wsp</a>}
+                    <button onClick={() => { setSelectedPatientForDrawer(p); setIsDrawerOpen(true); }} className="flex-1 bg-white/80 hover:bg-white text-blue-700 text-[10px] font-bold py-1 rounded shadow-sm">Ficha →</button>
                 </div>
             </div>
         );
     }
 
+    const tienePlan = p.estado_plan !== 'sin_plan' && (p.sesiones_totales || 0) > 0;
+    const pct = tienePlan ? Math.min(100, Math.round(((p.sesiones_usadas || 0) / (p.sesiones_totales || 1)) * 100)) : 0;
+    const debePago = p.estado_pago === 'pendiente';
+    const montoPendiente = formatCLP(p.monto_clp || 0);
+
     return (
-      <div key={cita.id} className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3 hover:border-slate-300/80 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md mb-3">
-        {/* Nivel 1: Datos del Paciente, Horario y Acciones de Ficha */}
+      <div key={cita.id} className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-4 hover:border-slate-300/80 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md mb-3">
+        {/* Cabecera y acciones de gestión */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-3">
-            {/* Hora destacada */}
-            <span className="font-bold text-slate-900 text-base bg-slate-100 px-2.5 py-1 rounded-lg">
+            <span className="font-bold text-slate-900 text-lg sm:text-xl bg-slate-100 px-3 py-1.5 rounded-xl shadow-sm">
               {cita.hora?.slice(0, 5)}
             </span>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h4 className="font-bold text-slate-900 text-sm">{cita.pacientes?.nombre_completo || p.nombre_completo}</h4>
-                {/* Badge de Estado */}
-                {s === 'confirmada' && <span className="text-[11px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">✓ Confirmada</span>}
-                {s === 'pendiente' && <span className="text-[11px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">⏳ Pendiente</span>}
-                {['asistio', 'asistió', 'atendido'].includes(s) && <span className="text-[11px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">✓ Asistió</span>}
-                {s === 'no_asistio' && <span className="text-[11px] font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">⚠️ No Asistió</span>}
-                {s === 'cancelada' && <span className="text-[11px] font-semibold bg-red-50 text-red-700 px-2 py-0.5 rounded-full line-through">Cancelada</span>}
+                <h4 className="font-bold text-slate-900 text-sm sm:text-base">{cita.pacientes?.nombre_completo || p.nombre_completo}</h4>
+                {s === 'confirmada' && <span className="text-[11px] font-bold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-100">✓ Confirmada</span>}
+                {s === 'pendiente' && <span className="text-[11px] font-bold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full border border-slate-200">⏳ Pendiente</span>}
+                {['asistio', 'asistió', 'atendido'].includes(s) && <span className="text-[11px] font-bold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-100">✓ Asistió</span>}
+                {s === 'no_asistio' && <span className="text-[11px] font-bold bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full border border-amber-100">⚠️ No Asistió</span>}
+                {s === 'cancelada' && <span className="text-[11px] font-bold bg-red-50 text-red-700 px-2.5 py-0.5 rounded-full border border-red-100 line-through">Cancelada</span>}
               </div>
-              <p className="text-xs text-slate-500 font-mono mt-0.5">
+              <p className="text-xs text-slate-500 font-mono mt-1">
                 {formatRut(p.rut) || 'Sin RUT'} • <span className="font-sans italic">{cita.motivo_consulta || 'Sesión Kinésica'}</span>
               </p>
             </div>
           </div>
-
-          {/* Alerta Clínica de Reevaluación */}
-          {requiereReevaluacion(p) && (
-            <div className="w-full mt-2 mb-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2">
-              <span className="text-amber-600 text-lg leading-none">⚠️</span>
-              <p className="text-[11px] text-amber-800 font-medium">
-                <strong className="font-bold">Alerta Clínica:</strong> Paciente en sesión {p.sesiones_usadas} con dolor persistente (ENA {p.ultimo_dolor_ena}/10). Considerar reevaluación biomecánica o cambio de técnica TMO.
-              </p>
-            </div>
-          )}
-
-          {/* Acciones de gestión a la derecha */}
+          
           <div className="flex items-center gap-2 self-end sm:self-auto">
-            <button
-              onClick={() => { setSelectedPatientForDrawer(p); setIsDrawerOpen(true); }}
-              className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold flex items-center gap-1 transition-colors"
-            >
-              Ficha & SOAP →
-            </button>
             <button onClick={() => {
               setEditingCita(cita);
               setEditForm({ fecha: cita.fecha, hora: cita.hora, motivo: cita.motivo_consulta || '', profesional: cita.profesional || '' });
-            }} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg" title="Editar horario">✏️</button>
-            <button onClick={() => { setDeletingCita(cita); }} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg" title="Cancelar cita">🗑️</button>
+            }} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition-colors" title="Editar horario">✏️</button>
+            <button onClick={() => { setDeletingCita(cita); }} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors" title="Cancelar cita">🗑️</button>
           </div>
         </div>
 
-        {/* Nivel 2: Botonera Operativa de Box (Con flex-wrap sin desbordes) */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Botón WhatsApp */}
-            {cleanPhone && (
-              <a
-                href={generarMensajeConfirmacion(cita)}
-                target="_blank"
-                rel="noreferrer"
-                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium inline-flex items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer"
-              >
-                💬 Solicitar Confirmación
-              </a>
-            )}
-
-            {/* Si está pendiente, opción de confirmar */}
-            {s === 'pendiente' && (
-              <button
-                onClick={() => handleMarcarConfirmada(cita.id)}
-                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all duration-150 active:scale-[0.98] shadow-sm"
-              >
-                ✓ Confirmar Cita
-              </button>
+        {/* Grid 3 Columnas (Contexto de Box) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+          
+          {/* Col 1: Tratamiento & Saldo */}
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <span>🩺 Tratamiento</span>
+            </div>
+            {tienePlan ? (
+              <div>
+                <p className="text-xs font-semibold text-slate-800 truncate mb-1" title={p.nombre_plan || 'Plan'}>{p.nombre_plan || 'Plan Kinésico'}</p>
+                <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600 mb-1">
+                  <span>Sesión {p.sesiones_usadas} de {p.sesiones_totales}</span>
+                  <span className="text-slate-400">• {p.sesiones_restantes} rest.</span>
+                </div>
+                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 italic mt-2">Sin plan activo</p>
             )}
           </div>
 
-          {/* Acciones de Atención en Box */}
-          <div className="flex flex-wrap items-center gap-2">
-            {!['asistio', 'asistió', 'atendido', 'no_asistio'].includes(s) && s !== 'cancelada' && (
-              <>
-                <button
-                  onClick={() => handleRegistrarAsistencia(cita.id, p.id)}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer"
+          {/* Col 2: Estado Financiero */}
+          <div className="space-y-1.5 md:border-l md:border-slate-200 md:pl-3">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <span>💰 Financiamiento</span>
+            </div>
+            {debePago ? (
+              <div className="mt-1">
+                <span className="text-xs font-bold text-rose-700 flex items-center gap-1 mb-1.5">
+                  🔴 Debe Pago ({montoPendiente})
+                </span>
+                <button 
+                  onClick={() => { setSelectedPatientForDrawer(p); setIsDrawerOpen(true); }}
+                  className="px-2 py-1 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-800 text-[10px] font-bold transition-colors w-full sm:w-auto active:scale-[0.98]"
                 >
+                  💳 Cobrar Plan
+                </button>
+              </div>
+            ) : (
+              <div className="mt-2 text-xs font-semibold text-slate-700 flex flex-col gap-1">
+                <span className="flex items-center gap-1 text-emerald-700">✓ Plan Pagado</span>
+                {p.numero_boleta && <span className="text-[10px] text-slate-500 font-mono">Boleta N° {p.numero_boleta}</span>}
+              </div>
+            )}
+          </div>
+
+          {/* Col 3: Semáforo Clínico TMO */}
+          <div className="space-y-1.5 md:border-l md:border-slate-200 md:pl-3">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <span>📊 Estado Clínico</span>
+            </div>
+            <div className="mt-1 flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-slate-700">Último Dolor: ENA {p.ultimo_dolor_ena != null ? p.ultimo_dolor_ena : '-'}/10</span>
+              {requiereReevaluacion(p) && (
+                <div className="bg-amber-100 text-amber-800 text-[10px] font-bold p-1.5 rounded-lg border border-amber-200 flex items-start gap-1">
+                  <span className="text-sm leading-none">⚠️</span> 
+                  <span>Requiere Reevaluación TMO</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Botonera Operativa Inferior */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {cleanPhone && (
+              <a href={generarMensajeConfirmacion(cita)} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer">
+                💬 Solicitar Confirmación
+              </a>
+            )}
+            {s === 'pendiente' && (
+              <button onClick={() => handleMarcarConfirmada(cita.id)} className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold active:scale-[0.98] transition-all duration-150 cursor-pointer shadow-sm">
+                ✓ Confirmar
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {!['asistio', 'asistió', 'atendido', 'no_asistio', 'cancelada'].includes(s) && (
+              <>
+                <button onClick={() => handleRegistrarAsistencia(cita.id, p.id)} className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer">
                   ✓ Registrar Asistencia
                 </button>
-                <button
-                  onClick={() => handleRegistrarInasistencia(cita.id, p.id)}
-                  className="px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold active:scale-[0.98] transition-all duration-150 cursor-pointer"
-                >
+                <button onClick={() => handleRegistrarInasistencia(cita.id, p.id)} className="px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold active:scale-[0.98] transition-all duration-150 cursor-pointer">
                   🚫 No Asistió
                 </button>
               </>
             )}
+            <button onClick={() => { setSelectedPatientForDrawer(p); setIsDrawerOpen(true); }} className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer">
+              Ficha & SOAP →
+            </button>
           </div>
         </div>
       </div>
