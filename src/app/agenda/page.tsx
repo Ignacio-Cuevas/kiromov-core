@@ -116,7 +116,7 @@ function AgendaContent() {
         .from('citas_atenciones')
         .select(`
           id, fecha, hora, profesional, estado, motivo_consulta, paciente_id,
-          pacientes ( id, nombre_completo, rut, telefono, email, prevision, alertas_seguridad, antecedentes_morbidos )
+          pacientes:paciente_id ( id, nombre_completo, rut, telefono, email, prevision, motivo_consulta, alertas_seguridad, antecedentes_morbidos )
         `)
         .gte('fecha', fechaInicioStr)
         .lte('fecha', fechaFinStr)
@@ -952,8 +952,8 @@ function AgendaContent() {
       <ClinicalBoxSuite 
         isOpen={isDrawerOpen} 
         onClose={() => setIsDrawerOpen(false)} 
-        paciente={selectedPatientForDrawer} 
-        cita={selectedCitaForSuite}
+        pacienteId={selectedPatientForDrawer?.id || ''} 
+        citaId={selectedCitaForSuite?.id || ''}
         onSaved={() => loadAgenda()} 
       />
       {/* Modal Nueva Cita */}

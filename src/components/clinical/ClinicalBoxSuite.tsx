@@ -8,17 +8,20 @@ import { toast } from 'sonner';
 interface ClinicalBoxSuiteProps {
   isOpen: boolean;
   onClose: () => void;
-  paciente: any;
-  cita: any;
+  pacienteId: string;
+  citaId: string;
   onSaved: () => void;
 }
 
-export function ClinicalBoxSuite({ isOpen, onClose, paciente, cita, onSaved }: ClinicalBoxSuiteProps) {
+export function ClinicalBoxSuite({ isOpen, onClose, pacienteId, citaId, onSaved }: ClinicalBoxSuiteProps) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
-  const [historial, setHistorial] = useState<any[]>([]);
+  const [paciente, setPaciente] = useState<any>(null);
+  const [planActivo, setPlanActivo] = useState<any>(null);
+  const [historialSOAP, setHistorialSOAP] = useState<any[]>([]);
+  const [citaActual, setCitaActual] = useState<any>(null);
 
   // Formularios SOAP
   const [ena, setEna] = useState<number | null>(null);
@@ -33,35 +36,61 @@ export function ClinicalBoxSuite({ isOpen, onClose, paciente, cita, onSaved }: C
   const tecnicasOptions = ['⚡ Manipulación Articular (HVLA)', 'Movilización Gr. I-IV', 'Terapia Miofascial', 'Neurodinamia', 'Ejercicio Terapéutico', 'Punción Seca', 'Educación en Dolor'];
 
   useEffect(() => {
-    if (isOpen && paciente?.id) {
-      loadHistorial();
+    if (!pacienteId) return;
+
+    const cargarDatosCompletos = async () => {
+      if (!supabase) return;
+      setLoading(true);
+      try {
+        if (citaId) {
+          const { data: c } = await supabase.from('citas_atenciones').select('*').eq('id', citaId).single();
+          if (c) setCitaActual(c);
+        }
+
+        // 1. Datos personales del paciente
+        const { data: p } = await supabase
+          .from('pacientes')
+          .select('*')
+          .eq('id', pacienteId)
+          .single();
+        if (p) setPaciente(p);
+
+        // 2. Plan activo real desde compras_planes
+        const { data: plan } = await supabase
+          .from('compras_planes')
+          .select('*')
+          .eq('paciente_id', pacienteId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (plan) setPlanActivo(plan);
+
+        // 3. Historial de notas SOAP reales
+        const { data: soaps } = await supabase
+          .from('citas_atenciones')
+          .select('*')
+          .eq('paciente_id', pacienteId)
+          .not('nota_clinica', 'is', null)
+          .order('fecha', { ascending: false })
+          .order('created_at', { ascending: false });
+        if (soaps) setHistorialSOAP(soaps);
+
+      } catch (err) {
+        console.error('Error cargando suite clínica:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isOpen) {
+      cargarDatosCompletos();
       // Limpiar formulario
       setEna(null);
       setSegmentos([]);
       setTecnicas([]);
       setS(''); setO(''); setA(''); setP('');
     }
-  }, [isOpen, paciente]);
-
-  const loadHistorial = async () => {
-    if (!supabase) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('citas_atenciones')
-        .select('*')
-        .eq('paciente_id', paciente.id)
-        .not('nota_clinica', 'is', null)
-        .order('fecha', { ascending: false });
-        
-      if (error) throw error;
-      setHistorial(data || []);
-    } catch (err: any) {
-      toast.error('Error cargando historial: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [isOpen, pacienteId, citaId]);
 
   const toggleArrayItem = (arr: string[], setArr: any, item: string) => {
     if (arr.includes(item)) setArr(arr.filter(i => i !== item));
@@ -70,7 +99,7 @@ export function ClinicalBoxSuite({ isOpen, onClose, paciente, cita, onSaved }: C
 
   const handleSaveSOAP = async () => {
     if (!supabase) return;
-    if (!cita?.id) {
+    if (!citaActual?.id) {
       toast.error('No hay una cita asociada para guardar el SOAP de hoy.');
       return;
     }
@@ -101,12 +130,12 @@ ${p}
           nota_clinica: notaFinal,
           dolor_ena: ena
         })
-        .eq('id', cita.id);
+        .eq('id', citaActual.id);
 
       if (error) throw error;
       
       // Update ultimo_dolor_ena in paciente
-      if (ena !== null) {
+      if (ena !== null && paciente?.id) {
         await supabase.from('pacientes').update({ ultimo_dolor_ena: ena }).eq('id', paciente.id);
       }
 
@@ -121,7 +150,7 @@ ${p}
   };
 
   const curvaDolor = useMemo(() => {
-    const records = [...historial].reverse().filter(h => h.dolor_ena !== null && h.dolor_ena !== undefined);
+    const records = [...historialSOAP].reverse().filter(h => h.dolor_ena !== null && h.dolor_ena !== undefined);
     if (records.length === 0) return { puntos: [], reduccion: 0 };
     
     const primerDolor = records[0].dolor_ena;
@@ -136,13 +165,13 @@ ${p}
       puntos: records.map((r, i) => ({ sesion: i + 1, dolor: r.dolor_ena, fecha: r.fecha })),
       reduccion
     };
-  }, [historial]);
+  }, [historialSOAP]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !paciente) return null;
 
-  const tienePlan = paciente.estado_plan !== 'sin_plan' && (paciente.sesiones_totales || 0) > 0;
-  const pct = tienePlan ? Math.min(100, Math.round(((paciente.sesiones_usadas || 0) / (paciente.sesiones_totales || 1)) * 100)) : 0;
-  const debePago = paciente.estado_pago === 'pendiente';
+  const tienePlan = planActivo && planActivo.sesiones_totales > 0;
+  const pct = tienePlan ? Math.min(100, Math.round(((planActivo.sesiones_usadas || 0) / (planActivo.sesiones_totales || 1)) * 100)) : 0;
+  const debePago = planActivo?.estado_pago === 'pendiente';
   const cleanPhone = paciente.telefono ? paciente.telefono.replace(/\D/g, '').slice(-9) : '';
 
   return (
@@ -162,8 +191,8 @@ ${p}
             {tienePlan ? (
               <>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-slate-800">{paciente.nombre_plan || 'Plan Kinésico'}</span>
-                  <span className="text-xs font-semibold text-slate-500">• {paciente.sesiones_usadas}/{paciente.sesiones_totales} ses. ({paciente.sesiones_restantes} rest.)</span>
+                  <span className="font-bold text-sm text-slate-800">{planActivo.nombre_plan || 'Plan Kinésico'}</span>
+                  <span className="text-xs font-semibold text-slate-500">• {planActivo.sesiones_usadas}/{planActivo.sesiones_totales} ses. ({Math.max(0, planActivo.sesiones_totales - planActivo.sesiones_usadas)} restantes)</span>
                 </div>
                 <div className="w-48 h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
                   <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }}></div>
@@ -177,7 +206,7 @@ ${p}
           <div className="flex items-center ml-4">
             {debePago ? (
               <span className="bg-rose-50 border border-rose-200 text-rose-700 font-bold px-3 py-1 rounded-lg text-xs">
-                🔴 Debe (${paciente.monto_clp?.toLocaleString('es-CL')})
+                🔴 Debe (${planActivo.monto_clp?.toLocaleString('es-CL')})
               </span>
             ) : (
               <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold px-3 py-1 rounded-lg text-xs">
@@ -264,7 +293,7 @@ ${p}
               Evolución Clínica (SOAP)
             </h2>
             <span className="bg-white border border-slate-200 shadow-sm px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500">
-              {cita?.fecha ? new Date(cita.fecha + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'short' }) : 'Hoy'}
+              {citaActual?.fecha ? new Date(citaActual.fecha + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'short' }) : 'Hoy'}
             </span>
           </div>
 
@@ -436,18 +465,18 @@ ${p}
           
           <div className="flex items-center justify-between mb-4 sticky top-0 bg-white py-1">
             <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Timeline Histórico</h3>
-            <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-bold">{historial.length} reg.</span>
+            <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-bold">{historialSOAP.length} reg.</span>
           </div>
 
           {loading ? (
             <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-slate-300" /></div>
-          ) : historial.length === 0 ? (
+          ) : historialSOAP.length === 0 ? (
             <div className="text-center p-8 border-2 border-dashed border-slate-100 rounded-2xl">
               <p className="text-xs font-semibold text-slate-400">Sin historial clínico previo</p>
             </div>
           ) : (
             <div className="space-y-4 relative before:absolute before:inset-y-0 before:left-[11px] before:w-[2px] before:bg-slate-100">
-              {historial.map((reg, idx) => (
+              {historialSOAP.map((reg, idx) => (
                 <div key={reg.id} className="relative pl-7">
                   <div className="absolute left-0 top-1.5 w-6 h-6 rounded-full bg-white border-4 border-slate-100 flex items-center justify-center">
                     <div className="w-2 h-2 rounded-full bg-slate-300"></div>
