@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EgresoCaja, CategoriaEgreso, MedioPago } from "@/types/database";
 import { crearEgresoCaja } from "@/lib/supabase";
-import { formatCLP } from "@/lib/utils";
+import { formatCLP , getChileanDate } from '@/lib/utils';
 import { toast } from "sonner";
 import {
   Receipt,
@@ -38,7 +38,7 @@ export function CreateExpenseDialog({
   onExpenseCreated,
 }: CreateExpenseDialogProps) {
   const [fecha, setFecha] = useState<string>(
-    new Date().toISOString().split("T")[0]
+    getChileanDate()
   );
   const [concepto, setConcepto] = useState("");
   const [categoria, setCategoria] =
@@ -64,7 +64,7 @@ export function CreateExpenseDialog({
     setIsSaving(true);
     try {
       const result = await crearEgresoCaja({
-        fecha: fecha || new Date().toISOString().split("T")[0],
+        fecha: fecha || getChileanDate(),
         concepto: concepto.trim(),
         categoria,
         monto_clp: montoCLP,

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { getChileanDate } from '@/lib/utils';
 
 interface AssignTreatmentModalProps {
   isOpen: boolean;
@@ -80,7 +81,7 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
         sesiones_usadas: 0,
         monto_clp: montoClp,
         estado_pago: 'pendiente',
-        fecha_compra: new Date().toISOString().split('T')[0],
+        fecha_compra: getChileanDate(),
         metodo_pago: null,
         numero_boleta: null,
         estado: 'activo'

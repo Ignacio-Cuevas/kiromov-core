@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useMemo } from "react";
 import { SettlePaymentModal } from "@/components/sales/SettlePaymentModal";
 import { createClient } from "@/utils/supabase/client";
-import { formatCLP, formatRut } from "@/lib/utils";
+import { formatCLP, formatRut , getChileanDate } from '@/lib/utils';
 import { Loader2, Plus, CreditCard, TrendingUp, TrendingDown, DollarSign, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -115,7 +115,7 @@ function FinanzasContent() {
       medio_pago: egresoForm.formaPago || 'Débito / Transbank',
       metodo_pago: egresoForm.formaPago || 'Débito / Transbank',
       monto_clp: parseInt(String(egresoForm.monto).replace(/\D/g, ''), 10) || 0,
-      fecha: egresoForm.fecha || new Date().toISOString().split('T')[0],
+      fecha: egresoForm.fecha || getChileanDate(),
       responsable: 'Clínica'
     };
     try {

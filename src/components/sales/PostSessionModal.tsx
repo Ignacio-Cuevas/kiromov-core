@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { CreditCard, Clock, Loader2 } from 'lucide-react';
+import { getChileanDate } from '@/lib/utils';
 
 interface PostSessionModalProps {
   isOpen: boolean;
@@ -82,7 +83,7 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
         sesiones_usadas: 0,
         monto_clp: montoClp,
         estado_pago: decision === 'pagar_ahora' ? 'pagado' : 'pendiente',
-        fecha_compra: new Date().toISOString().split('T')[0],
+        fecha_compra: getChileanDate(),
         metodo_pago: decision === 'pagar_ahora' ? metodoPago : null,
         numero_boleta: numeroBoleta || null,
         estado: 'activo'

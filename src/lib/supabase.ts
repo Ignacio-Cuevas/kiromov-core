@@ -1,4 +1,5 @@
 import { createClient as createBrowserSupabaseClient } from "@/utils/supabase/client";
+import { getChileanDate } from "@/lib/utils";
 import {
   VistaResumenPaciente,
   Paciente,
@@ -422,7 +423,7 @@ export async function fetchResumenFinanciero(): Promise<ResumenFinanciero> {
   const ventas = await fetchHistorialVentas();
   const egresos = await fetchEgresosCaja();
 
-  const currentMonthStr = new Date().toISOString().slice(0, 7); // '2026-08'
+  const currentMonthStr = getChileanDate().slice(0, 7); // '2026-08'
 
   // Ventas del mes
   const ventasMes = ventas.filter(

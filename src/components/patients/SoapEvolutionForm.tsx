@@ -17,6 +17,7 @@ import {
   FileCheck2,
   HelpCircle,
 } from "lucide-react";
+import { getChileanDate } from '@/lib/utils';
 
 interface SoapEvolutionFormProps {
   pacienteId: string;
@@ -172,7 +173,7 @@ export function SoapEvolutionForm({
     }
 
     setIsSaving(true);
-    const today = new Date().toISOString().split("T")[0];
+    const today = getChileanDate();
 
     try {
       let composedObjetivo = objetivo.trim();

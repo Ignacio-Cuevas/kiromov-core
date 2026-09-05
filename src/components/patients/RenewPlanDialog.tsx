@@ -15,7 +15,7 @@ import {
   registrarCompraPlan,
   validarCupon,
 } from "@/lib/supabase";
-import { formatCLP } from "@/lib/utils";
+import { formatCLP , getChileanDate } from '@/lib/utils';
 import { toast } from "sonner";
 import {
   PackagePlus,
@@ -181,7 +181,7 @@ export function RenewPlanDialog({
         total_final_clp: valorTotal,
         medio_pago: "Transferencia",
         estado_pago: "Pagado",
-        fecha_compra: new Date().toISOString().split("T")[0],
+        fecha_compra: getChileanDate(),
         estado: "activo",
       });
 

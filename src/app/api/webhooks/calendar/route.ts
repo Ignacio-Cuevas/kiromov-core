@@ -23,13 +23,26 @@ interface CalendarPayload {
   google_event_id: string;
 }
 
-export async function POST(request: NextRequest) {
-  // 1. Validación de Seguridad
-  const authHeader = request.headers.get('x-api-key') || request.headers.get('authorization');
-  const secretKey = process.env.CALENDAR_WEBHOOK_SECRET;
+import crypto from 'crypto';
 
-  if (!secretKey || authHeader !== secretKey) {
-    return NextResponse.json({ error: 'No autorizado: Token de webhook inválido o ausente' }, { status: 401 });
+export async function POST(request: NextRequest) {
+  // 1. Validación de Seguridad Criptográfica
+  const authHeader = request.headers.get('x-api-key') || request.headers.get('authorization') || '';
+  const secretKey = process.env.CALENDAR_WEBHOOK_SECRET || '';
+
+  if (!secretKey) {
+    return NextResponse.json({ error: 'Configuración de servidor incompleta' }, { status: 500 });
+  }
+
+  try {
+    const authBuffer = Buffer.from(authHeader);
+    const secretBuffer = Buffer.from(secretKey);
+    
+    if (authBuffer.length !== secretBuffer.length || !crypto.timingSafeEqual(authBuffer, secretBuffer)) {
+      return NextResponse.json({ error: 'No autorizado: Token de webhook inválido' }, { status: 401 });
+    }
+  } catch (error) {
+    return NextResponse.json({ error: 'No autorizado: Formato de token inválido' }, { status: 401 });
   }
 
   if (!supabase) {

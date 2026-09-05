@@ -24,7 +24,7 @@ import {
   registrarCompraPlan,
   validarCupon,
 } from '@/lib/supabase';
-import { formatCLP, formatRut } from '@/lib/utils';
+import { formatCLP, formatRut , getChileanDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   ShoppingCart,
@@ -190,7 +190,7 @@ export function RegisterSaleDialog({
         total_final_clp: totalFinalCLP,
         medio_pago: medioPago,
         estado_pago: estadoPago,
-        fecha_compra: new Date().toISOString().split('T')[0],
+        fecha_compra: getChileanDate(),
         estado: 'activo',
         notas: notas.trim() || null,
       });

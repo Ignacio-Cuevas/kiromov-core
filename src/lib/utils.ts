@@ -110,3 +110,34 @@ export function formatCLP(val: number): string {
     maximumFractionDigits: 0,
   }).format(val || 0);
 }
+
+/**
+ * Retorna la fecha actual en la zona horaria de Chile (America/Santiago) en formato 'YYYY-MM-DD'
+ */
+export function getChileanDate(): string {
+  const parts = new Intl.DateTimeFormat('es-CL', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Retorna la hora actual en la zona horaria de Chile (America/Santiago) en formato 'HH:mm:ss'
+ */
+export function getChileanTime(): string {
+  return new Intl.DateTimeFormat('es-CL', {
+    timeZone: 'America/Santiago',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(new Date());
+}

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Loader2, CheckCircle2, FileText, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
+import { getChileanDate } from '@/lib/utils';
 
 interface SettlePaymentModalProps {
   isOpen: boolean;
@@ -14,7 +15,7 @@ interface SettlePaymentModalProps {
 
 export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: SettlePaymentModalProps) {
   const [paymentMethod, setPaymentMethod] = useState('transferencia');
-  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [paymentDate, setPaymentDate] = useState(() => getChileanDate());
   const [boletaNumber, setBoletaNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);

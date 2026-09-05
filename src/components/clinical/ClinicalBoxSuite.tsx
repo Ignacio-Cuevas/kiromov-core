@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
+import { getChileanDate } from '@/lib/utils';
 
 interface ClinicalBoxSuiteProps {
   pacienteId: string;
@@ -72,7 +73,7 @@ export default function ClinicalBoxSuite({
       if (soaps) setHistorialSOAP(soaps);
 
       // Próxima Cita
-      const hoyStr = new Date().toISOString().split('T')[0];
+      const hoyStr = getChileanDate();
       const { data: proxima } = await supabase
         .from('citas_atenciones')
         .select('fecha, hora, motivo_consulta, estado')
@@ -118,7 +119,7 @@ export default function ClinicalBoxSuite({
     try {
       const payload = {
         paciente_id: pacienteId,
-        fecha: new Date().toISOString().split('T')[0],
+        fecha: getChileanDate(),
         nivel_dolor_ena: Number(nivelDolor),
         s_subjetivo: sSubjetivo.trim(),
         o_objetivo: `[Segmentos: ${segmentosSeleccionados.join(', ') || 'General'}] ${oObjetivo.trim()}`,

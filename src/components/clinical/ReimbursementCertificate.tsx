@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Printer } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { getChileanDate } from '@/lib/utils';
 
 interface ReimbursementCertificateProps {
   isOpen?: boolean;
@@ -73,7 +74,7 @@ export function ReimbursementCertificate({
           setSesionesCertificado([{
             id: 'sesion-1',
             numero: 1,
-            fecha: new Date().toISOString().split('T')[0],
+            fecha: getChileanDate(),
             hora: '16:00',
             prestacion: 'Evaluación Kinésica Integral + TMO'
           }]);
@@ -119,7 +120,12 @@ export function ReimbursementCertificate({
       {
         id: `sesion-${Date.now()}`,
         numero: ultimoNumero + 1,
-        fecha: nuevaFecha.toISOString().split('T')[0],
+        fecha: new Intl.DateTimeFormat('es-CL', {
+          timeZone: 'America/Santiago',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }).format(nuevaFecha).split('-').reverse().join('-'),
         hora: '16:00',
         prestacion: 'Tratamiento Kinésico y Terapia Manual Ortopédica'
       }
