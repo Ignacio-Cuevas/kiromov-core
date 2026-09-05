@@ -9,8 +9,14 @@ import ClinicalBoxSuite from "@/components/clinical/ClinicalBoxSuite";
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { markAppointmentAttended, markAppointmentNoShow } from '@/actions/appointments';
-import { requiereReevaluacion } from '@/lib/clinical';
+import { markAppointmentNoShow, markAppointmentAttended } from '@/actions/appointments';
+import { CitaAtencion, Paciente, VistaResumenPaciente, CompraPlan } from '@/types/database';
+import { requiereReevaluacion, getResumenPlan } from '@/lib/clinical';
+
+type CitaExtendida = CitaAtencion & {
+  pacientes?: (Paciente & VistaResumenPaciente & { numero_boleta?: string | null }) | any;
+  paciente_id?: string;
+};
 import { formatRut, formatCLP } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -52,19 +58,20 @@ function AgendaContent() {
   const [fechaBase, setFechaBase] = useState<Date>(new Date());
   const [vista, setVista] = useState<VistaAgenda>('dia');
 
-  const [citas, setCitas] = useState<any[]>([]);
-  const [showNoSessionsAlert, setShowNoSessionsAlert] = useState<any>(null);
-  const [modalPostAtencion, setModalPostAtencion] = useState<{isOpen: boolean, paciente: any, motivo: string} | null>(null);
-  const [assignTreatmentModal, setAssignTreatmentModal] = useState<{isOpen: boolean, paciente: any} | null>(null);
+  const [citas, setCitas] = useState<CitaExtendida[]>([]);
+  const [showNoSessionsAlert, setShowNoSessionsAlert] = useState<{isOpen: boolean, pacienteId: string, reason?: string} | null>(null);
+  const [modalPostAtencion, setModalPostAtencion] = useState<{isOpen: boolean, paciente: Paciente, motivo: string} | null>(null);
+  const [assignTreatmentModal, setAssignTreatmentModal] = useState<{isOpen: boolean, paciente: Paciente} | null>(null);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
   const [settlingPlan, setSettlingPlan] = useState<any>(null);
-  const [pacientes, setPacientes] = useState<any[]>([]);
+  const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Drawer
-  const [selectedPatientForDrawer, setSelectedPatientForDrawer] = useState<any | null>(null);
+  const [selectedPatientForDrawer, setSelectedPatientForDrawer] = useState<Paciente | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [selectedCitaForSuite, setSelectedCitaForSuite] = useState<any | null>(null);
+  const [showClinicalSuite, setShowClinicalSuite] = useState(false);
+  const [selectedCitaForSuite, setSelectedCitaForSuite] = useState<CitaExtendida | null>(null);
 
   // Modal Nueva Cita
   const [showNewCitaModal, setShowNewCitaModal] = useState(false);
@@ -72,19 +79,18 @@ function AgendaContent() {
     pacienteId: '',
     fecha: getFormattedLocalDate(new Date()),
     hora: '09:00',
-    profesional: 'Klgo. Ignacio Cuevas',
-    motivo: 'Tratamiento Kinésico / TMO',
+    motivo: 'Sesión Kinésica',
+    profesional: 'Klgo. Ignacio Cuevas'
   });
   const [pacienteSearch, setPacienteSearch] = useState('');
   const [savingCita, setSavingCita] = useState(false);
 
-  // Modal Editar Cita
-  const [editingCita, setEditingCita] = useState<any | null>(null);
+  // Edición y Eliminación
+  const [editingCita, setEditingCita] = useState<CitaExtendida | null>(null);
   const [editForm, setEditForm] = useState({ fecha: '', hora: '', motivo: '', profesional: '' });
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Modal Eliminar Cita
-  const [deletingCita, setDeletingCita] = useState<any | null>(null);
+  const [deletingCita, setDeletingCita] = useState<CitaExtendida | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const loadAgenda = useCallback(async () => {
@@ -129,7 +135,7 @@ function AgendaContent() {
         .select('id, nombre_completo, rut')
         .order('nombre_completo', { ascending: true });
 
-      if (!pacError && pacData) setPacientes(pacData);
+      if (!pacError && pacData) setPacientes(pacData as Paciente[]);
 
       const pacIds = Array.from(new Set(citasData?.map(c => c.paciente_id).filter(Boolean)));
       if (pacIds.length > 0) {
@@ -146,7 +152,7 @@ function AgendaContent() {
             if (vistaP && c.pacientes) {
               const plan = planesData?.find(pl => pl.id === vistaP.plan_id);
               c.pacientes = { 
-                ...c.pacientes, 
+                ...(c.pacientes as any), 
                 ...vistaP, 
                 numero_boleta: plan?.numero_boleta || null 
               };
@@ -155,7 +161,7 @@ function AgendaContent() {
         }
       }
 
-      setCitas(citasData || []);
+      setCitas((citasData as CitaExtendida[]) || []);
     } catch (err) {
       console.error('Error cargando agenda:', err);
       toast.error('Error al cargar la agenda');
@@ -241,7 +247,7 @@ function AgendaContent() {
     } catch (err) { toast.error('Ocurrió un error inesperado', { id: toastId }); }
   };
 
-  const handleRegistrarAsistencia = async (cita: any) => {
+  const handleRegistrarAsistencia = async (cita: CitaExtendida) => {
     if (!supabase) return;
     if (cita.estado === 'asistio') {
       toast.info('Esta cita ya está registrada como asistida');
@@ -280,19 +286,21 @@ function AgendaContent() {
       const quedanSesiones = (resumen?.sesiones_restantes || 1) - 1;
       if (!resumen?.plan_id || quedanSesiones <= 0) {
         // Abrir modal unificado de Atención-Venta-Cobro
-        setModalPostAtencion({
-          isOpen: true,
-          paciente: cita.pacientes,
-          motivo: quedanSesiones <= 0 ? 'plan_completado' : 'sin_plan'
-        });
+        if (cita.pacientes) {
+          setModalPostAtencion({
+            isOpen: true,
+            paciente: cita.pacientes,
+            motivo: quedanSesiones <= 0 ? 'plan_completado' : 'sin_plan'
+          });
+        }
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error al registrar asistencia:', err);
-      toast.error(`Error: ${err.message}`);
+      toast.error(`Error: ${(err as Error).message}`);
     }
   };
 
-  const handleCambiarEstadoCita = async (cita: any, nuevoEstado: string) => {
+  const handleCambiarEstadoCita = async (cita: CitaExtendida, nuevoEstado: string) => {
     if (!supabase) return;
     const estadoAnterior = cita.estado;
     if (estadoAnterior === nuevoEstado) return;
@@ -339,9 +347,9 @@ function AgendaContent() {
         prev.map(c => (c.id === cita.id ? { ...c, estado: nuevoEstado } : c))
       );
       loadAgenda(); // Refrescar en segundo plano
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error al cambiar estado:', err);
-      toast.error(`Error: ${err.message}`);
+      toast.error(`Error: ${(err as Error).message}`);
     }
   };
 
@@ -388,9 +396,9 @@ function AgendaContent() {
       toast.success('¡Cita agendada exitosamente!');
       setShowNewCitaModal(false);
       loadAgenda();
-    } catch (err: any) {
+    } catch (err) {
       console.error('Excepción al agendar:', err);
-      toast.error(err.message || 'Error inesperado al agendar cita');
+      toast.error((err as Error).message || 'Error inesperado al agendar cita');
     } finally {
       setSavingCita(false); // Garantiza que el formulario nunca quede congelado
     }
@@ -446,7 +454,7 @@ function AgendaContent() {
     return primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase();
   };
 
-  const generarMensajeConfirmacion = (cita: any) => {
+  const generarMensajeConfirmacion = (cita: CitaExtendida) => {
     const nombre = formatearNombre(cita.pacientes?.nombre_completo);
     const fechaCL = formatearFechaChilena(cita.fecha);
     const hora = cita.hora?.slice(0, 5) || '16:00';
@@ -456,7 +464,6 @@ function AgendaContent() {
 
     return `https://wa.me/56${telefonoLimpio}?text=${encodeURIComponent(texto)}`;
   };
-
   const pacientesOptions = useMemo(() => {
     if (!pacienteSearch.trim()) return pacientes.slice(0, 50);
     const q = pacienteSearch.toLowerCase();
@@ -499,24 +506,21 @@ function AgendaContent() {
       case 'atendido':
       case 'en_sala':
         return {
-          card: 'bg-slate-50/70 border-slate-200 text-slate-600 opacity-90 shadow-none',
-          hora: 'bg-slate-200 text-slate-700 border border-slate-300'
+          card: 'bg-slate-50/50 border-slate-200/80 hover:border-slate-300 opacity-95',
+          hora: 'bg-slate-100 text-slate-700 border border-slate-200'
         };
       case 'cancelada':
       case 'no_asistio':
         return {
-          card: 'bg-rose-50/40 border-rose-200/80 text-rose-900 opacity-75 shadow-none',
-          hora: 'bg-rose-100 text-rose-800 border border-rose-200'
+          card: 'bg-rose-50/30 border-rose-100 opacity-75 grayscale hover:grayscale-0',
+          hora: 'bg-rose-100 text-rose-900 border border-rose-200 line-through'
         };
       default:
-        return {
-          card: 'bg-white border-slate-200 shadow-sm',
-          hora: 'bg-slate-100 text-slate-900'
-        };
+        return { card: 'bg-white', hora: 'bg-slate-50 text-slate-800' };
     }
   };
 
-  const renderCardCita = (cita: any, compact = false) => {
+  const renderCardCita = (cita: CitaExtendida, compact = false) => {
     const p = cita.pacientes;
     if (!p) return null;
     
@@ -531,7 +535,7 @@ function AgendaContent() {
 
     if (compact) {
         const semaforoClass = getEstiloSemaforoSemanal(s);
-        const tienePlanCompact = p.estado_plan !== 'sin_plan' && (p.sesiones_totales || 0) > 0;
+        const { tienePlan: tienePlanCompact, sesionesUsadas, sesionesTotales } = getResumenPlan(p);
         
         let badgePrevision = '';
         if (p.prevision) {
@@ -569,7 +573,7 @@ function AgendaContent() {
                         {p.prevision || 'Particular'}
                       </span>
                       <span className="font-bold text-slate-700">
-                        {tienePlanCompact ? `${p.sesiones_usadas}/${p.sesiones_totales} ses.` : 'Sin plan'}
+                        {tienePlanCompact ? `${sesionesUsadas}/${sesionesTotales} ses.` : 'Sin plan'}
                       </span>
                     </div>
                 </div>
@@ -941,9 +945,9 @@ function AgendaContent() {
                                     else if (s === 'pendiente') bg = 'bg-amber-100 text-amber-900 border border-amber-300 font-semibold';
                                     else if (['cancelada', 'no_asistio'].includes(s)) bg = 'bg-rose-100 text-rose-800 line-through opacity-75 border-transparent';
                                     
-                                    const primerNombre = c.pacientes?.nombre_completo.split(' ')[0] || '';
-                                    const tienePlan = c.pacientes?.estado_plan !== 'sin_plan' && (c.pacientes?.sesiones_totales || 0) > 0;
-                                    const planStr = tienePlan ? `${c.pacientes.nombre_plan} (${c.pacientes.sesiones_usadas}/${c.pacientes.sesiones_totales} ses)` : 'Sin plan';
+                                    const primerNombre = c.pacientes?.nombre_completo?.split(' ')[0] || '';
+                                    const { tienePlan, sesionesUsadas, sesionesTotales } = getResumenPlan(c.pacientes || {});
+                                    const planStr = tienePlan ? `${c.pacientes?.nombre_plan} (${sesionesUsadas}/${sesionesTotales} ses)` : 'Sin plan';
 
                                     return (
                                         <div key={c.id} className={`px-1.5 py-0.5 rounded-full text-[9px] truncate relative group ${bg}`}>

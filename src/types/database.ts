@@ -6,14 +6,23 @@ export type EstadoPlan =
 
 export type EstadoAtencion =
   | "Asistió"
+  | "asistio"
+  | "asistió"
   | "Atendido"
+  | "atendido"
   | "Inasistencia (Descuenta Sesión)"
   | "No Asistió"
+  | "no_asistio"
   | "En Sala"
+  | "en_sala"
   | "Pendiente"
+  | "pendiente"
+  | "confirmada"
   | "Cancelado con Aviso"
   | "Cancelado"
-  | "Inasistencia Justificada";
+  | "cancelada"
+  | "Inasistencia Justificada"
+  | string;
 
 export type CategoriaPlan = "General" | "Convenio" | "Promoción" | "Personalizado";
 

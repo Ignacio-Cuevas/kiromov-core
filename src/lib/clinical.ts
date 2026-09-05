@@ -1,3 +1,5 @@
+import { VistaResumenPaciente, Paciente } from '@/types/database';
+
 export interface AlertaDesercion {
   nivel: 1 | 2 | 3 | null;
   etiqueta: string;
@@ -12,8 +14,8 @@ const formatearTiempoSinAtencion = (dias: number): string => {
   return `aproximadamente ${meses} ${meses === 1 ? 'mes' : 'meses'}`;
 };
 
-export const evaluarRiesgoDesercion = (p: any): AlertaDesercion => {
-  const usadas = Number(p.sesiones_usadas) || 0;
+export const evaluarRiesgoDesercion = (p: Partial<VistaResumenPaciente>): AlertaDesercion => {
+  const usadas = Number(p.sesiones_consumidas) || 0;
   const restantes = Number(p.sesiones_restantes) || 0;
   const dias = Number(p.dias_sin_atencion) || 0;
   const nombre = p.nombre_completo?.split(' ')[0] || 'Estimado/a';
@@ -53,8 +55,29 @@ export const evaluarRiesgoDesercion = (p: any): AlertaDesercion => {
 };
 
 export const requiereReevaluacion = (p: any): boolean => {
-  const usadas = Number(p.sesiones_usadas) || 0;
+  const usadas = Number(p.sesiones_usadas || p.sesiones_consumidas) || 0;
   const dolor = Number(p.ultimo_dolor_ena);
   // Paciente con 3 o más sesiones cuyo dolor se mantiene en ENA >= 6
   return usadas >= 3 && dolor >= 6;
+};
+
+export const getResumenPlan = (p: any) => {
+  const tienePlan = p.estado_plan !== 'sin_plan' && (p.sesiones_totales || 0) > 0;
+  const sesionesTotales = Number(p.sesiones_totales) || 0;
+  const sesionesUsadas = Number(p.sesiones_usadas || p.sesiones_consumidas) || 0;
+  const sesionesRestantes = Math.max(0, sesionesTotales - sesionesUsadas);
+  
+  let estadoPlanLabel = 'Sin plan';
+  if (p.estado_plan === 'vigente') estadoPlanLabel = 'Plan Vigente';
+  else if (p.estado_plan === 'por_renovar') estadoPlanLabel = 'Por Renovar';
+  else if (p.estado_plan === 'finalizado') estadoPlanLabel = 'Plan Finalizado';
+
+  return {
+    tienePlan,
+    sesionesTotales,
+    sesionesUsadas,
+    sesionesRestantes,
+    estadoPlanLabel,
+    porcentajeUso: sesionesTotales > 0 ? Math.min(100, Math.round((sesionesUsadas / sesionesTotales) * 100)) : 0
+  };
 };

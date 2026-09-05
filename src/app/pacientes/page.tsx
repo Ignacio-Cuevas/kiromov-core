@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import SaleModal from "@/components/sales/SaleModal";
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
-import { evaluarRiesgoDesercion, requiereReevaluacion } from '@/lib/clinical';
+import { getResumenPlan, evaluarRiesgoDesercion, requiereReevaluacion } from '@/lib/clinical';
 
 interface PacienteResumen {
   id: string;
@@ -238,8 +238,7 @@ export default function PacientesPage() {
                   </tr>
                 ) : (
                   pacientesFiltrados.map((p) => {
-                    const tienePlan = p.estado_plan !== 'sin_plan' && p.sesiones_totales > 0;
-                    const pct = tienePlan ? Math.min(100, Math.round((p.sesiones_usadas / p.sesiones_totales) * 100)) : 0;
+                    const { tienePlan, sesionesUsadas, sesionesTotales, sesionesRestantes, porcentajeUso } = getResumenPlan(p);
 
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/90 transition-colors duration-150 group">
@@ -286,15 +285,15 @@ export default function PacientesPage() {
                           {tienePlan ? (
                             <div className="space-y-1">
                               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900">
-                                <span>{p.sesiones_usadas}/{p.sesiones_totales} ses.</span>
-                                <span className="text-slate-400 font-normal">({p.sesiones_restantes} rest.)</span>
+                                <span>{sesionesUsadas}/{sesionesTotales} ses.</span>
+                                <span className="text-slate-400 font-normal">({sesionesRestantes} rest.)</span>
                               </div>
                               <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                 <div 
                                   className={`h-full rounded-full transition-all duration-500 ease-out ${
                                     p.estado_plan === 'por_renovar' ? 'bg-amber-500' : 'bg-emerald-500'
                                   }`} 
-                                  style={{ width: `${pct}%` }} 
+                                  style={{ width: `${porcentajeUso}%` }} 
                                 />
                               </div>
                             </div>
