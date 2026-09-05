@@ -5,7 +5,7 @@ import SaleModal from "@/components/sales/SaleModal";
 import { SettlePaymentModal } from "@/components/sales/SettlePaymentModal";
 import { PostSessionModal } from "@/components/sales/PostSessionModal";
 import { AssignTreatmentModal } from "@/components/sales/AssignTreatmentModal";
-import { ClinicalBoxSuite } from "@/components/clinical/ClinicalBoxSuite";
+import ClinicalBoxSuite from "@/components/clinical/ClinicalBoxSuite";
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
@@ -949,13 +949,14 @@ function AgendaContent() {
         />
       )}
 </main>
-      <ClinicalBoxSuite 
-        isOpen={isDrawerOpen} 
-        onClose={() => setIsDrawerOpen(false)} 
-        pacienteId={selectedPatientForDrawer?.id || ''} 
-        citaId={selectedCitaForSuite?.id || ''}
-        onSaved={() => loadAgenda()} 
-      />
+      {isDrawerOpen && (
+        <ClinicalBoxSuite 
+          onClose={() => setIsDrawerOpen(false)} 
+          pacienteId={selectedPatientForDrawer?.id || ''} 
+          citaId={selectedCitaForSuite?.id || ''}
+          onSuccess={() => loadAgenda()} 
+        />
+      )}
       {/* Modal Nueva Cita */}
       <Dialog open={showNewCitaModal} onOpenChange={setShowNewCitaModal}>
         <DialogHeader><DialogTitle>Agendar Nueva Cita</DialogTitle><DialogDescription>Selecciona un paciente y un horario para agendar.</DialogDescription></DialogHeader>

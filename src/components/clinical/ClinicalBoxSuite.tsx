@@ -2,517 +2,512 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { X, Phone, ShieldAlert, Activity, FileText, CheckCircle2, FileSignature, Save, Loader2, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ClinicalBoxSuiteProps {
-  isOpen: boolean;
-  onClose: () => void;
   pacienteId: string;
-  citaId: string;
-  onSaved: () => void;
+  citaId?: string;
+  onClose: () => void;
+  onSuccess?: () => void;
 }
 
-export function ClinicalBoxSuite({ isOpen, onClose, pacienteId, citaId, onSaved }: ClinicalBoxSuiteProps) {
+export default function ClinicalBoxSuite({
+  pacienteId,
+  citaId,
+  onClose,
+  onSuccess
+}: ClinicalBoxSuiteProps) {
   const supabase = createClient();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  
+
+  // Estados de datos
   const [paciente, setPaciente] = useState<any>(null);
   const [planActivo, setPlanActivo] = useState<any>(null);
   const [historialSOAP, setHistorialSOAP] = useState<any[]>([]);
-  const [citaActual, setCitaActual] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Formularios SOAP
-  const [ena, setEna] = useState<number | null>(null);
-  const [segmentos, setSegmentos] = useState<string[]>([]);
-  const [tecnicas, setTecnicas] = useState<string[]>([]);
-  const [s, setS] = useState('');
-  const [o, setO] = useState('');
-  const [a, setA] = useState('');
-  const [p, setP] = useState('');
+  // Estados del Formulario SOAP de hoy
+  const [nivelDolor, setNivelDolor] = useState<number>(0);
+  const [segmentosSeleccionados, setSegmentosSeleccionados] = useState<string[]>([]);
+  const [tecnicasSeleccionadas, setTecnicasSeleccionadas] = useState<string[]>([]);
+  const [sSubjetivo, setSSubjetivo] = useState('');
+  const [oObjetivo, setOObjetivo] = useState('');
+  const [aAnalisis, setAAnalisis] = useState('');
+  const [pPlan, setPPlan] = useState('');
+  const [pronostico, setPronostico] = useState('4 a 6 sesiones');
 
-  const segmentosOptions = ['Cervical', 'Dorsal', 'Lumbopélvica', 'Hombro', 'Codo', 'Muñeca/Mano', 'Cadera', 'Rodilla', 'Tobillo/Pie', 'ATM'];
-  const tecnicasOptions = ['⚡ Manipulación Articular (HVLA)', 'Movilización Gr. I-IV', 'Terapia Miofascial', 'Neurodinamia', 'Ejercicio Terapéutico', 'Punción Seca', 'Educación en Dolor'];
+  // Control de acordeón en timeline histórico
+  const [notaExpandidaId, setNotaExpandidaId] = useState<string | null>(null);
+
+  // 1. Carga de datos de Supabase
+  const cargarDatos = async () => {
+    if (!pacienteId || !supabase) return;
+    setLoading(true);
+    try {
+      // Paciente
+      const { data: p } = await supabase
+        .from('pacientes')
+        .select('*')
+        .eq('id', pacienteId)
+        .single();
+      if (p) setPaciente(p);
+
+      // Plan activo más reciente
+      const { data: plan } = await supabase
+        .from('compras_planes')
+        .select('*')
+        .eq('paciente_id', pacienteId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (plan) setPlanActivo(plan);
+
+      // Historial SOAP
+      const { data: soaps } = await supabase
+        .from('evoluciones_soap')
+        .select('*')
+        .eq('paciente_id', pacienteId)
+        .order('fecha', { ascending: false });
+      if (soaps) setHistorialSOAP(soaps);
+
+    } catch (err) {
+      console.error('Error cargando datos en suite:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!pacienteId) return;
+    cargarDatos();
+  }, [pacienteId]);
 
-    const cargarDatosCompletos = async () => {
-      if (!supabase) return;
-      setLoading(true);
-      try {
-        if (citaId) {
-          const { data: c } = await supabase.from('citas_atenciones').select('*').eq('id', citaId).single();
-          if (c) setCitaActual(c);
-        }
-
-        // 1. Datos personales del paciente
-        const { data: p } = await supabase
-          .from('pacientes')
-          .select('*')
-          .eq('id', pacienteId)
-          .single();
-        if (p) setPaciente(p);
-
-        // 2. Plan activo real desde compras_planes
-        const { data: plan } = await supabase
-          .from('compras_planes')
-          .select('*')
-          .eq('paciente_id', pacienteId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (plan) setPlanActivo(plan);
-
-        // 3. Historial de notas SOAP reales
-        const { data: soaps, error: errorSoaps } = await supabase
-          .from('evoluciones_soap')
-          .select('*')
-          .eq('paciente_id', pacienteId)
-          .order('fecha', { ascending: false });
-
-        if (errorSoaps) {
-          console.error('Error al cargar evoluciones SOAP:', errorSoaps);
-        } else if (soaps) {
-          console.log('Notas SOAP cargadas:', soaps.length);
-          setHistorialSOAP(soaps);
-        }
-
-      } catch (err) {
-        console.error('Error cargando suite clínica:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (isOpen) {
-      cargarDatosCompletos();
-      // Limpiar formulario
-      setEna(null);
-      setSegmentos([]);
-      setTecnicas([]);
-      setS(''); setO(''); setA(''); setP('');
-    }
-  }, [isOpen, pacienteId, citaId]);
-
-  const toggleArrayItem = (arr: string[], setArr: any, item: string) => {
-    if (arr.includes(item)) setArr(arr.filter(i => i !== item));
-    else setArr([...arr, item]);
+  // Manejador de toggles para chips
+  const toggleSegmento = (seg: string) => {
+    setSegmentosSeleccionados(prev =>
+      prev.includes(seg) ? prev.filter(s => s !== seg) : [...prev, seg]
+    );
   };
 
-  const handleSaveSOAP = async () => {
+  const toggleTecnica = (tec: string) => {
+    setTecnicasSeleccionadas(prev =>
+      prev.includes(tec) ? prev.filter(t => t !== tec) : [...prev, tec]
+    );
+  };
+
+  // Guardar SOAP de hoy
+  const handleGuardarSOAP = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!supabase) return;
-    if (!citaActual?.id) {
-      toast.error('No hay una cita asociada para guardar el SOAP de hoy.');
-      return;
-    }
-    
-    setSaving(true);
+    setIsSubmitting(true);
+
     try {
-      const notaFinal = `
-**DOLOR (ENA):** ${ena !== null ? ena + '/10' : 'No registrado'}
-**SEGMENTOS:** ${segmentos.length > 0 ? segmentos.join(', ') : 'No registrados'}
-**TÉCNICAS TMO:** ${tecnicas.length > 0 ? tecnicas.join(', ') : 'No registradas'}
+      const payload = {
+        paciente_id: pacienteId,
+        fecha: new Date().toISOString().split('T')[0],
+        nivel_dolor_ena: Number(nivelDolor),
+        s_subjetivo: sSubjetivo.trim(),
+        o_objetivo: `[Segmentos: ${segmentosSeleccionados.join(', ') || 'General'}] ${oObjetivo.trim()}`,
+        a_analisis: aAnalisis.trim(),
+        p_plan: `[TMO: ${tecnicasSeleccionadas.join(' + ') || 'Terapia Kinésica'}] ${pPlan.trim()}`,
+        pronostico_sesiones: pronostico,
+        profesional: 'Klgo. Ignacio Cuevas Silva'
+      };
 
-**S (Subjetivo):**
-${s}
-
-**O (Objetivo):**
-${o}
-
-**A (Análisis/Apreciación):**
-${a}
-
-**P (Plan):**
-${p}
-      `.trim();
-
-      const { error } = await supabase
-        .from('citas_atenciones')
-        .update({
-          nota_clinica: notaFinal,
-          dolor_ena: ena
-        })
-        .eq('id', citaActual.id);
-
+      const { error } = await supabase.from('evoluciones_soap').insert([payload]);
       if (error) throw error;
-      
-      // Update ultimo_dolor_ena in paciente
-      if (ena !== null && paciente?.id) {
-        await supabase.from('pacientes').update({ ultimo_dolor_ena: ena }).eq('id', paciente.id);
-      }
 
-      toast.success('Evolución clínica guardada exitosamente');
-      onSaved();
-      onClose();
+      toast.success('¡Evolución clínica guardada exitosamente!');
+      
+      // Limpiar formulario y recargar historial
+      setSSubjetivo('');
+      setOObjetivo('');
+      setAAnalisis('');
+      setPPlan('');
+      setSegmentosSeleccionados([]);
+      setTecnicasSeleccionadas([]);
+      await cargarDatos();
+      onSuccess?.();
     } catch (err: any) {
-      toast.error('Error al guardar SOAP: ' + err.message);
+      console.error('Error guardando SOAP:', err);
+      toast.error(`Error al guardar: ${err.message}`);
     } finally {
-      setSaving(false);
+      setIsSubmitting(false);
     }
   };
 
-  const curvaDolor = useMemo(() => {
-    const records = [...historialSOAP].reverse().filter(h => h.dolor_ena !== null && h.dolor_ena !== undefined);
-    if (records.length === 0) return { puntos: [], reduccion: 0 };
-    
-    const primerDolor = records[0].dolor_ena;
-    const ultimoDolor = records[records.length - 1].dolor_ena;
-    
-    let reduccion = 0;
-    if (primerDolor > 0) {
-      reduccion = Math.round(((primerDolor - ultimoDolor) / primerDolor) * 100);
-    }
-
-    return {
-      puntos: records.map((r, i) => ({ sesion: i + 1, dolor: r.dolor_ena, fecha: r.fecha })),
-      reduccion
-    };
-  }, [historialSOAP]);
-
-  if (!isOpen || !paciente) return null;
-
-  const tienePlan = planActivo && planActivo.sesiones_totales > 0;
-  const pct = tienePlan ? Math.min(100, Math.round(((planActivo.sesiones_usadas || 0) / (planActivo.sesiones_totales || 1)) * 100)) : 0;
-  const debePago = planActivo?.estado_pago === 'pendiente';
-  const cleanPhone = paciente.telefono ? paciente.telefono.replace(/\D/g, '').slice(-9) : '';
+  const segmentosList = ['Cervical', 'Dorsal', 'Lumbopélvica', 'Hombro', 'Codo', 'Muñeca/Mano', 'Cadera', 'Rodilla', 'Tobillo/Pie', 'ATM'];
+  const tecnicasList = [
+    '⚡ Manipulación Articular (HVLA)',
+    'Movilización Gr. I-IV',
+    'Terapia Miofascial',
+    'Neurodinamia',
+    'Ejercicio Terapéutico',
+    'Punción Seca',
+    'Educación en Dolor'
+  ];
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-      
-      {/* BARRA SUPERIOR */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0 shadow-sm z-10">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-xl font-black text-slate-900 leading-tight">{paciente.nombre_completo}</h1>
-            <p className="text-xs text-slate-500 font-mono mt-0.5">{paciente.rut || 'Sin RUT'}</p>
-          </div>
-          
-          <div className="h-8 w-px bg-slate-200 mx-2"></div>
-          
-          <div className="flex flex-col">
-            {tienePlan ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-slate-800">{planActivo.nombre_plan || 'Plan Kinésico'}</span>
-                  <span className="text-xs font-semibold text-slate-500">• {planActivo.sesiones_usadas}/{planActivo.sesiones_totales} ses. ({Math.max(0, planActivo.sesiones_totales - planActivo.sesiones_usadas)} restantes)</span>
-                </div>
-                <div className="w-48 h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }}></div>
-                </div>
-              </>
-            ) : (
-              <span className="text-sm font-semibold text-slate-500 italic">Sin plan activo</span>
-            )}
-          </div>
-          
-          <div className="flex items-center ml-4">
-            {debePago ? (
-              <span className="bg-rose-50 border border-rose-200 text-rose-700 font-bold px-3 py-1 rounded-lg text-xs">
-                🔴 Debe (${planActivo.monto_clp?.toLocaleString('es-CL')})
-              </span>
-            ) : (
-              <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold px-3 py-1 rounded-lg text-xs">
-                ✓ Plan Pagado
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors">
-            <FileSignature className="w-4 h-4" /> Certificado Reembolso
-          </button>
-          <button onClick={onClose} className="flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors shadow-sm">
-            <X className="w-4 h-4" /> Volver a la Agenda
-          </button>
-        </div>
-      </header>
-
-      {/* CUERPO 3 COLUMNAS */}
-      <div className="flex-1 flex overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+      <div className="w-full max-w-[96vw] h-[94vh] bg-slate-100 rounded-3xl shadow-2xl border border-slate-300 flex flex-col overflow-hidden">
         
-        {/* COLUMNA IZQUIERDA (25%) */}
-        <aside className="w-1/4 min-w-[280px] bg-white border-r border-slate-200 p-5 overflow-y-auto flex flex-col gap-6">
+        {/* ==================================================================== */}
+        {/* CABECERA SUPERIOR FIJA */}
+        {/* ==================================================================== */}
+        <header className="h-16 flex-shrink-0 bg-white border-b border-slate-200 px-6 flex items-center justify-between z-10">
+          <div className="flex items-center gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight leading-none">
+                {paciente?.nombre_completo || 'Cargando paciente...'}
+              </h2>
+              <p className="text-xs text-slate-500 font-mono mt-1">
+                RUT: {paciente?.rut || 'Sin RUT'}
+              </p>
+            </div>
+
+            {/* Badges de Plan y Pago */}
+            <div className="hidden md:flex items-center gap-2">
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+                {planActivo?.nombre_plan ? `${planActivo.nombre_plan} • ${planActivo.sesiones_usadas}/${planActivo.sesiones_totales} ses.` : 'Sin plan activo'}
+              </span>
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                planActivo?.estado_pago === 'pagado' 
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+              }`}>
+                {planActivo?.estado_pago === 'pagado' ? '✓ Plan Pagado' : '🔴 Cobro Pendiente'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              ✕ Volver a la Agenda
+            </button>
+          </div>
+        </header>
+
+        {/* ==================================================================== */}
+        {/* CUERPO DE 3 COLUMNAS CON SCROLL INDEPENDIENTE */}
+        {/* ==================================================================== */}
+        <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-4 p-4">
           
-          <div>
-            <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-3">Contexto del Paciente</h3>
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                  <Phone className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase">Teléfono / Contacto</p>
-                  <p className="text-sm font-semibold text-slate-800 truncate">{paciente.telefono || 'Sin registro'}</p>
-                </div>
-                {cleanPhone && (
-                  <a href={`https://wa.me/56${cleanPhone}`} target="_blank" rel="noreferrer" className="shrink-0 bg-green-500 hover:bg-green-600 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition-colors">
-                    WhatsApp
+          {/* ------------------------------------------------------------------ */}
+          {/* COLUMNA 1 (IZQUIERDA - 3 cols): CONTEXTO Y ANTECEDENTES */}
+          {/* ------------------------------------------------------------------ */}
+          <aside className="md:col-span-3 h-full overflow-y-auto bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Contexto del Paciente</h3>
+
+            {/* Teléfono y WhatsApp */}
+            <div className="space-y-1">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase">Teléfono / Contacto</span>
+              {paciente?.telefono ? (
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs font-bold text-slate-800">{paciente.telefono}</span>
+                  <a
+                    href={`https://wa.me/56${paciente.telefono.replace(/\D/g, '').slice(-9)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold text-[11px] rounded-lg border border-emerald-200 transition-colors"
+                  >
+                    💬 WhatsApp
                   </a>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 italic">Sin registro</p>
+              )}
+            </div>
+
+            {/* Previsión */}
+            <div className="space-y-1">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase">Previsión de Salud</span>
+              <p className="text-xs font-semibold text-slate-800 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 inline-block">
+                {paciente?.prevision || 'Particular'}
+              </p>
+            </div>
+
+            {/* Banderas Rojas / Alertas TMO */}
+            <div className="space-y-1">
+              <span className="text-[11px] font-semibold text-rose-600 uppercase flex items-center gap-1">
+                <span>🚩</span> Banderas Rojas & Seguridad TMO
+              </span>
+              <div className="bg-rose-50/70 border border-rose-200 p-3 rounded-xl text-xs text-rose-900 leading-relaxed">
+                {paciente?.alertas_seguridad || paciente?.antecedentes_morbidos || 'Sin contraindicaciones médicas registradas para manipulación o carga.'}
+              </div>
+            </div>
+
+            {/* Motivo de Consulta Inicial */}
+            <div className="space-y-1">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase">Motivo Inicial</span>
+              <p className="text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200 leading-relaxed italic">
+                "{paciente?.motivo_consulta || 'Evaluación Kinésica Inicial'}"
+              </p>
+            </div>
+          </aside>
+
+          {/* ------------------------------------------------------------------ */}
+          {/* COLUMNA 2 (CENTRO - 6 cols): ESPACIO DE ATENCIÓN ACTIVA SOAP */}
+          {/* ------------------------------------------------------------------ */}
+          <main className="md:col-span-6 h-full overflow-y-auto bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+            <form onSubmit={handleGuardarSOAP} className="space-y-6 pb-6">
+              
+              {/* Encabezado del Formulario */}
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-blue-600 font-bold text-lg">📝</span>
+                  <h3 className="font-bold text-slate-900 text-sm">Registro de Evolución Clínica (SOAP)</h3>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                  Sesión de Hoy
+                </span>
+              </div>
+
+              {/* Curva / Estado de Dolor ENA */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Curva de Dolor ENA (Histórica)
+                </span>
+                {historialSOAP.length > 1 ? (
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-800">
+                    <span>S1: {historialSOAP[historialSOAP.length - 1].nivel_dolor_ena}/10</span>
+                    <span className="text-slate-400">➔</span>
+                    <span>S{historialSOAP.length}: {historialSOAP[0].nivel_dolor_ena}/10</span>
+                    <span className="ml-auto text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      📉 Progreso en evolución
+                    </span>
+                  </div>
+                ) : historialSOAP.length === 1 ? (
+                  <p className="text-xs text-slate-600">
+                    Línea de base inicial: <span className="font-bold text-slate-900">ENA {historialSOAP[0].nivel_dolor_ena}/10</span> (Registrada el {historialSOAP[0].fecha}).
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">Primera sesión (Se fijará la línea de base hoy).</p>
                 )}
               </div>
 
-              <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-                  <Activity className="w-4 h-4" />
+              {/* Selector de Dolor ENA Hoy (0 al 10) */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Nivel de Dolor Hoy (Escala ENA 0 - 10)
+                </label>
+                <div className="grid grid-cols-11 gap-1">
+                  {[0,1,2,3,4,5,6,7,8,9,10].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setNivelDolor(num)}
+                      className={`h-9 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                        nivelDolor === num
+                          ? 'bg-blue-600 text-white shadow-md scale-105 ring-2 ring-blue-400'
+                          : num <= 3 
+                          ? 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                          : num <= 6 
+                          ? 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                          : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase">Previsión</p>
-                  <p className="text-sm font-semibold text-slate-800 truncate">{paciente.prevision || 'Particular'}</p>
+              </div>
+
+              {/* Chips de Segmentos Tratados */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Segmentos Anatómicos Abordados
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {segmentosList.map((seg) => {
+                    const sel = segmentosSeleccionados.includes(seg);
+                    return (
+                      <button
+                        key={seg}
+                        type="button"
+                        onClick={() => toggleSegmento(seg)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                          sel 
+                            ? 'bg-blue-600 text-white shadow-sm font-semibold' 
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                        }`}
+                      >
+                        {seg}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            </div>
-          </div>
 
-          {(paciente.alertas_seguridad || paciente.antecedentes_morbidos) && (
-            <div className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4 animate-in slide-in-from-left-4">
-              <div className="flex items-center gap-2 mb-2 text-rose-700">
-                <ShieldAlert className="w-5 h-5" />
-                <h4 className="font-bold text-sm">Alertas de Seguridad TMO</h4>
+              {/* Chips de Técnicas TMO */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Técnicas e Intervenciones Aplicadas
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {tecnicasList.map((tec) => {
+                    const sel = tecnicasSeleccionadas.includes(tec);
+                    return (
+                      <button
+                        key={tec}
+                        type="button"
+                        onClick={() => toggleTecnica(tec)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                          sel 
+                            ? 'bg-blue-600 text-white shadow-sm font-semibold' 
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                        }`}
+                      >
+                        {tec}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <p className="text-xs text-rose-800 font-medium">
-                {paciente.alertas_seguridad || paciente.antecedentes_morbidos}
-              </p>
-            </div>
-          )}
 
-          <div>
-            <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Motivo Inicial</h3>
-            <div className="bg-amber-50/50 border border-amber-100 p-3.5 rounded-xl text-xs text-slate-700 italic">
-              "{paciente.motivo_consulta || 'Dolor o disfunción a evaluar en la primera sesión.'}"
-            </div>
-          </div>
-          
-        </aside>
+              {/* Textareas S y O */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">S — Subjetivo (Relato)</label>
+                  <textarea
+                    rows={3}
+                    value={sSubjetivo}
+                    onChange={(e) => setSSubjetivo(e.target.value)}
+                    placeholder="¿Cómo se siente hoy el paciente? Respuesta al tratamiento previo..."
+                    className="w-full text-xs p-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none bg-slate-50/50 focus:bg-white"
+                  />
+                </div>
 
-        {/* COLUMNA CENTRAL (50%) */}
-        <main className="w-2/4 min-w-[500px] bg-slate-50/50 p-6 overflow-y-auto flex flex-col gap-6">
-          
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-600" />
-              Evolución Clínica (SOAP)
-            </h2>
-            <span className="bg-white border border-slate-200 shadow-sm px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500">
-              {citaActual?.fecha ? new Date(citaActual.fecha + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'short' }) : 'Hoy'}
-            </span>
-          </div>
-
-          {/* Gráfica de Dolor Simulada */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Curva ENA de Dolor (Histórica)</h3>
-              {curvaDolor.puntos.length > 1 && curvaDolor.reduccion > 0 && (
-                <span className="bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-md text-[10px] flex items-center gap-1">
-                  📉 {curvaDolor.reduccion}% de reducción
-                </span>
-              )}
-            </div>
-            
-            {curvaDolor.puntos.length === 0 ? (
-              <div className="h-24 flex items-center justify-center border-2 border-dashed border-slate-100 rounded-xl text-slate-400 text-xs italic">
-                Primera sesión (Aún sin datos históricos de dolor)
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">O — Objetivo (Examen Físico)</label>
+                  <textarea
+                    rows={3}
+                    value={oObjetivo}
+                    onChange={(e) => setOObjetivo(e.target.value)}
+                    placeholder="Hallazgos palpatorios, arcos de movimiento (ROM), pruebas ortopédicas..."
+                    className="w-full text-xs p-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none bg-slate-50/50 focus:bg-white"
+                  />
+                </div>
               </div>
+
+              {/* Textareas A y P */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">A — Análisis (Evolución Kinésica)</label>
+                  <textarea
+                    rows={3}
+                    value={aAnalisis}
+                    onChange={(e) => setAAnalisis(e.target.value)}
+                    placeholder="Juicio funcional, avance respecto a objetivos biomecánicos..."
+                    className="w-full text-xs p-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none bg-slate-50/50 focus:bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">P — Plan (Próxima Sesión y Tarea)</label>
+                  <textarea
+                    rows={3}
+                    value={pPlan}
+                    onChange={(e) => setPPlan(e.target.value)}
+                    placeholder="Pauta de ejercicios para casa, dosificación y fecha de próximo control..."
+                    className="w-full text-xs p-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none bg-slate-50/50 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Botón de Guardado */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Guardando Evolución en Ficha...
+                    </>
+                  ) : (
+                    '✓ Guardar Evolución Clínica de Hoy'
+                  )}
+                </button>
+              </div>
+
+            </form>
+          </main>
+
+          {/* ------------------------------------------------------------------ */}
+          {/* COLUMNA 3 (DERECHA - 3 cols): HISTORIAL INTERACTIVO CON DESPLIEGUE */}
+          {/* ------------------------------------------------------------------ */}
+          <aside className="md:col-span-3 h-full overflow-y-auto bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Timeline Histórico</h3>
+              <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
+                {historialSOAP.length} reg.
+              </span>
+            </div>
+
+            {historialSOAP.length === 0 ? (
+              <p className="text-xs text-slate-400 italic py-6 text-center">Sin notas clínicas previas.</p>
             ) : (
-              <div className="relative h-24 flex items-end gap-2 px-4 pb-6 pt-4 border-b border-l border-slate-200">
-                {curvaDolor.puntos.map((p, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center justify-end relative group">
-                    <span className="absolute -top-6 text-[10px] font-bold text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">S{p.sesion}</span>
-                    <div 
-                      className={`w-full max-w-[24px] rounded-t-md transition-all duration-500 relative cursor-pointer ${
-                        p.dolor > 7 ? 'bg-rose-400' : p.dolor > 4 ? 'bg-amber-400' : 'bg-emerald-400'
-                      }`}
-                      style={{ height: `${(p.dolor / 10) * 100}%`, minHeight: '10%' }}
+              <div className="space-y-3">
+                {historialSOAP.map((nota) => {
+                  const expandida = notaExpandidaId === nota.id;
+                  return (
+                    <div
+                      key={nota.id}
+                      className="border border-slate-200 rounded-xl p-3 text-xs space-y-2 hover:border-slate-300 transition-colors bg-slate-50/40"
                     >
-                      <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-black text-slate-700 bg-white/80 px-1 rounded shadow-xs">{p.dolor}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Formulario SOAP */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col">
-            
-            <div className="p-5 border-b border-slate-100 space-y-5 bg-slate-50/30">
-              
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Nivel de Dolor Hoy (ENA 0-10)</label>
-                <div className="flex items-center gap-1">
-                  {[0,1,2,3,4,5,6,7,8,9,10].map(n => (
-                    <button
-                      key={n}
-                      onClick={() => setEna(n)}
-                      className={`flex-1 h-10 rounded-lg text-sm font-black transition-all border ${
-                        ena === n 
-                          ? 'bg-slate-800 text-white border-slate-800 shadow-md scale-105 z-10' 
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Segmentos Tratados</label>
-                <div className="flex flex-wrap gap-2">
-                  {segmentosOptions.map(seg => (
-                    <button
-                      key={seg}
-                      onClick={() => toggleArrayItem(segmentos, setSegmentos, seg)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
-                        segmentos.includes(seg)
-                          ? 'bg-blue-100 text-blue-700 border-blue-200'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      {seg}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Técnicas TMO Aplicadas</label>
-                <div className="flex flex-wrap gap-2">
-                  {tecnicasOptions.map(t => (
-                    <button
-                      key={t}
-                      onClick={() => toggleArrayItem(tecnicas, setTecnicas, t)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
-                        tecnicas.includes(t)
-                          ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-            </div>
-
-            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
-              <div className="space-y-1.5 flex flex-col">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center font-black">S</span>
-                  Subjetivo (Relato)
-                </label>
-                <textarea 
-                  value={s} onChange={e => setS(e.target.value)} 
-                  className="w-full flex-1 min-h-[80px] p-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  placeholder="¿Cómo se siente hoy el paciente?"
-                />
-              </div>
-
-              <div className="space-y-1.5 flex flex-col">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center font-black">O</span>
-                  Objetivo (Examen)
-                </label>
-                <textarea 
-                  value={o} onChange={e => setO(e.target.value)} 
-                  className="w-full flex-1 min-h-[80px] p-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
-                  placeholder="Hallazgos palpatorios, ROM, test especiales..."
-                />
-              </div>
-
-              <div className="space-y-1.5 flex flex-col">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center font-black">A</span>
-                  Análisis
-                </label>
-                <textarea 
-                  value={a} onChange={e => setA(e.target.value)} 
-                  className="w-full flex-1 min-h-[80px] p-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm outline-none focus:ring-2 focus:ring-amber-500 resize-none"
-                  placeholder="Impresión clínica, cambios post-intervención..."
-                />
-              </div>
-
-              <div className="space-y-1.5 flex flex-col">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-md bg-purple-100 text-purple-600 flex items-center justify-center font-black">P</span>
-                  Plan
-                </label>
-                <textarea 
-                  value={p} onChange={e => setP(e.target.value)} 
-                  className="w-full flex-1 min-h-[80px] p-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                  placeholder="Indicaciones para el hogar, próxima sesión..."
-                />
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
-              <button 
-                onClick={handleSaveSOAP}
-                disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm shadow-md transition-all active:scale-[0.98]"
-              >
-                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                Guardar Evolución Clínica
-              </button>
-            </div>
-
-          </div>
-
-        </main>
-
-        {/* COLUMNA DERECHA (25%) */}
-        <aside className="w-1/4 min-w-[280px] bg-white border-l border-slate-200 p-5 overflow-y-auto">
-          
-          <div className="flex items-center justify-between mb-4 sticky top-0 bg-white py-1">
-            <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Timeline Histórico</h3>
-            <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-bold">{historialSOAP.length} reg.</span>
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-slate-300" /></div>
-          ) : historialSOAP.length === 0 ? (
-            <div className="text-center p-8 border-2 border-dashed border-slate-100 rounded-2xl">
-              <p className="text-xs font-semibold text-slate-400">Sin historial clínico previo</p>
-            </div>
-          ) : (
-            <div className="space-y-4 relative before:absolute before:inset-y-0 before:left-[11px] before:w-[2px] before:bg-slate-100">
-              {historialSOAP.map((reg, idx) => (
-                <div key={reg.id} className="relative pl-7">
-                  <div className="absolute left-0 top-1.5 w-6 h-6 rounded-full bg-white border-4 border-slate-100 flex items-center justify-center">
-                    <div className="w-2 h-2 rounded-full bg-slate-300"></div>
-                  </div>
-                  
-                  <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow cursor-default group">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[11px] font-bold text-slate-500">
-                        {new Date(reg.fecha + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </p>
-                      {reg.dolor_ena !== null && (
-                        <span className="bg-white border border-slate-200 text-[10px] font-black text-slate-700 px-1.5 py-0.5 rounded">
-                          ENA {reg.dolor_ena}
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-800">{nota.fecha}</span>
+                        <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                          (nota.nivel_dolor_ena || 0) <= 3 
+                            ? 'bg-emerald-100 text-emerald-800' 
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          ENA {nota.nivel_dolor_ena ?? 0}/10
                         </span>
+                      </div>
+
+                      {/* Resumen o Despliegue Completo */}
+                      {expandida ? (
+                        <div className="space-y-2 pt-2 border-t border-slate-200 text-slate-700">
+                          {nota.s_subjetivo && <p><strong>S:</strong> {nota.s_subjetivo}</p>}
+                          {nota.o_objetivo && <p><strong>O:</strong> {nota.o_objetivo}</p>}
+                          {nota.a_analisis && <p><strong>A:</strong> {nota.a_analisis}</p>}
+                          {nota.p_plan && <p><strong>P:</strong> {nota.p_plan}</p>}
+                          <button
+                            type="button"
+                            onClick={() => setNotaExpandidaId(null)}
+                            className="text-blue-600 hover:underline font-semibold text-[11px] block mt-1"
+                          >
+                            Contraer ▲
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-slate-600 line-clamp-2">
+                            {nota.s_subjetivo || nota.o_objetivo || 'Evolución registrada.'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setNotaExpandidaId(nota.id)}
+                            className="text-blue-600 hover:underline font-semibold text-[11px] block mt-1 cursor-pointer"
+                          >
+                            Leer más ▼
+                          </button>
+                        </div>
                       )}
                     </div>
-                    
-                    <div className="text-xs text-slate-700 leading-relaxed max-h-24 overflow-hidden relative group-hover:max-h-[500px] transition-all duration-300 whitespace-pre-wrap">
-                      {reg.nota_clinica}
-                      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-50 to-transparent group-hover:opacity-0 transition-opacity"></div>
-                    </div>
-                    
-                    <button className="text-[10px] font-bold text-blue-600 mt-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      Leer más <ChevronRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </aside>
 
-        </aside>
+        </div>
 
       </div>
     </div>
