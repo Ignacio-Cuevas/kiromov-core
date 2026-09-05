@@ -23,6 +23,7 @@ export default function ClinicalBoxSuite({
   const [paciente, setPaciente] = useState<any>(null);
   const [planActivo, setPlanActivo] = useState<any>(null);
   const [historialSOAP, setHistorialSOAP] = useState<any[]>([]);
+  const [proximaCita, setProximaCita] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -69,6 +70,20 @@ export default function ClinicalBoxSuite({
         .eq('paciente_id', pacienteId)
         .order('fecha', { ascending: false });
       if (soaps) setHistorialSOAP(soaps);
+
+      // Próxima Cita
+      const hoyStr = new Date().toISOString().split('T')[0];
+      const { data: proxima } = await supabase
+        .from('citas_atenciones')
+        .select('fecha, hora, motivo_consulta, estado')
+        .eq('paciente_id', pacienteId)
+        .gte('fecha', hoyStr)
+        .neq('estado', 'cancelada')
+        .order('fecha', { ascending: true })
+        .order('hora', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (proxima) setProximaCita(proxima);
 
     } catch (err) {
       console.error('Error cargando datos en suite:', err);
@@ -201,6 +216,27 @@ export default function ClinicalBoxSuite({
           <aside className="md:col-span-3 h-full overflow-y-auto bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-5">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Contexto del Paciente</h3>
 
+            {/* Próxima Cita */}
+            <div className="bg-blue-50/80 border border-blue-200 p-3 rounded-xl space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-800 flex items-center gap-1">
+                📅 Próxima Sesión Programada
+              </span>
+              {proximaCita ? (
+                <div>
+                  <p className="text-xs font-bold text-slate-900">
+                    {proximaCita.fecha.split('-').reverse().join('/')} a las {proximaCita.hora?.slice(0, 5)} hrs
+                  </p>
+                  <p className="text-[11px] text-blue-700 font-medium">
+                    Estado: <span className="capitalize">{proximaCita.estado}</span>
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-amber-800 font-medium flex items-center gap-1">
+                  ⚠️ Sin próxima cita agendada
+                </p>
+              )}
+            </div>
+
             {/* Teléfono y WhatsApp */}
             <div className="space-y-1">
               <span className="text-[11px] font-semibold text-slate-500 uppercase">Teléfono / Contacto</span>
@@ -246,6 +282,19 @@ export default function ClinicalBoxSuite({
                 "{paciente?.motivo_consulta || 'Evaluación Kinésica Inicial'}"
               </p>
             </div>
+
+            {/* Estimación de Alta */}
+            <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                🎯 Estimación de Alta Funcional
+              </span>
+              <p className="text-xs font-bold text-slate-800">
+                {historialSOAP[0]?.pronostico_sesiones || '4 a 6 sesiones estimadas'}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {planActivo ? `${Math.max(0, (planActivo.sesiones_totales || 0) - (planActivo.sesiones_usadas || 0))} sesiones disponibles en plan actual` : 'Sin plan activo'}
+              </p>
+            </div>
           </aside>
 
           {/* ------------------------------------------------------------------ */}
@@ -265,26 +314,64 @@ export default function ClinicalBoxSuite({
                 </span>
               </div>
 
-              {/* Curva / Estado de Dolor ENA */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Curva de Dolor ENA (Histórica)
-                </span>
-                {historialSOAP.length > 1 ? (
-                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-800">
-                    <span>S1: {historialSOAP[historialSOAP.length - 1].nivel_dolor_ena}/10</span>
-                    <span className="text-slate-400">➔</span>
-                    <span>S{historialSOAP.length}: {historialSOAP[0].nivel_dolor_ena}/10</span>
-                    <span className="ml-auto text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                      📉 Progreso en evolución
+              {/* Componente Visual de Gráfica ENA */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Evolución del Dolor (Escala ENA 0 - 10)
+                  </span>
+                  {historialSOAP.length > 1 && (
+                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      {Math.round(((historialSOAP[historialSOAP.length - 1].nivel_dolor_ena - historialSOAP[0].nivel_dolor_ena) / Math.max(1, historialSOAP[historialSOAP.length - 1].nivel_dolor_ena)) * 100)}% de mejoría
                     </span>
-                  </div>
-                ) : historialSOAP.length === 1 ? (
-                  <p className="text-xs text-slate-600">
-                    Línea de base inicial: <span className="font-bold text-slate-900">ENA {historialSOAP[0].nivel_dolor_ena}/10</span> (Registrada el {historialSOAP[0].fecha}).
+                  )}
+                </div>
+
+                {/* Gráfico de Barras y Puntos */}
+                {historialSOAP.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic py-3 text-center">
+                    Primera sesión. El gráfico comenzará a trazarse al guardar la primera nota de hoy.
                   </p>
                 ) : (
-                  <p className="text-xs text-slate-400 italic">Primera sesión (Se fijará la línea de base hoy).</p>
+                  <div className="space-y-2 pt-2">
+                    <div className="h-28 flex items-end justify-between gap-2 px-2 border-b border-slate-200 pb-1">
+                      {[...historialSOAP].reverse().map((nota, idx) => {
+                        const ena = Number(nota.nivel_dolor_ena) || 0;
+                        const alturaPct = Math.max(10, (ena / 10) * 100);
+                        const colorBarra = ena <= 3 ? 'bg-emerald-500' : ena <= 6 ? 'bg-amber-500' : 'bg-rose-500';
+
+                        return (
+                          <div key={nota.id || idx} className="flex-1 flex flex-col items-center gap-1 group relative">
+                            {/* Valor ENA arriba del punto */}
+                            <span className="text-[10px] font-bold text-slate-700 font-mono">
+                              {ena}
+                            </span>
+                            {/* Barra visual con punto superior */}
+                            <div className="w-full max-w-[28px] bg-slate-200 rounded-t-lg overflow-hidden flex items-end h-20">
+                              <div 
+                                className={`w-full ${colorBarra} rounded-t-lg transition-all duration-500`}
+                                style={{ height: `${alturaPct}%` }}
+                              />
+                            </div>
+                            {/* Etiqueta de la Sesión */}
+                            <span className="text-[10px] text-slate-500 font-medium truncate max-w-[40px]">
+                              S{idx + 1}
+                            </span>
+                            {/* Tooltip con fecha al pasar el mouse */}
+                            <div className="absolute -top-7 hidden group-hover:block bg-slate-900 text-white text-[9px] px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap z-10">
+                              {nota.fecha} • ENA {ena}/10
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex justify-between text-[10px] text-slate-400 font-medium px-1">
+                      <span>0: Sin dolor</span>
+                      <span>5: Dolor moderado</span>
+                      <span>10: Máximo dolor</span>
+                    </div>
+                  </div>
                 )}
               </div>
 
