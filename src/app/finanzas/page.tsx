@@ -135,13 +135,23 @@ function FinanzasContent() {
     }
   };
 
+  const getRangoFechasStrings = (tipo: string) => {
+    const { inicio, fin } = getRangoFechas(tipo);
+    const formatDateStr = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    return { inicioStr: formatDateStr(inicio), finStr: formatDateStr(fin) };
+  };
+
   // Filtrado dinámico por fecha
   const asistenciasFiltradas = useMemo(() => {
-    const { inicio, fin } = getRangoFechas(periodo);
+    const { inicioStr, finStr } = getRangoFechasStrings(periodo);
     return citas.filter((a) => {
-      if (!a.created_at) return false;
-      const f = new Date(a.created_at);
-      return f >= inicio && f <= fin;
+      if (!a.fecha) return false;
+      return a.fecha >= inicioStr && a.fecha <= finStr;
     });
   }, [citas, periodo]);
 

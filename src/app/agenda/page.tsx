@@ -542,39 +542,55 @@ function AgendaContent() {
         }
 
         return (
-            <div key={cita.id} className={`p-2 rounded-xl border mb-2 text-left shadow-sm flex flex-col hover:shadow-md transition-all group ${semaforoClass}`}>
-                <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-[11px] text-slate-900 bg-white/60 px-1.5 py-0.5 rounded-md shadow-sm">{cita.hora?.substring(0,5)}</span>
+            <div key={cita.id} className={`rounded-xl border p-3 space-y-2 transition-all hover:shadow-sm mb-2 ${semaforoClass}`}>
+                {/* Nivel 1: Hora y Selector de Estado */}
+                <div className="flex items-center justify-between border-b border-slate-200/50 pb-1.5">
+                    <span className="font-bold text-xs font-mono text-slate-900">{cita.hora?.slice(0, 5)}</span>
                     <select
                       value={['asistió', 'atendido'].includes(s) ? 'asistio' : s}
                       onChange={(e) => handleCambiarEstadoCita(cita, e.target.value)}
-                      className="text-[9px] font-bold rounded px-1 py-0.5 bg-white/80 border-none shadow-sm focus:outline-none cursor-pointer text-slate-700"
+                      className="text-[10px] font-bold rounded-lg px-2 py-0.5 border bg-white/90 shadow-xs cursor-pointer focus:outline-none"
                     >
-                      <option value="pendiente">⏳ Pend</option>
-                      <option value="confirmada">✓ Conf</option>
-                      <option value="asistio">✓ Asist</option>
-                      <option value="no_asistio">⚠️ No</option>
-                      <option value="cancelada">✕ Canc</option>
+                      <option value="pendiente">⏳ Pendiente</option>
+                      <option value="confirmada">✓ Confirmada</option>
+                      <option value="asistio">✓ Asistió</option>
+                      <option value="no_asistio">⚠️ No Asistió</option>
+                      <option value="cancelada">✕ Cancelada</option>
                     </select>
                 </div>
-                <div className="flex items-center gap-1 mb-0.5">
-                    {badgePrevision && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-200/80 text-slate-700">{badgePrevision}</span>}
-                    <div className="font-bold text-xs leading-tight">{p.nombre_completo.split(' ')[0]} {p.nombre_completo.split(' ')[1] || ''}</div>
+
+                {/* Nivel 2: Nombre Completo y Saldo de Sesiones */}
+                <div>
+                    <p className="font-bold text-slate-900 text-xs truncate" title={p.nombre_completo}>
+                      {p.nombre_completo}
+                    </p>
+                    <div className="flex items-center justify-between mt-1 text-[10px]">
+                      <span className="font-semibold text-slate-500 bg-white/80 px-1.5 py-0.5 rounded border border-slate-200/50">
+                        {p.prevision || 'Particular'}
+                      </span>
+                      <span className="font-bold text-slate-700">
+                        {tienePlanCompact ? `${p.sesiones_usadas}/${p.sesiones_totales} ses.` : 'Sin plan'}
+                      </span>
+                    </div>
                 </div>
-                
-                {tienePlanCompact && (
-                  <div className="text-[10px] font-medium text-slate-600 mb-1">
-                    {p.sesiones_usadas}/{p.sesiones_totales} ses.
-                  </div>
-                )}
-                
-                <div className="flex flex-wrap gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {cleanPhone && <a href={generarMensajeConfirmacion(cita)} target="_blank" rel="noreferrer" className="flex-1 bg-white/80 hover:bg-white text-slate-700 text-[10px] font-bold py-1 rounded text-center shadow-sm">💬</a>}
-                    {s === 'pendiente' && <button onClick={() => handleMarcarConfirmada(cita.id)} className="flex-1 bg-white/80 hover:bg-white text-indigo-700 text-[10px] font-bold py-1 rounded shadow-sm" title="Confirmar">✓</button>}
-                    {!['asistio', 'asistió', 'atendido', 'no_asistio', 'cancelada'].includes(s) && (
-                        <button onClick={() => handleRegistrarAsistencia(cita)} className="flex-1 bg-white/80 hover:bg-white text-emerald-700 text-[10px] font-bold py-1 rounded shadow-sm">✓ Asistió</button>
-                    )}
-                    <button onClick={() => { setSelectedPatientForDrawer(p); setSelectedCitaForSuite(cita); setIsDrawerOpen(true); }} className="flex-1 bg-white/80 hover:bg-white text-blue-700 text-[10px] font-bold py-1 rounded shadow-sm">Ficha →</button>
+
+                {/* Nivel 3: Botones Rápidos */}
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200/40">
+                    <a
+                      href={cleanPhone ? generarMensajeConfirmacion(cita) : '#'}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] text-slate-600 hover:text-emerald-700 font-medium"
+                      title="WhatsApp"
+                    >
+                      💬 WhatsApp
+                    </a>
+                    <button
+                      onClick={() => { setSelectedPatientForDrawer(p); setSelectedCitaForSuite(cita); setIsDrawerOpen(true); }}
+                      className="text-[11px] text-blue-700 font-semibold hover:underline"
+                    >
+                      Ficha →
+                    </button>
                 </div>
             </div>
         );
@@ -838,7 +854,7 @@ function AgendaContent() {
 
     return (
         <div className="overflow-x-auto min-h-[400px] bg-slate-50/50">
-            <div className="flex divide-x divide-slate-200 border-b border-slate-200/80 min-w-[850px]">
+            <div className="flex divide-x divide-slate-200 border-b border-slate-200/80 min-w-[900px]">
                 {dias.map((dia, idx) => {
                     const isToday = getFormattedLocalDate(dia) === getFormattedLocalDate(new Date());
                     const diaStr = getFormattedLocalDate(dia);
@@ -856,9 +872,9 @@ function AgendaContent() {
                                         setNewCita(prev => ({ ...prev, fecha: diaStr }));
                                         setShowNewCitaModal(true);
                                       }}
-                                      className="w-full text-center text-xs text-slate-400 py-4 font-semibold border-2 border-dashed border-slate-200 rounded-xl hover:bg-white hover:text-blue-600 hover:border-blue-300 transition-colors cursor-pointer"
+                                      className="w-full py-6 rounded-xl border-2 border-dashed border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/40 text-xs font-medium flex items-center justify-center gap-1 transition-all cursor-pointer"
                                     >
-                                      + Agendar Cita
+                                      + Agendar
                                     </button>
                                 ) : citasDia.map(c => renderCardCita(c, true))}
                             </div>
@@ -897,7 +913,7 @@ function AgendaContent() {
                     </div>
                 ))}
                 {daysArray.map((dia, idx) => {
-                    if (!dia) return <div key={idx} className="border-b border-r border-slate-200/80 bg-slate-50/50 min-h-[100px]"></div>;
+                    if (!dia) return <div key={idx} className="border-b border-r border-slate-200/80 bg-slate-50/50 h-[115px]"></div>;
                     
                     const diaStr = getFormattedLocalDate(dia);
                     const isToday = diaStr === getFormattedLocalDate(new Date());
@@ -912,12 +928,12 @@ function AgendaContent() {
                                 setFechaBase(dia);
                                 setVista('dia');
                             }}
-                            className={`p-1 border-b border-r border-slate-200/80 min-h-[110px] cursor-pointer hover:bg-slate-50/50 transition-colors ${isToday ? 'bg-blue-50/20' : ''}`}
+                            className={`p-1 border-b border-r border-slate-200/80 h-[115px] overflow-hidden relative cursor-pointer hover:bg-slate-50/50 transition-colors ${isToday ? 'bg-blue-50/20' : ''}`}
                         >
                             <div className="text-right p-1 mb-1">
                                 <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'text-slate-600'}`}>{dia.getDate()}</span>
                             </div>
-                            <div className="space-y-1 relative">
+                            <div className="space-y-1">
                                 {citasToShow.map(c => {
                                     const s = c.estado?.toLowerCase() || 'pendiente';
                                     let bg = 'bg-slate-100 text-slate-700 border border-slate-200';

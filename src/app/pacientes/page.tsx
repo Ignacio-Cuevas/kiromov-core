@@ -352,18 +352,17 @@ export default function PacientesPage() {
                           )}
                         </td>
 
-                        {/* Acciones Rápidas */}
                         <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1.5">
+                          <div className="flex items-center justify-end gap-2">
                             <Link
                               href={`/agenda?pacienteId=${p.id}`}
-                              className="px-2.5 py-1 rounded-lg border border-slate-200/80 bg-white hover:bg-slate-50/50 text-slate-700 text-[11px] font-semibold transition-colors"
+                              className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl shadow-xs transition-all active:scale-[0.98]"
                             >
                               Agendar
                             </Link>
                             <Link
                               href={`/agenda?pacienteId=${p.id}&ficha=true`}
-                              className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold transition-colors"
+                              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-xl transition-all active:scale-[0.98]"
                             >
                               Ficha →
                             </Link>
