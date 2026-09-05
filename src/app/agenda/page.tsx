@@ -212,7 +212,17 @@ function AgendaContent() {
     } else if (vista === 'semana') {
       const inicio = getMonday(fechaBase);
       const fin = new Date(inicio); fin.setDate(fin.getDate() + 5);
-      return `Semana del ${inicio.getDate()} al ${fin.getDate()} de ${inicio.toLocaleDateString('es-CL', {month: 'long', year: 'numeric'})}`;
+      const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      const diaIni = inicio.getDate();
+      const mesIni = meses[inicio.getMonth()];
+      const diaFin = fin.getDate();
+      const mesFin = meses[fin.getMonth()];
+      const ano = fin.getFullYear();
+
+      if (mesIni === mesFin) {
+        return `Semana del ${diaIni} al ${diaFin} de ${mesFin} de ${ano}`;
+      }
+      return `Semana del ${diaIni} de ${mesIni} al ${diaFin} de ${mesFin} de ${ano}`;
     } else {
       return fechaBase.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
     }
@@ -288,6 +298,20 @@ function AgendaContent() {
     
     setSavingCita(true);
     try {
+      // 1. Verificación previa al agendar
+      const { data: citaOcupada } = await supabase
+        .from('citas_atenciones')
+        .select('id, hora, pacientes(nombre_completo)')
+        .eq('fecha', newCita.fecha)
+        .eq('hora', newCita.hora)
+        .neq('estado', 'cancelada')
+        .maybeSingle();
+
+      if (citaOcupada) {
+        const nombre = Array.isArray(citaOcupada.pacientes) ? citaOcupada.pacientes[0]?.nombre_completo : (citaOcupada.pacientes as any)?.nombre_completo;
+        toast.error(`⚠️ El horario de las ${newCita.hora.slice(0, 5)} ya está reservado para ${nombre}. Elige otro bloque.`);
+        return;
+      }
       const payload = {
          paciente_id: newCita.pacienteId,
          fecha: newCita.fecha, 
@@ -454,16 +478,33 @@ function AgendaContent() {
 
     if (compact) {
         const semaforoClass = getEstiloSemaforoSemanal(s);
+        const tienePlanCompact = p.estado_plan !== 'sin_plan' && (p.sesiones_totales || 0) > 0;
+        
+        let badgePrevision = '';
+        if (p.prevision) {
+          if (p.prevision.toLowerCase().includes('convenio')) badgePrevision = '[Conv]';
+          else if (p.prevision.toLowerCase().includes('isapre')) badgePrevision = '[Isapre]';
+          else if (p.prevision.toLowerCase().includes('fonasa')) badgePrevision = '[Fonasa]';
+          else badgePrevision = '[Part]';
+        }
+
         return (
             <div key={cita.id} className={`p-2 rounded-xl border mb-2 text-left shadow-sm flex flex-col hover:shadow-md transition-all group ${semaforoClass}`}>
                 <div className="flex items-center justify-between mb-1">
                     <span className="font-bold text-[11px] text-slate-900 bg-white/60 px-1.5 py-0.5 rounded-md shadow-sm">{cita.hora?.substring(0,5)}</span>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/80`}>{stateLabel}</span>
+                    {badgePrevision && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-200/80 text-slate-700">{badgePrevision}</span>}
                 </div>
                 <div className="font-bold text-xs leading-tight mb-0.5">{p.nombre_completo.split(' ')[0]} {p.nombre_completo.split(' ')[1] || ''}</div>
+                
+                {tienePlanCompact && (
+                  <div className="text-[10px] font-medium text-slate-600 mb-1">
+                    {p.sesiones_usadas}/{p.sesiones_totales} ses.
+                  </div>
+                )}
+                
                 <div className="flex flex-wrap gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     {cleanPhone && <a href={generarMensajeConfirmacion(cita)} target="_blank" rel="noreferrer" className="flex-1 bg-white/80 hover:bg-white text-slate-700 text-[10px] font-bold py-1 rounded text-center shadow-sm">💬</a>}
-                    {s === 'pendiente' && <button onClick={() => handleMarcarConfirmada(cita.id)} className="flex-1 bg-white/80 hover:bg-white text-indigo-700 text-[10px] font-bold py-1 rounded shadow-sm">✓ Conf.</button>}
+                    {s === 'pendiente' && <button onClick={() => handleMarcarConfirmada(cita.id)} className="flex-1 bg-white/80 hover:bg-white text-indigo-700 text-[10px] font-bold py-1 rounded shadow-sm" title="Confirmar">✓</button>}
                     {!['asistio', 'asistió', 'atendido', 'no_asistio', 'cancelada'].includes(s) && (
                         <button onClick={() => handleRegistrarAsistencia(cita)} className="flex-1 bg-white/80 hover:bg-white text-emerald-700 text-[10px] font-bold py-1 rounded shadow-sm">✓ Asistió</button>
                     )}
@@ -715,7 +756,7 @@ function AgendaContent() {
 
     return (
         <div className="overflow-x-auto min-h-[400px] bg-slate-50/50">
-            <div className="flex divide-x divide-slate-200 border-b border-slate-200/80 min-w-[900px]">
+            <div className="flex divide-x divide-slate-200 border-b border-slate-200/80 min-w-[850px]">
                 {dias.map((dia, idx) => {
                     const isToday = getFormattedLocalDate(dia) === getFormattedLocalDate(new Date());
                     const diaStr = getFormattedLocalDate(dia);
@@ -724,11 +765,19 @@ function AgendaContent() {
                         <div key={idx} className={`flex-1 min-w-[220px] ${isToday ? 'bg-blue-50/30' : ''}`}>
                             <div className={`p-3 text-center border-b border-slate-200/80 sticky top-0 bg-white shadow-sm z-10 ${isToday ? 'text-blue-700 bg-blue-50' : 'text-slate-700'}`}>
                                 <p className="text-[10px] font-bold uppercase tracking-widest">{dia.toLocaleDateString('es-CL', { weekday: 'short' })}</p>
-                                <p className="text-xl font-black">{dia.getDate()}</p>
+                                <p className={`text-xl font-black inline-flex items-center justify-center w-8 h-8 rounded-full ${isToday ? 'bg-blue-600 text-white' : ''}`}>{dia.getDate()}</p>
                             </div>
                             <div className="p-3">
                                 {citasDia.length === 0 ? (
-                                    <div className="text-center text-xs text-slate-400 py-4 italic">Sin citas</div>
+                                    <button 
+                                      onClick={() => {
+                                        setNewCita(prev => ({ ...prev, fecha: diaStr }));
+                                        setShowNewCitaModal(true);
+                                      }}
+                                      className="w-full text-center text-xs text-slate-400 py-4 font-semibold border-2 border-dashed border-slate-200 rounded-xl hover:bg-white hover:text-blue-600 hover:border-blue-300 transition-colors cursor-pointer"
+                                    >
+                                      + Agendar Cita
+                                    </button>
                                 ) : citasDia.map(c => renderCardCita(c, true))}
                             </div>
                         </div>
@@ -781,28 +830,38 @@ function AgendaContent() {
                                 setFechaBase(dia);
                                 setVista('dia');
                             }}
-                            className={`p-1 border-b border-r border-slate-200/80 min-h-[100px] cursor-pointer hover:bg-slate-50/50 transition-colors ${isToday ? 'bg-blue-50/20' : ''}`}
+                            className={`p-1 border-b border-r border-slate-200/80 min-h-[110px] cursor-pointer hover:bg-slate-50/50 transition-colors ${isToday ? 'bg-blue-50/20' : ''}`}
                         >
                             <div className="text-right p-1 mb-1">
                                 <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'text-slate-600'}`}>{dia.getDate()}</span>
                             </div>
-                            <div className="space-y-1">
+                            <div className="space-y-1 relative">
                                 {citasToShow.map(c => {
                                     const s = c.estado?.toLowerCase() || 'pendiente';
-                                    let bg = 'bg-slate-100 text-slate-600';
-                                    if (s === 'en_sala') bg = 'bg-amber-100 text-amber-700';
-                                    else if (['asistio', 'asistió', 'atendido'].includes(s)) bg = 'bg-emerald-100 text-emerald-700';
-                                    else if (s === 'confirmada') bg = 'bg-indigo-100 text-indigo-700';
-                                    else if (s === 'cancelada') bg = 'bg-red-100 text-red-700 line-through';
+                                    let bg = 'bg-slate-100 text-slate-700 border border-slate-200';
+                                    if (s === 'confirmada') bg = 'bg-emerald-100 text-emerald-900 border border-emerald-300 font-semibold';
+                                    else if (s === 'pendiente') bg = 'bg-amber-100 text-amber-900 border border-amber-300 font-semibold';
+                                    else if (['cancelada', 'no_asistio'].includes(s)) bg = 'bg-rose-100 text-rose-800 line-through opacity-75 border-transparent';
                                     
+                                    const primerNombre = c.pacientes?.nombre_completo.split(' ')[0] || '';
+                                    const tienePlan = c.pacientes?.estado_plan !== 'sin_plan' && (c.pacientes?.sesiones_totales || 0) > 0;
+                                    const planStr = tienePlan ? `${c.pacientes.nombre_plan} (${c.pacientes.sesiones_usadas}/${c.pacientes.sesiones_totales} ses)` : 'Sin plan';
+
                                     return (
-                                        <div key={c.id} className={`px-1.5 py-0.5 rounded text-[9px] font-semibold truncate ${bg}`} title={c.pacientes?.nombre_completo}>
-                                            {c.hora?.slice(0,5)} {c.pacientes?.nombre_completo.split(' ')[0]}
+                                        <div key={c.id} className={`px-1.5 py-0.5 rounded-full text-[9px] truncate relative group ${bg}`}>
+                                            {c.hora?.slice(0,5)} • {primerNombre}
+                                            
+                                            {/* Hover Tooltip */}
+                                            <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-48 bg-slate-900 text-white p-2 rounded-lg shadow-xl z-[60] text-xs whitespace-normal pointer-events-none">
+                                                <p className="font-bold">{c.pacientes?.nombre_completo}</p>
+                                                <p className="text-slate-300 text-[10px] mt-0.5">{c.pacientes?.prevision || 'Particular'} • {c.pacientes?.telefono}</p>
+                                                <p className="text-blue-300 text-[10px] mt-1">{planStr}</p>
+                                            </div>
                                         </div>
                                     );
                                 })}
                                 {hasMore && (
-                                    <div className="text-[10px] text-center font-bold text-slate-400 mt-1">+{citasDia.length - 3} más</div>
+                                    <div className="text-[10px] text-center font-bold text-slate-400 mt-1 hover:text-slate-600 transition-colors">+{citasDia.length - 3} citas más</div>
                                 )}
                             </div>
                         </div>
@@ -969,7 +1028,10 @@ function AgendaContent() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Fecha</label><Input type="date" value={newCita.fecha} onChange={e => setNewCita({...newCita, fecha: e.target.value})} className="bg-slate-50/50" /></div>
-            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Hora</label><select value={newCita.hora} onChange={e => setNewCita({...newCita, hora: e.target.value})} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10">{timeBlocks.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Hora</label><select value={newCita.hora} onChange={e => setNewCita({...newCita, hora: e.target.value})} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10">{timeBlocks.map(t => {
+              const isOccupied = citas.some(c => c.fecha === newCita.fecha && c.hora?.startsWith(t) && c.estado !== 'cancelada');
+              return <option key={t} value={t} disabled={isOccupied}>{t} {isOccupied ? '(Ocupado)' : ''}</option>;
+            })}</select></div>
           </div>
           <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Motivo de Consulta</label><Input value={newCita.motivo} onChange={e => setNewCita({...newCita, motivo: e.target.value})} className="bg-slate-50/50" /></div>
         </DialogBody>
