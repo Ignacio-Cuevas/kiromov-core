@@ -292,6 +292,59 @@ function AgendaContent() {
     }
   };
 
+  const handleCambiarEstadoCita = async (cita: any, nuevoEstado: string) => {
+    if (!supabase) return;
+    const estadoAnterior = cita.estado;
+    if (estadoAnterior === nuevoEstado) return;
+
+    try {
+      // 1. Actualizar estado de la cita en Supabase
+      const { error: errCita } = await supabase
+        .from('citas_atenciones')
+        .update({ estado: nuevoEstado })
+        .eq('id', cita.id);
+
+      if (errCita) throw errCita;
+
+      const resumen = cita.pacientes;
+      // 2. Lógica inteligente de ajuste de saldo en compras_planes:
+      // A. Si se REVIERTE de 'asistio' o 'no_asistio' a 'pendiente' o 'cancelada' -> DEVOLVER 1 sesión
+      const restabaSesionAnterior = ['asistio', 'no_asistio'].includes(estadoAnterior);
+      const restaSesionNuevo = ['asistio', 'no_asistio'].includes(nuevoEstado);
+
+      if (restabaSesionAnterior && !restaSesionNuevo && resumen?.plan_id) {
+        const nuevasUsadas = Math.max(0, (resumen.sesiones_usadas || 1) - 1);
+        await supabase
+          .from('compras_planes')
+          .update({ sesiones_usadas: nuevasUsadas, estado: 'activo' })
+          .eq('id', resumen.plan_id);
+
+        toast.success(`Cita cambiada a ${nuevoEstado}. 1 sesión devuelta al plan del paciente.`);
+      } 
+      // B. Si pasa a 'asistio' o 'no_asistio' desde un estado que no descontaba -> DESCONTAR 1 sesión
+      else if (!restabaSesionAnterior && restaSesionNuevo && resumen?.plan_id) {
+        const nuevasUsadas = (resumen.sesiones_usadas || 0) + 1;
+        await supabase
+          .from('compras_planes')
+          .update({ sesiones_usadas: nuevasUsadas })
+          .eq('id', resumen.plan_id);
+
+        toast.success(`Cita marcada como ${nuevoEstado}. 1 sesión descontada del plan.`);
+      } else {
+        toast.success(`Estado de la cita actualizado a ${nuevoEstado}`);
+      }
+
+      // 3. Actualizar estado local reactivo inmediatamente
+      setCitas(prev =>
+        prev.map(c => (c.id === cita.id ? { ...c, estado: nuevoEstado } : c))
+      );
+      loadAgenda(); // Refrescar en segundo plano
+    } catch (err: any) {
+      console.error('Error al cambiar estado:', err);
+      toast.error(`Error: ${err.message}`);
+    }
+  };
+
   const handleCreateCita = async () => {
     if (!supabase) return;
     if (!newCita.pacienteId || !newCita.fecha || !newCita.hora) { toast.error('Completa los campos obligatorios'); return; }
@@ -492,9 +545,22 @@ function AgendaContent() {
             <div key={cita.id} className={`p-2 rounded-xl border mb-2 text-left shadow-sm flex flex-col hover:shadow-md transition-all group ${semaforoClass}`}>
                 <div className="flex items-center justify-between mb-1">
                     <span className="font-bold text-[11px] text-slate-900 bg-white/60 px-1.5 py-0.5 rounded-md shadow-sm">{cita.hora?.substring(0,5)}</span>
-                    {badgePrevision && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-200/80 text-slate-700">{badgePrevision}</span>}
+                    <select
+                      value={['asistió', 'atendido'].includes(s) ? 'asistio' : s}
+                      onChange={(e) => handleCambiarEstadoCita(cita, e.target.value)}
+                      className="text-[9px] font-bold rounded px-1 py-0.5 bg-white/80 border-none shadow-sm focus:outline-none cursor-pointer text-slate-700"
+                    >
+                      <option value="pendiente">⏳ Pend</option>
+                      <option value="confirmada">✓ Conf</option>
+                      <option value="asistio">✓ Asist</option>
+                      <option value="no_asistio">⚠️ No</option>
+                      <option value="cancelada">✕ Canc</option>
+                    </select>
                 </div>
-                <div className="font-bold text-xs leading-tight mb-0.5">{p.nombre_completo.split(' ')[0]} {p.nombre_completo.split(' ')[1] || ''}</div>
+                <div className="flex items-center gap-1 mb-0.5">
+                    {badgePrevision && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-200/80 text-slate-700">{badgePrevision}</span>}
+                    <div className="font-bold text-xs leading-tight">{p.nombre_completo.split(' ')[0]} {p.nombre_completo.split(' ')[1] || ''}</div>
+                </div>
                 
                 {tienePlanCompact && (
                   <div className="text-[10px] font-medium text-slate-600 mb-1">
@@ -544,11 +610,27 @@ function AgendaContent() {
                     {p.prevision}
                   </span>
                 )}
-                {s === 'confirmada' && <span className="text-[11px] font-bold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-100">✓ Confirmada</span>}
-                {s === 'pendiente' && <span className="text-[11px] font-bold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full border border-slate-200">⏳ Pendiente</span>}
-                {['asistio', 'asistió', 'atendido'].includes(s) && <span className="text-[11px] font-bold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-100">✓ Asistió</span>}
-                {s === 'no_asistio' && <span className="text-[11px] font-bold bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full border border-amber-100">⚠️ No Asistió</span>}
-                {s === 'cancelada' && <span className="text-[11px] font-bold bg-red-50 text-red-700 px-2.5 py-0.5 rounded-full border border-red-100 line-through">Cancelada</span>}
+                <select
+                  value={['asistió', 'atendido'].includes(s) ? 'asistio' : s}
+                  onChange={(e) => handleCambiarEstadoCita(cita, e.target.value)}
+                  className={`text-[11px] font-bold rounded-xl px-2 py-0.5 border shadow-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ml-1 ${
+                    s === 'confirmada'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                      : s === 'pendiente'
+                      ? 'bg-amber-50 text-amber-800 border-amber-300'
+                      : ['asistio', 'asistió', 'atendido'].includes(s)
+                      ? 'bg-slate-100 text-slate-700 border-slate-300'
+                      : s === 'no_asistio'
+                      ? 'bg-rose-50 text-rose-800 border-rose-300'
+                      : 'bg-slate-50 text-slate-500 border-slate-200'
+                  }`}
+                >
+                  <option value="pendiente">⏳ Pendiente</option>
+                  <option value="confirmada">✓ Confirmada</option>
+                  <option value="asistio">✓ Asistió</option>
+                  <option value="no_asistio">⚠️ No Asistió</option>
+                  <option value="cancelada">✕ Cancelada</option>
+                </select>
               </div>
               <p className="text-xs text-slate-500 font-mono mt-1">
                 {formatRut(p.rut) || 'Sin RUT'} • <span className="font-sans italic">{cita.motivo_consulta || 'Sesión Kinésica'}</span>
