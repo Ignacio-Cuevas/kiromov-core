@@ -3,10 +3,12 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import SaleModal from "@/components/sales/SaleModal";
 import { SettlePaymentModal } from "@/components/sales/SettlePaymentModal";
+import { PostSessionModal } from "@/components/sales/PostSessionModal";
+import { AssignTreatmentModal } from "@/components/sales/AssignTreatmentModal";
+import { ClinicalBoxSuite } from "@/components/clinical/ClinicalBoxSuite";
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { PatientDrawer } from '@/components/patients/PatientDrawer';
 import { markAppointmentAttended, markAppointmentNoShow } from '@/actions/appointments';
 import { requiereReevaluacion } from '@/lib/clinical';
 import { formatRut, formatCLP } from '@/lib/utils';
@@ -52,6 +54,8 @@ function AgendaContent() {
 
   const [citas, setCitas] = useState<any[]>([]);
   const [showNoSessionsAlert, setShowNoSessionsAlert] = useState<any>(null);
+  const [modalPostAtencion, setModalPostAtencion] = useState<{isOpen: boolean, paciente: any, motivo: string} | null>(null);
+  const [assignTreatmentModal, setAssignTreatmentModal] = useState<{isOpen: boolean, paciente: any} | null>(null);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
   const [settlingPlan, setSettlingPlan] = useState<any>(null);
   const [pacientes, setPacientes] = useState<any[]>([]);
@@ -60,6 +64,7 @@ function AgendaContent() {
   // Drawer
   const [selectedPatientForDrawer, setSelectedPatientForDrawer] = useState<any | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedCitaForSuite, setSelectedCitaForSuite] = useState<any | null>(null);
 
   // Modal Nueva Cita
   const [showNewCitaModal, setShowNewCitaModal] = useState(false);
@@ -226,20 +231,55 @@ function AgendaContent() {
     } catch (err) { toast.error('Ocurrió un error inesperado', { id: toastId }); }
   };
 
-  const handleRegistrarAsistencia = async (citaId: string, pacienteId: string) => {
-    const toastId = toast.loading('Registrando asistencia...');
+  const handleRegistrarAsistencia = async (cita: any) => {
+    if (!supabase) return;
+    if (cita.estado === 'asistio') {
+      toast.info('Esta cita ya está registrada como asistida');
+      return;
+    }
+
     try {
-      const res = await markAppointmentAttended(citaId, pacienteId);
-      if (res.success) {
-        toast.success(res.message, { id: toastId });
-        loadAgenda();
-        if (res.planCompleted) {
-          setShowNoSessionsAlert({ pacienteId, reason: 'completed' });
-        } else if (!res.discountedPlan) {
-          setShowNoSessionsAlert({ pacienteId, reason: 'no_plan' });
-        }
-      } else toast.error(res.error || 'Error', { id: toastId });
-    } catch (err) { toast.error('Ocurrió un error inesperado', { id: toastId }); }
+      // A. Marcar cita como asistio en Supabase
+      const { error: errCita } = await supabase
+        .from('citas_atenciones')
+        .update({ estado: 'asistio' })
+        .eq('id', cita.id);
+
+      if (errCita) throw errCita;
+
+      const resumen = cita.pacientes;
+
+      // B. Descontar 1 sesión en compras_planes si tiene plan activo
+      if (resumen?.plan_id && (resumen?.sesiones_restantes || 0) > 0) {
+        const { error: errPlan } = await supabase
+          .from('compras_planes')
+          .update({ sesiones_usadas: (resumen.sesiones_usadas || 0) + 1 })
+          .eq('id', resumen.plan_id);
+
+        if (errPlan) throw errPlan;
+      }
+
+      // C. Actualizar estado local reactivo en pantalla INMEDIATAMENTE
+      setCitas((prev) =>
+        prev.map((c) => (c.id === cita.id ? { ...c, estado: 'asistio' } : c))
+      );
+
+      toast.success('¡Asistencia confirmada exitosamente!');
+
+      // D. Evaluar si completó su plan o no tiene plan
+      const quedanSesiones = (resumen?.sesiones_restantes || 1) - 1;
+      if (!resumen?.plan_id || quedanSesiones <= 0) {
+        // Abrir modal unificado de Atención-Venta-Cobro
+        setModalPostAtencion({
+          isOpen: true,
+          paciente: cita.pacientes,
+          motivo: quedanSesiones <= 0 ? 'plan_completado' : 'sin_plan'
+        });
+      }
+    } catch (err: any) {
+      console.error('Error al registrar asistencia:', err);
+      toast.error(`Error: ${err.message}`);
+    }
   };
 
   const handleCreateCita = async () => {
@@ -425,9 +465,9 @@ function AgendaContent() {
                     {cleanPhone && <a href={generarMensajeConfirmacion(cita)} target="_blank" rel="noreferrer" className="flex-1 bg-white/80 hover:bg-white text-slate-700 text-[10px] font-bold py-1 rounded text-center shadow-sm">💬</a>}
                     {s === 'pendiente' && <button onClick={() => handleMarcarConfirmada(cita.id)} className="flex-1 bg-white/80 hover:bg-white text-indigo-700 text-[10px] font-bold py-1 rounded shadow-sm">✓ Conf.</button>}
                     {!['asistio', 'asistió', 'atendido', 'no_asistio', 'cancelada'].includes(s) && (
-                        <button onClick={() => handleRegistrarAsistencia(cita.id, p.id)} className="flex-1 bg-white/80 hover:bg-white text-emerald-700 text-[10px] font-bold py-1 rounded shadow-sm">✓ Asistió</button>
+                        <button onClick={() => handleRegistrarAsistencia(cita)} className="flex-1 bg-white/80 hover:bg-white text-emerald-700 text-[10px] font-bold py-1 rounded shadow-sm">✓ Asistió</button>
                     )}
-                    <button onClick={() => { setSelectedPatientForDrawer(p); setIsDrawerOpen(true); }} className="flex-1 bg-white/80 hover:bg-white text-blue-700 text-[10px] font-bold py-1 rounded shadow-sm">Ficha →</button>
+                    <button onClick={() => { setSelectedPatientForDrawer(p); setSelectedCitaForSuite(cita); setIsDrawerOpen(true); }} className="flex-1 bg-white/80 hover:bg-white text-blue-700 text-[10px] font-bold py-1 rounded shadow-sm">Ficha →</button>
                 </div>
             </div>
         );
@@ -527,57 +567,64 @@ function AgendaContent() {
               💰 Financiamiento
             </span>
 
-            {/* CASO A: Paciente con Plan y Pagado */}
-            {p?.plan_id && p?.estado_pago === 'pagado' && (
+            {/* CASO 3: Si el plan está pagado */}
+            {p?.plan_id && p?.estado_pago === 'pagado' && p?.estado_plan !== 'finalizado' && (
               <div>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  ✓ Plan Pagado
+                  ✓ Plan Pagado (Al día)
                 </span>
-                <p className="text-[11px] text-slate-500 mt-1">Al día {p.numero_boleta ? `(Boleta ${p.numero_boleta})` : ''}</p>
+                {p.numero_boleta && <p className="text-[11px] text-slate-500 mt-1">Boleta: {p.numero_boleta}</p>}
               </div>
             )}
 
-            {/* CASO B: Paciente con Plan y Deuda Pendiente */}
-            {p?.plan_id && p?.estado_pago === 'pendiente' && (
+            {/* CASO 2: Si tiene cobro pendiente y el plan NO está finalizado */}
+            {p?.plan_id && p?.estado_pago === 'pendiente' && p?.estado_plan !== 'finalizado' && (
               <div>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                  🔴 Debe Plan ({montoPendiente})
+                  🔴 Debe ({montoPendiente})
                 </span>
                 <button
-                  onClick={() => { setSelectedPatientForDrawer(p); setIsDrawerOpen(true); }}
-                  className="block mt-1 text-[11px] font-semibold text-rose-600 hover:underline"
+                  onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.monto_clp, paciente_id: p.id }); }}
+                  className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold shadow-sm transition-colors"
                 >
-                  Registrar cobro →
+                  💳 Registrar Cobro
                 </button>
               </div>
             )}
 
-            {/* CASO C: Paciente con Plan Finalizado */}
+            {/* CASO 4: Si completó su plan */}
             {p?.estado_plan === 'finalizado' && (
               <div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                  ⚠️ Plan Finalizado
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                  ⚠️ Sesión Finalizada
                 </span>
-                <button
-                  onClick={() => { setIsSaleModalOpen(true); }}
-                  className="block mt-1 text-[11px] font-semibold text-blue-600 hover:underline"
-                >
-                  + Vender nuevo plan
-                </button>
+                
+                {p.estado_pago === 'pendiente' ? (
+                  <button
+                    onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.monto_clp, paciente_id: p.id }); }}
+                    className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold shadow-sm transition-colors"
+                  >
+                    💳 Cobrar ({montoPendiente})
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setAssignTreatmentModal({ isOpen: true, paciente: p }); }}
+                    className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-blue-600 text-blue-700 hover:bg-blue-50 text-[11px] font-bold shadow-sm transition-colors"
+                  >
+                    + Asignar Nuevo Plan
+                  </button>
+                )}
               </div>
             )}
 
-            {/* CASO D: Paciente Nuevo / Sin Plan (Ej: Maiquel Goelzer Rinco) */}
+            {/* CASO 1: Si no tiene plan */}
             {(!p?.plan_id || p?.estado_plan === 'sin_plan') && (
               <div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                  ⚪ Cobro en Box (Sin Plan)
-                </span>
                 <button
-                  onClick={() => { setIsSaleModalOpen(true); }}
-                  className="block mt-1 text-[11px] font-semibold text-blue-600 hover:underline"
+                  onClick={() => { setAssignTreatmentModal({ isOpen: true, paciente: p }); }}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-blue-600 text-blue-700 hover:bg-blue-50 text-[11px] font-bold shadow-sm transition-colors"
                 >
-                  + Asignar plan o cobro
+                  + Asignar Tratamiento / Plan
                 </button>
               </div>
             )}
@@ -624,7 +671,7 @@ function AgendaContent() {
           <div className="flex flex-wrap items-center gap-2">
             {!['asistio', 'asistió', 'atendido', 'no_asistio', 'cancelada'].includes(s) && (
               <>
-                <button onClick={() => handleRegistrarAsistencia(cita.id, p.id)} className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer">
+                <button onClick={() => handleRegistrarAsistencia(cita)} className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer">
                   ✓ Registrar Asistencia
                 </button>
                 <button onClick={() => handleRegistrarInasistencia(cita.id, p.id)} className="px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold active:scale-[0.98] transition-all duration-150 cursor-pointer">
@@ -632,7 +679,7 @@ function AgendaContent() {
                 </button>
               </>
             )}
-            <button onClick={() => { setSelectedPatientForDrawer(p); setIsDrawerOpen(true); }} className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer">
+            <button onClick={() => { setSelectedPatientForDrawer(p); setSelectedCitaForSuite(cita); setIsDrawerOpen(true); }} className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer">
               Ficha & SOAP →
             </button>
           </div>
@@ -869,10 +916,46 @@ function AgendaContent() {
         onClose={() => setIsSaleModalOpen(false)} 
         onSuccess={() => loadAgenda()} 
       />
+
+      <SettlePaymentModal 
+        isOpen={!!settlingPlan} 
+        onClose={() => setSettlingPlan(null)} 
+        planEnUso={settlingPlan}
+        onSuccess={() => { setSettlingPlan(null); loadAgenda(); }}
+      />
+
+      {modalPostAtencion && (
+        <PostSessionModal
+          isOpen={modalPostAtencion.isOpen}
+          paciente={modalPostAtencion.paciente}
+          motivo={modalPostAtencion.motivo}
+          onClose={() => setModalPostAtencion(null)}
+          onSuccess={() => {
+            setModalPostAtencion(null);
+            loadAgenda();
+          }}
+        />
+      )}
+
+      {assignTreatmentModal && (
+        <AssignTreatmentModal
+          isOpen={assignTreatmentModal.isOpen}
+          paciente={assignTreatmentModal.paciente}
+          onClose={() => setAssignTreatmentModal(null)}
+          onSuccess={() => {
+            setAssignTreatmentModal(null);
+            loadAgenda();
+          }}
+        />
+      )}
 </main>
-
-      <PatientDrawer patient={selectedPatientForDrawer} isOpen={isDrawerOpen} onOpenChange={setIsDrawerOpen} onAttendanceRegistered={() => loadAgenda()} />
-
+      <ClinicalBoxSuite 
+        isOpen={isDrawerOpen} 
+        onClose={() => setIsDrawerOpen(false)} 
+        paciente={selectedPatientForDrawer} 
+        cita={selectedCitaForSuite}
+        onSaved={() => loadAgenda()} 
+      />
       {/* Modal Nueva Cita */}
       <Dialog open={showNewCitaModal} onOpenChange={setShowNewCitaModal}>
         <DialogHeader><DialogTitle>Agendar Nueva Cita</DialogTitle><DialogDescription>Selecciona un paciente y un horario para agendar.</DialogDescription></DialogHeader>

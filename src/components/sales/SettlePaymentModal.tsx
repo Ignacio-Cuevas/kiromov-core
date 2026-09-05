@@ -14,6 +14,7 @@ interface SettlePaymentModalProps {
 
 export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: SettlePaymentModalProps) {
   const [paymentMethod, setPaymentMethod] = useState('transferencia');
+  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [boletaNumber, setBoletaNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,7 +39,7 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
           numero_boleta: boletaClean,
           notas: notes.trim() ? notes.trim() : null,
           observaciones: notes.trim() ? notes.trim() : null,
-          fecha_compra: new Date().toISOString().split('T')[0] // Set fecha as today or leave old? The prompt says "Fecha de Pago" so today makes sense
+          fecha_compra: paymentDate
         })
         .eq('id', planEnUso.id);
 
@@ -104,6 +105,21 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
                   <option value="efectivo">Efectivo</option>
                   <option value="convenio">Convenio Institucional</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5 text-blue-600" />
+                    Fecha de Pago
+                  </span>
+                </label>
+                <input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 p-2.5 text-sm font-bold bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
               </div>
 
               <div>

@@ -91,7 +91,15 @@ export function Header() {
           </div>
           <div className="h-6 w-px bg-slate-200 mx-1"></div>
           <button 
-            onClick={() => {/* logout logic if any */}}
+            onClick={async () => {
+              try {
+                if (supabase) await supabase.auth.signOut();
+              } catch (error) {
+                console.error('Error al cerrar sesión:', error);
+              } finally {
+                window.location.href = '/login';
+              }
+            }}
             className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
             title="Cerrar Sesión"
           >

@@ -46,26 +46,55 @@ export async function POST(request: NextRequest) {
 
     const horaNormalizada = hora.length === 5 ? hora + ':00' : hora;
 
-    // Paso A (Buscar o Crear Paciente)
+    // Normalización de Datos
+    let cleanName = nombre_completo
+      .replace(/^Cita Kiromov\s*[-–—:]\s*/i, '')
+      .replace(/^Kiromov\s*[-–—:]\s*/i, '')
+      .replace(/^Cita con\s*/i, '')
+      .replace(/\([^)]*\)/g, '') // Remueve paréntesis
+      .trim();
+
+    let cleanTel: string | null = null;
+    if (telefono) {
+      const digits = telefono.replace(/\D/g, '');
+      if (digits.length >= 9) {
+        cleanTel = `+56${digits.slice(-9)}`;
+      }
+    }
+
+    let cleanEmail: string | null = null;
+    if (email) {
+      cleanEmail = email.split(',')[0].trim().toLowerCase();
+    }
+
+    // Paso A (Buscar o Crear Paciente - Anti-Duplicados)
     let pacienteId: string | null = null;
 
-    if (email) {
+    if (cleanEmail) {
       const { data: existente } = await supabase
         .from('pacientes')
         .select('id')
-        .eq('email', email.trim().toLowerCase())
+        .eq('email', cleanEmail)
         .maybeSingle();
       if (existente) pacienteId = existente.id;
     }
 
-    if (!pacienteId && telefono) {
-      const cleanTel = telefono.replace(/\D/g, '').slice(-9);
+    if (!pacienteId && cleanTel) {
       const { data: existenteTel } = await supabase
         .from('pacientes')
         .select('id')
-        .ilike('telefono', `%${cleanTel}%`)
+        .ilike('telefono', `%${cleanTel.slice(-9)}%`)
         .maybeSingle();
       if (existenteTel) pacienteId = existenteTel.id;
+    }
+
+    if (!pacienteId && cleanName) {
+      const { data: existenteNom } = await supabase
+        .from('pacientes')
+        .select('id')
+        .ilike('nombre_completo', `%${cleanName}%`)
+        .maybeSingle();
+      if (existenteNom) pacienteId = existenteNom.id;
     }
 
     // Si no existe, crear la ficha del paciente nuevo:
@@ -73,9 +102,9 @@ export async function POST(request: NextRequest) {
       const { data: nuevo, error: errNuevo } = await supabase
         .from('pacientes')
         .insert([{
-          nombre_completo: nombre_completo.trim(),
-          email: email?.trim().toLowerCase() || null,
-          telefono: telefono?.trim() || null,
+          nombre_completo: cleanName,
+          email: cleanEmail,
+          telefono: cleanTel,
           motivo_consulta: motivo_consulta?.trim() || 'Reserva desde web kiromov.cl',
           estado: 'activo'
         }])

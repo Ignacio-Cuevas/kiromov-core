@@ -77,7 +77,7 @@ function FinanzasContent() {
       const [resCitas, resCompras, resEgresos] = await Promise.all([
         supabase.from('citas_atenciones')
           .select('*, pacientes(nombre_completo, rut)')
-          .in('estado', ['asistio', 'atendido'])
+          .eq('estado', 'asistio')
           .order('fecha', { ascending: false }),
         supabase.from('compras_planes')
           .select('*, pacientes(nombre_completo, rut)')
@@ -369,7 +369,7 @@ function FinanzasContent() {
                               </td>
                               <td className="py-3 px-4 text-right">
                                 <Button onClick={() => setSettlingPlan(c)} className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm h-8">
-                                  <CreditCard className="w-3.5 h-3.5 mr-1.5" /> Registrar Cobro
+                                  <CreditCard className="w-3.5 h-3.5 mr-1.5" /> Cobrar Plan
                                 </Button>
                               </td>
                             </tr>
