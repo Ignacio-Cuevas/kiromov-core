@@ -66,14 +66,18 @@ export function ClinicalBoxSuite({ isOpen, onClose, pacienteId, citaId, onSaved 
         if (plan) setPlanActivo(plan);
 
         // 3. Historial de notas SOAP reales
-        const { data: soaps } = await supabase
-          .from('citas_atenciones')
+        const { data: soaps, error: errorSoaps } = await supabase
+          .from('evoluciones_soap')
           .select('*')
           .eq('paciente_id', pacienteId)
-          .not('nota_clinica', 'is', null)
-          .order('fecha', { ascending: false })
-          .order('created_at', { ascending: false });
-        if (soaps) setHistorialSOAP(soaps);
+          .order('fecha', { ascending: false });
+
+        if (errorSoaps) {
+          console.error('Error al cargar evoluciones SOAP:', errorSoaps);
+        } else if (soaps) {
+          console.log('Notas SOAP cargadas:', soaps.length);
+          setHistorialSOAP(soaps);
+        }
 
       } catch (err) {
         console.error('Error cargando suite clínica:', err);
