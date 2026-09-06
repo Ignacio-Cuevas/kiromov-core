@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import SaleModal from "@/components/sales/SaleModal";
+import PatientModal from "@/components/patients/PatientModal";
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import { getResumenPlan, evaluarRiesgoDesercion, requiereReevaluacion } from '@/lib/clinical';
@@ -9,7 +10,7 @@ import { getResumenPlan, evaluarRiesgoDesercion, requiereReevaluacion } from '@/
 interface PacienteResumen {
   id: string;
   nombre_completo: string;
-  rut: string | null;
+  rut: string;
   telefono: string | null;
   email: string | null;
   prevision: string;
@@ -22,13 +23,16 @@ interface PacienteResumen {
   estado_plan: 'vigente' | 'por_renovar' | 'finalizado' | 'sin_plan';
   estado_pago: 'pagado' | 'pendiente' | null;
   monto_clp: number | null;
+  ultimo_dolor_ena?: number | null;
+  dias_sin_atencion?: number | null;
 }
 
 export default function PacientesPage() {
   const supabase = createClient();
   const [activeTab, setActiveTab] = useState<'todos' | 'riesgo' | 'reevaluacion'>('todos');
-  const [pacientes, setPacientes] = useState<any[]>([]);
+  const [pacientes, setPacientes] = useState<PacienteResumen[]>([]);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
+  const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filtroTab, setFiltroTab] = useState<'todos' | 'vigentes' | 'renovar' | 'finalizados'>('todos');
   const [busqueda, setBusqueda] = useState('');
@@ -117,6 +121,7 @@ export default function PacientesPage() {
               + Registrar Venta
             </button>
             <button 
+              onClick={() => setIsPatientModalOpen(true)}
               className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
             >
               + Nuevo Paciente
@@ -324,7 +329,7 @@ export default function PacientesPage() {
                           )}
                           
                           {(() => {
-                            const alerta = evaluarRiesgoDesercion(p);
+                            const alerta = evaluarRiesgoDesercion(p as any);
                             if (alerta.nivel) {
                               return (
                                 <div className="mt-1">
@@ -342,7 +347,7 @@ export default function PacientesPage() {
                             return null;
                           })()}
 
-                          {requiereReevaluacion(p) && (
+                          {requiereReevaluacion(p as any) && (
                             <div className="mt-1">
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
                                 ⚠️ Reevaluar TMO (ENA {p.ultimo_dolor_ena}/10)
@@ -381,7 +386,12 @@ export default function PacientesPage() {
       <SaleModal 
         isOpen={isSaleModalOpen} 
         onClose={() => setIsSaleModalOpen(false)} 
-        onSuccess={() => cargarPacientes()} 
+        onSuccess={cargarPacientes}
+      />
+      <PatientModal
+        open={isPatientModalOpen}
+        onOpenChange={setIsPatientModalOpen}
+        onPatientSaved={cargarPacientes}
       />
     </main>
     </div>

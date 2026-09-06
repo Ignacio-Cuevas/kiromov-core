@@ -168,185 +168,50 @@ export function PatientModal({
 
     try {
       const isEditing = Boolean(patientToEdit?.id);
-      const patientId = patientToEdit?.id;
 
-      // 1. Estructura exacta solicitada
-      const patientPayload: any = {
-        nombre_completo: cleanName,
+      const actionData = {
+        full_name: cleanName,
         rut: cleanRut,
-        telefono: telefono.trim() || null,
+        phone: telefono.trim() || null,
         email: email.trim().toLowerCase() || null,
-        fecha_nacimiento: fechaNacimiento || null,
-        prevision: prevision || 'Particular',
+        birth_date: fechaNacimiento || null,
+        health_insurance: prevision || 'Particular',
+        medical_notes: diagnosticoPrincipal.trim() || null,
         motivo_consulta: motivoConsulta.trim() || null,
-        diagnostico_principal: diagnosticoPrincipal.trim() || null,
         antecedentes_morbidos: antecedentesMorbidos.trim() || null,
         alertas_seguridad: alertasSeguridad.trim() || null,
-        estado: 'activo',
-        updated_at: new Date().toISOString(),
+        status: 'active' as const,
       };
 
-      let savedPatientResult: any = null;
-
-      if (supabase) {
-        if (isEditing) {
-          // Intento 1: update con payload solicitado
-          let { data, error } = await supabase
-            .from('pacientes')
-            .update(patientPayload)
-            .eq('id', patientId)
-            .select()
-            .single();
-
-          // Si el esquema usa nombres alternativos de columna
-          if (error && error.message.includes('column')) {
-            const fallbackPayload: any = {
-              nombre_completo: cleanName,
-              rut: cleanRut,
-              telefono: telefono.trim() || null,
-              email: email.trim().toLowerCase() || null,
-              fecha_nacimiento: fechaNacimiento || null,
-              prevision_salud: prevision || 'Particular',
-              motivo_consulta: motivoConsulta.trim() || null,
-              diagnostico_medico: diagnosticoPrincipal.trim() || null,
-              antecedentes_medicos: antecedentesMorbidos.trim() || null,
-              banderas_rojas: alertasSeguridad.trim() || null,
-              estado: 'active',
-              updated_at: new Date().toISOString(),
-            };
-            const fallbackRes = await supabase
-              .from('pacientes')
-              .update(fallbackPayload)
-              .eq('id', patientId)
-              .select()
-              .single();
-            data = fallbackRes.data;
-            error = fallbackRes.error;
-          }
-
-          if (error) {
-            console.warn('Error en supabase update pacientes:', error.message);
-          }
-
-          // Actualizar en tabla patients
-          await supabase.from('patients').update({
-            full_name: cleanName,
-            rut: cleanRut,
-            phone: telefono.trim() || null,
-            email: email.trim().toLowerCase() || null,
-            birth_date: fechaNacimiento || null,
-            health_insurance: prevision,
-            medical_notes: diagnosticoPrincipal.trim() || null,
-            updated_at: new Date().toISOString(),
-          }).eq('id', patientId);
-
-          savedPatientResult = data || {
-            ...patientToEdit,
-            ...patientPayload,
-            full_name: cleanName,
-          };
-        } else {
-          // Inserción de nuevo paciente
-          const nextCode = `KIR-${Math.floor(1000 + Math.random() * 9000)}`;
-          const insertPayload: any = {
-            ...patientPayload,
-            codigo_paciente: nextCode,
-            created_at: new Date().toISOString(),
-          };
-
-          let { data, error } = await supabase
-            .from('pacientes')
-            .insert([insertPayload])
-            .select()
-            .single();
-
-          // Si falta alguna columna específica en el esquema cache
-          if (error && error.message.includes('column')) {
-            const fallbackInsert: any = {
-              codigo_paciente: nextCode,
-              nombre_completo: cleanName,
-              rut: cleanRut,
-              telefono: telefono.trim() || null,
-              email: email.trim().toLowerCase() || null,
-              fecha_nacimiento: fechaNacimiento || null,
-              prevision_salud: prevision || 'Particular',
-              motivo_consulta: motivoConsulta.trim() || null,
-              diagnostico_medico: diagnosticoPrincipal.trim() || null,
-              diagnostico_principal: diagnosticoPrincipal.trim() || null,
-              antecedentes_medicos: antecedentesMorbidos.trim() || null,
-              banderas_rojas: alertasSeguridad.trim() || null,
-              estado: 'active',
-            };
-            const fallbackRes = await supabase
-              .from('pacientes')
-              .insert([fallbackInsert])
-              .select()
-              .single();
-            data = fallbackRes.data;
-            error = fallbackRes.error;
-          }
-
-          // Inserción en tabla patients
-          const { data: newPatientRecord } = await supabase.from('patients').insert([
-            {
-              id: data?.id,
-              full_name: cleanName,
-              rut: cleanRut,
-              phone: telefono.trim() || null,
-              email: email.trim().toLowerCase() || null,
-              birth_date: fechaNacimiento || null,
-              health_insurance: prevision,
-              medical_notes: diagnosticoPrincipal.trim() || null,
-              status: 'active',
-            },
-          ]).select().single();
-
-          savedPatientResult = data || newPatientRecord || {
-            ...insertPayload,
-            id: 'pac-' + Date.now(),
-            full_name: cleanName,
-          };
-        }
-      }
-
-      // 2. Invocar Server Actions para revalidar rutas en Next.js App Router
-      if (isEditing) {
-        await updatePatient(patientId, {
-          full_name: cleanName,
-          rut: cleanRut,
-          phone: telefono.trim() || null,
-          email: email.trim().toLowerCase() || null,
-          birth_date: fechaNacimiento || null,
-          health_insurance: prevision,
-          medical_notes: diagnosticoPrincipal.trim() || null,
-        });
-        toast.success('Ficha del paciente actualizada con éxito', {
-          description: cleanName,
-          icon: <CheckCircle2 className="h-5 w-5 text-emerald-500" />,
-        });
+      let result;
+      if (isEditing && patientToEdit?.id) {
+        result = await updatePatient(patientToEdit.id, actionData);
       } else {
-        await createPatient({
-          full_name: cleanName,
-          rut: cleanRut,
-          phone: telefono.trim() || null,
-          email: email.trim().toLowerCase() || null,
-          birth_date: fechaNacimiento || null,
-          health_insurance: prevision,
-          medical_notes: diagnosticoPrincipal.trim() || null,
-        });
-        toast.success('Paciente registrado exitosamente', {
-          description: cleanName,
-          icon: <CheckCircle2 className="h-5 w-5 text-emerald-500" />,
-        });
+        result = await createPatient(actionData);
       }
 
-      // 3. Callback, limpieza y cierre
-      onPatientSaved?.(savedPatientResult);
-      resetForm();
+      if (!result.success) {
+        throw new Error(result.error || 'Error al guardar el paciente');
+      }
+
+      toast.success(
+        <div className="flex flex-col gap-1">
+          <span className="font-bold">¡Excelente!</span>
+          <span className="text-sm">
+            Paciente {isEditing ? 'actualizado' : 'registrado'} correctamente.
+          </span>
+        </div>
+      );
+
+      if (onPatientSaved && result.data) {
+        onPatientSaved(result.data);
+      }
       onOpenChange(false);
     } catch (err: any) {
-      console.error('Error al guardar paciente:', err);
-      toast.error(err?.message || 'Error al guardar los datos del paciente');
+      console.error('Excepción al guardar paciente:', err);
+      toast.error('Error Inesperado', {
+        description: err.message || 'No se pudo guardar el paciente.',
+      });
     } finally {
       setIsSubmitting(false);
     }
