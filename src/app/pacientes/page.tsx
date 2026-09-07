@@ -27,12 +27,17 @@ interface PacienteResumen {
   dias_sin_atencion?: number | null;
 }
 
+import { AppointmentModal } from "@/components/appointments/AppointmentModal";
+import { toast } from 'sonner';
+
 export default function PacientesPage() {
   const supabase = createClient();
   const [activeTab, setActiveTab] = useState<'todos' | 'riesgo' | 'reevaluacion'>('todos');
   const [pacientes, setPacientes] = useState<PacienteResumen[]>([]);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
+  const [pacienteParaAgendar, setPacienteParaAgendar] = useState<any>(null);
+  const [isAgendarModalOpen, setIsAgendarModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filtroTab, setFiltroTab] = useState<'todos' | 'vigentes' | 'renovar' | 'finalizados'>('todos');
   const [busqueda, setBusqueda] = useState('');
@@ -358,12 +363,20 @@ export default function PacientesPage() {
 
                         <td className="px-5 py-3.5 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
-                            <Link
-                              href={`/agenda?pacienteId=${p.id}`}
-                              className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl shadow-xs transition-all active:scale-[0.98]"
+                            <button
+                              onClick={() => {
+                                setPacienteParaAgendar({
+                                  id: p.id,
+                                  nombre_completo: p.nombre_completo,
+                                  rut: p.rut,
+                                  telefono: p.telefono
+                                });
+                                setIsAgendarModalOpen(true);
+                              }}
+                              className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl shadow-xs transition-all cursor-pointer"
                             >
                               Agendar
-                            </Link>
+                            </button>
                             <Link
                               href={`/agenda?pacienteId=${p.id}&ficha=true`}
                               className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-xl transition-all active:scale-[0.98]"
@@ -396,6 +409,20 @@ export default function PacientesPage() {
           cargarPacientes();
         }}
       />
+      
+      {isAgendarModalOpen && (
+        <AppointmentModal
+          isOpen={isAgendarModalOpen}
+          preselectedPatient={pacienteParaAgendar}
+          onClose={() => {
+            setIsAgendarModalOpen(false);
+            setPacienteParaAgendar(null);
+          }}
+          onSuccess={() => {
+            toast.success('Cita agendada correctamente');
+          }}
+        />
+      )}
     </main>
     </div>
   );

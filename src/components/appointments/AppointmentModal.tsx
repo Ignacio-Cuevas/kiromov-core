@@ -19,6 +19,7 @@ interface AppointmentModalProps {
     id: string;
     nombre_completo: string;
     rut?: string;
+    telefono?: string;
   } | null;
   initialDate?: string;
 }
@@ -58,10 +59,14 @@ export function AppointmentModal({
   const [savingCita, setSavingCita] = useState(false);
 
   useEffect(() => {
+    if (preselectedPatient?.id) {
+      setSelectedPatientId(preselectedPatient.id);
+    } else {
+      setSelectedPatientId('');
+    }
+    
     if (isOpen) {
-      if (preselectedPatient) {
-        setSelectedPatientId(preselectedPatient.id);
-      } else {
+      if (!preselectedPatient) {
         cargarPacientes();
       }
       cargarCitasOcupadas(fecha);
@@ -151,13 +156,25 @@ export function AppointmentModal({
       </DialogHeader>
       <DialogBody className="space-y-4 pt-4">
         {preselectedPatient ? (
-          <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Paciente Seleccionado</span>
-            <p className="text-xs font-bold text-slate-900">{preselectedPatient.nombre_completo}</p>
-            {preselectedPatient.rut && <p className="text-[11px] text-slate-500 font-mono">{preselectedPatient.rut}</p>}
+          /* Tarjeta Fija del Paciente Vinculado (Sin buscador) */
+          <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                Paciente de la Cita
+              </span>
+              <p className="text-sm font-bold text-slate-900">{preselectedPatient.nombre_completo}</p>
+              <p className="text-xs text-slate-500 font-mono mt-0.5">
+                {preselectedPatient.rut || 'Sin RUT'} {preselectedPatient.telefono ? `• ${preselectedPatient.telefono}` : ''}
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+              ✓ Vinculado
+            </span>
           </div>
         ) : (
-          <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Paciente</label>
+          /* Buscador normal solo si se agendó desde el botón global '+ Agendar Cita' */
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-700">Seleccionar Paciente</label>
             <div className="relative">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input placeholder="Buscar por nombre o RUT..." value={pacienteSearch} onChange={e => setPacienteSearch(e.target.value)} className="pl-9 bg-slate-50/50" />
