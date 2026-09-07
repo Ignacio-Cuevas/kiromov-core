@@ -14,11 +14,12 @@ const supabase =
     : null;
 
 interface CalendarPayload {
-  nombre_completo: string;
+  action?: 'upsert' | 'cancel';
+  nombre_completo?: string;
   email?: string;
   telefono?: string;
-  fecha: string; // 'YYYY-MM-DD'
-  hora: string;  // 'HH:mm:ss' o 'HH:mm'
+  fecha?: string; // 'YYYY-MM-DD'
+  hora?: string;  // 'HH:mm:ss' o 'HH:mm'
   motivo_consulta?: string;
   google_event_id: string;
 }
@@ -51,13 +52,25 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json() as CalendarPayload;
-    const { nombre_completo, email, telefono, fecha, hora, motivo_consulta, google_event_id } = body;
+    const { action, nombre_completo, email, telefono, fecha, hora, motivo_consulta, google_event_id } = body;
 
-    if (!nombre_completo || !fecha || !hora || !google_event_id) {
+    if (!google_event_id) {
+      return NextResponse.json({ error: 'Falta google_event_id' }, { status: 400 });
+    }
+
+    if (action === 'cancel') {
+      console.log('[WEBHOOK CALENDAR] Cancelando cita:', google_event_id);
+      await supabase.from('citas_atenciones').update({ estado: 'cancelada' }).eq('google_event_id', google_event_id);
+      return NextResponse.json({ success: true, action: 'cancelled' });
+    }
+
+    if (!nombre_completo || !fecha || !hora) {
       return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 });
     }
 
     const horaNormalizada = hora.length === 5 ? hora + ':00' : hora;
+
+    console.log('[WEBHOOK CALENDAR] Cita recibida:', { nombre_completo, fecha, hora, google_event_id });
 
     // Normalización de Datos
     let cleanName = nombre_completo

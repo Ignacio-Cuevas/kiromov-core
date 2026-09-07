@@ -129,13 +129,40 @@ export function AppointmentModal({
          estado: 'pendiente'
       };
 
-      const { error } = await supabase
+      const { data: nuevaCita, error } = await supabase
          .from('citas_atenciones')
-         .insert([payload]);
+         .insert([payload])
+         .select('id, pacientes(nombre_completo)')
+         .single();
 
       if (error) {
          toast.error(`No se pudo agendar: ${error.message}`);
          return;
+      }
+
+      // 2. Sincronizar hacia Google Calendar (Dirección Kiromov -> Google)
+      try {
+        const nombrePaciente = preselectedPatient?.nombre_completo || 
+           (Array.isArray(nuevaCita.pacientes) ? nuevaCita.pacientes[0]?.nombre_completo : (nuevaCita.pacientes as any)?.nombre_completo);
+
+        const { syncEventToGoogleCalendar } = await import('@/actions/calendar');
+        const syncRes = await syncEventToGoogleCalendar({
+          action: 'create_event',
+          cita_id: nuevaCita.id,
+          fecha,
+          hora,
+          paciente_nombre: nombrePaciente || 'Paciente Kiromov',
+          motivo_consulta: payload.motivo_consulta
+        });
+        
+        if (syncRes?.success && syncRes?.google_event_id) {
+           await supabase
+             .from('citas_atenciones')
+             .update({ google_event_id: syncRes.google_event_id })
+             .eq('id', nuevaCita.id);
+        }
+      } catch (syncErr) {
+         console.error('Error no bloqueante en sync calendar:', syncErr);
       }
 
       toast.success('¡Cita agendada exitosamente!');

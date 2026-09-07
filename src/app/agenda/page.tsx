@@ -342,7 +342,21 @@ function AgendaContent() {
         toast.success(`Estado de la cita actualizado a ${nuevoEstado}`);
       }
 
-      // 3. Actualizar estado local reactivo inmediatamente
+      // 3. Sincronizar cancelación en Google Calendar si aplica
+      if (nuevoEstado === 'cancelada' && cita.google_event_id) {
+        try {
+          const { syncEventToGoogleCalendar } = await import('@/actions/calendar');
+          await syncEventToGoogleCalendar({
+            action: 'cancel_event',
+            cita_id: cita.id,
+            google_event_id: cita.google_event_id
+          });
+        } catch (syncErr) {
+          console.error('Error al sincronizar cancelación con Google Calendar:', syncErr);
+        }
+      }
+
+      // 4. Actualizar estado local reactivo inmediatamente
       setCitas(prev =>
         prev.map(c => (c.id === cita.id ? { ...c, estado: nuevoEstado } : c))
       );
@@ -385,12 +399,36 @@ function AgendaContent() {
       const { data, error } = await supabase
          .from('citas_atenciones')
          .insert([payload])
-         .select();
+         .select('id, pacientes(nombre_completo)')
+         .single();
 
       if (error) {
          console.error('Error Supabase al agendar:', error);
          toast.error(`No se pudo agendar: ${error.message}`);
          return;
+      }
+
+      // Sincronizar hacia Google Calendar
+      try {
+        const paciente = pacientesOptions.find(p => p.id === newCita.pacienteId);
+        const nombrePaciente = paciente?.nombre_completo || 
+           (Array.isArray(data.pacientes) ? data.pacientes[0]?.nombre_completo : (data.pacientes as any)?.nombre_completo);
+
+        const { syncEventToGoogleCalendar } = await import('@/actions/calendar');
+        const syncRes = await syncEventToGoogleCalendar({
+          action: 'create_event',
+          cita_id: data.id,
+          fecha: newCita.fecha,
+          hora: newCita.hora,
+          paciente_nombre: nombrePaciente || 'Paciente Kiromov',
+          motivo_consulta: newCita.motivo
+        });
+        
+        if (syncRes?.success && syncRes?.google_event_id) {
+           await supabase.from('citas_atenciones').update({ google_event_id: syncRes.google_event_id }).eq('id', data.id);
+        }
+      } catch (syncErr) {
+         console.error('Error al sincronizar con Google Calendar:', syncErr);
       }
 
       toast.success('¡Cita agendada exitosamente!');
@@ -412,10 +450,31 @@ function AgendaContent() {
         fecha: editForm.fecha, hora: editForm.hora, motivo_consulta: editForm.motivo, profesional: editForm.profesional
       }).eq('id', editingCita.id);
       if (error) throw error;
+
+      if (editingCita.google_event_id) {
+        try {
+          const { syncEventToGoogleCalendar } = await import('@/actions/calendar');
+          await syncEventToGoogleCalendar({
+            action: 'update_event',
+            cita_id: editingCita.id,
+            google_event_id: editingCita.google_event_id,
+            fecha: editForm.fecha,
+            hora: editForm.hora,
+            motivo_consulta: editForm.motivo
+          });
+        } catch (syncErr) {
+          console.error('Error al actualizar Google Calendar:', syncErr);
+        }
+      }
+
       toast.success('Cita actualizada');
       setEditingCita(null);
       loadAgenda();
-    } catch (err) { toast.error('Error al actualizar'); } finally { setSavingEdit(false); }
+    } catch (err) {
+      toast.error('Error al actualizar cita');
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const handleDeleteCita = async () => {
