@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { getChileanDate } from '@/lib/utils';
+import { AppointmentModal } from '@/components/appointments/AppointmentModal';
 
 interface ClinicalBoxSuiteProps {
   pacienteId: string;
@@ -27,6 +28,7 @@ export default function ClinicalBoxSuite({
   const [proximaCita, setProximaCita] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [abrirAgendarModal, setAbrirAgendarModal] = useState(false);
 
   // Estados del Formulario SOAP de hoy
   const [nivelDolor, setNivelDolor] = useState<number>(0);
@@ -236,6 +238,14 @@ export default function ClinicalBoxSuite({
                   ⚠️ Sin próxima cita agendada
                 </p>
               )}
+              
+              <button
+                type="button"
+                onClick={() => setAbrirAgendarModal(true)}
+                className="w-full mt-2 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                📅 Agendar Siguiente Cita
+              </button>
             </div>
 
             {/* Teléfono y WhatsApp */}
@@ -598,6 +608,22 @@ export default function ClinicalBoxSuite({
         </div>
 
       </div>
+
+      {paciente && (
+        <AppointmentModal
+          isOpen={abrirAgendarModal}
+          onClose={() => setAbrirAgendarModal(false)}
+          onSuccess={() => {
+            setAbrirAgendarModal(false);
+            cargarDatos();
+          }}
+          preselectedPatient={{
+            id: paciente.id,
+            nombre_completo: paciente.nombre_completo,
+            rut: paciente.rut
+          }}
+        />
+      )}
     </div>
   );
 }

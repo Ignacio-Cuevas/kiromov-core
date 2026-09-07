@@ -14,7 +14,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Patient, HealthInsurance } from '@/types/clinical';
 import { createClient } from '@/utils/supabase/client';
-import { createPatient, updatePatient } from '@/actions/patients';
 import { formatRut, validateRut } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -143,75 +142,86 @@ export function PatientModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    const cleanName = nombreCompleto.trim().toUpperCase();
-    const cleanRut = rut.trim();
-
-    if (!cleanName) {
-      toast.error('El nombre completo es obligatorio');
-      return;
-    }
-
-    if (!cleanRut) {
-      toast.error('El RUT es obligatorio');
-      return;
-    }
-
-    if (!validateRut(cleanRut)) {
-      toast.error('El RUT ingresado no es válido', {
-        description: 'Revisa el formato y el dígito verificador.',
-      });
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
-      const isEditing = Boolean(patientToEdit?.id);
+      if (!supabase) throw new Error('Supabase no inicializado');
+      // Validar que al menos haya un nombre
+      if (!nombreCompleto?.trim()) {
+        toast.error('El nombre completo es obligatorio');
+        setIsSubmitting(false);
+        return;
+      }
 
-      const actionData = {
-        full_name: cleanName,
-        rut: cleanRut,
-        phone: telefono.trim() || null,
-        email: email.trim().toLowerCase() || null,
-        birth_date: fechaNacimiento || null,
-        health_insurance: prevision || 'Particular',
-        medical_notes: diagnosticoPrincipal.trim() || null,
-        motivo_consulta: motivoConsulta.trim() || null,
-        antecedentes_morbidos: antecedentesMorbidos.trim() || null,
-        alertas_seguridad: alertasSeguridad.trim() || null,
-        status: 'active' as const,
+      // Normalizar teléfono a formato chileno si existe
+      let telLimpio: string | null = null;
+      if (telefono?.trim()) {
+        const digitos = telefono.replace(/\D/g, '');
+        telLimpio = digitos.length >= 9 ? `+56${digitos.slice(-9)}` : telefono.trim();
+      }
+
+      const payload = {
+        nombre_completo: nombreCompleto.trim(),
+        rut: rut?.trim() || null,
+        telefono: telLimpio,
+        email: email?.trim().toLowerCase() || null,
+        fecha_nacimiento: fechaNacimiento || null,
+        prevision: prevision || 'Particular',
+        prevision_salud: prevision || 'Particular',
+        motivo_consulta: motivoConsulta?.trim() || null,
+        diagnostico_principal: diagnosticoPrincipal?.trim() || null,
+        antecedentes_morbidos: antecedentesMorbidos?.trim() || null,
+        alertas_seguridad: alertasSeguridad?.trim() || null,
+        estado: 'activo'
       };
 
-      let result;
+      console.log('Enviando payload a Supabase:', payload);
+      
+      const isEditing = Boolean(patientToEdit?.id);
+      let resultData;
+
       if (isEditing && patientToEdit?.id) {
-        result = await updatePatient(patientToEdit.id, actionData);
+        const { data, error } = await supabase
+          .from('pacientes')
+          .update(payload)
+          .eq('id', patientToEdit.id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error al actualizar paciente:', error);
+          toast.error(`No se pudo actualizar el paciente: ${error.message}`);
+          setIsSubmitting(false);
+          return;
+        }
+        resultData = data;
+        toast.success('¡Paciente actualizado exitosamente!');
       } else {
-        result = await createPatient(actionData);
+        const { data, error } = await supabase
+          .from('pacientes')
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error de Supabase al insertar paciente:', error);
+          // MOSTRAR EL ERROR EXACTO EN PANTALLA
+          toast.error(`Error al registrar paciente: ${error.message}`);
+          setIsSubmitting(false);
+          return;
+        }
+        console.log('Paciente creado exitosamente:', data);
+        toast.success('¡Paciente registrado exitosamente!');
+        resultData = data;
       }
 
-      if (!result.success) {
-        throw new Error(result.error || 'Error al guardar el paciente');
-      }
-
-      toast.success(
-        <div className="flex flex-col gap-1">
-          <span className="font-bold">¡Excelente!</span>
-          <span className="text-sm">
-            Paciente {isEditing ? 'actualizado' : 'registrado'} correctamente.
-          </span>
-        </div>
-      );
-
-      if (onPatientSaved && result.data) {
-        onPatientSaved(result.data);
+      if (onPatientSaved && resultData) {
+        onPatientSaved(resultData);
       }
       onOpenChange(false);
     } catch (err: any) {
-      console.error('Excepción al guardar paciente:', err);
-      toast.error('Error Inesperado', {
-        description: err.message || 'No se pudo guardar el paciente.',
-      });
+      console.error('Excepción al registrar paciente:', err);
+      toast.error(err.message || 'Error inesperado en el formulario');
     } finally {
       setIsSubmitting(false);
     }
@@ -267,9 +277,9 @@ export function PatientModal({
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-slate-700">
-                    RUT <span className="text-rose-500">*</span>
+                    RUT
                   </label>
-                  {isRutValid !== null && (
+                  {isRutValid !== null && rut.trim() !== '' && (
                     <span
                       className={`text-[10px] font-bold ${
                         isRutValid ? 'text-emerald-600' : 'text-rose-600'
@@ -280,12 +290,11 @@ export function PatientModal({
                   )}
                 </div>
                 <Input
-                  required
                   placeholder="12.345.678-9"
                   value={rut}
                   onChange={handleRutChange}
                   className={`bg-white rounded-xl text-sm font-mono ${
-                    isRutValid === false ? 'border-rose-400 focus:ring-rose-400' : ''
+                    isRutValid === false && rut.trim() !== '' ? 'border-rose-400 focus:ring-rose-400' : ''
                   }`}
                 />
               </div>
@@ -293,12 +302,11 @@ export function PatientModal({
               {/* Teléfono / WhatsApp */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700">
-                  Teléfono / WhatsApp <span className="text-rose-500">*</span>
+                  Teléfono / WhatsApp
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                   <Input
-                    required
                     placeholder="+56 9 8765 4321"
                     value={telefono}
                     onChange={(e) => setTelefono(e.target.value)}

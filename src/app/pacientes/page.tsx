@@ -391,7 +391,10 @@ export default function PacientesPage() {
       <PatientModal
         open={isPatientModalOpen}
         onOpenChange={setIsPatientModalOpen}
-        onPatientSaved={cargarPacientes}
+        onPatientSaved={(nuevoPaciente) => {
+          setFiltroTab('todos');
+          cargarPacientes();
+        }}
       />
     </main>
     </div>
