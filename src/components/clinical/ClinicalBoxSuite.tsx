@@ -78,15 +78,16 @@ export default function ClinicalBoxSuite({
       const hoyStr = getChileanDate();
       const { data: proxima } = await supabase
         .from('citas_atenciones')
-        .select('fecha, hora, motivo_consulta, estado')
+        .select('id, fecha, hora, motivo_consulta, estado')
         .eq('paciente_id', pacienteId)
+        .in('estado', ['pendiente', 'confirmada'])
         .gte('fecha', hoyStr)
-        .neq('estado', 'cancelada')
         .order('fecha', { ascending: true })
         .order('hora', { ascending: true })
         .limit(1)
         .maybeSingle();
-      if (proxima) setProximaCita(proxima);
+      
+      setProximaCita(proxima || null);
 
     } catch (err) {
       console.error('Error cargando datos en suite:', err);
@@ -229,16 +230,19 @@ export default function ClinicalBoxSuite({
                   <p className="text-xs font-bold text-slate-900">
                     {proximaCita.fecha.split('-').reverse().join('/')} a las {proximaCita.hora?.slice(0, 5)} hrs
                   </p>
-                  <p className="text-[11px] text-blue-700 font-medium">
-                    Estado: <span className="capitalize">{proximaCita.estado}</span>
-                  </p>
+                  <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold ${
+                    proximaCita.estado === 'confirmada' 
+                      ? 'bg-emerald-100 text-emerald-800' 
+                      : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {proximaCita.estado === 'confirmada' ? '✓ Confirmada' : '⏳ Pendiente'}
+                  </span>
                 </div>
               ) : (
                 <p className="text-xs text-amber-800 font-medium flex items-center gap-1">
                   ⚠️ Sin próxima cita agendada
                 </p>
               )}
-              
               <button
                 type="button"
                 onClick={() => setAbrirAgendarModal(true)}
@@ -609,18 +613,19 @@ export default function ClinicalBoxSuite({
 
       </div>
 
-      {paciente && (
+      {abrirAgendarModal && paciente && (
         <AppointmentModal
           isOpen={abrirAgendarModal}
-          onClose={() => setAbrirAgendarModal(false)}
-          onSuccess={() => {
-            setAbrirAgendarModal(false);
-            cargarDatos();
-          }}
           preselectedPatient={{
             id: paciente.id,
             nombre_completo: paciente.nombre_completo,
             rut: paciente.rut
+          }}
+          onClose={() => setAbrirAgendarModal(false)}
+          onSuccess={async () => {
+            setAbrirAgendarModal(false);
+            await cargarDatos();
+            toast.success('¡Próxima cita agendada y actualizada en la ficha!');
           }}
         />
       )}
