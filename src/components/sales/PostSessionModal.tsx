@@ -17,9 +17,22 @@ interface PostSessionModalProps {
   onSuccess: () => void;
 }
 
+const CATALOGO_RESPALDO = [
+  { id: 'eval-tmo', nombre: 'Evaluación Inicial + TMO', sesiones: 1, precio: 28000 },
+  { id: 'sesion-particular', nombre: 'Sesión Individual (Particular)', sesiones: 1, precio: 28000 },
+  { id: 'sesion-convenio', nombre: 'Sesión Individual (Convenio)', sesiones: 1, precio: 25000 },
+  { id: 'activa-particular', nombre: 'Plan Activa Care (4 Sesiones)', sesiones: 4, precio: 104000 },
+  { id: 'activa-convenio', nombre: 'Plan Activa Care (Convenio - 4 Sesiones)', sesiones: 4, precio: 75000 },
+  { id: 'pro-particular', nombre: 'Plan Pro Care (6 Sesiones)', sesiones: 6, precio: 145000 },
+  { id: 'pro-convenio', nombre: 'Plan Pro Care (Convenio - 6 Sesiones)', sesiones: 6, precio: 110000 },
+  { id: 'integral-particular', nombre: 'Plan Integral (10 Sesiones)', sesiones: 10, precio: 250000 },
+  { id: 'integral-convenio', nombre: 'Plan Integral (Convenio - 10 Sesiones)', sesiones: 10, precio: 200000 },
+  { id: 'personalizado', nombre: 'Plan Personalizado / Especial', sesiones: 1, precio: 0 }
+];
+
 export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess }: PostSessionModalProps) {
   const supabase = createClient();
-  const [planesList, setPlanesList] = useState<any[]>([]);
+  const [planesDisponibles, setPlanesDisponibles] = useState<any[]>(CATALOGO_RESPALDO);
   const [loadingPlanes, setLoadingPlanes] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -32,31 +45,39 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
 
   useEffect(() => {
     if (isOpen) {
-      loadPlanes();
+      cargarCatalogo();
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    if (selectedPlanId) {
-      const p = planesList.find((x) => x.id === selectedPlanId);
-      if (p) {
-        setMontoCustom(p.precio.toString());
-      }
+  const handleSeleccionarPlan = (planId: string) => {
+    setSelectedPlanId(planId);
+    const planEncontrado = planesDisponibles.find(p => p.id === planId);
+    if (planEncontrado) {
+      setMontoCustom(planEncontrado.precio.toString());
     }
-  }, [selectedPlanId, planesList]);
+  };
 
-  const loadPlanes = async () => {
+  const cargarCatalogo = async () => {
     if (!supabase) return;
     setLoadingPlanes(true);
     try {
-      const { data, error } = await supabase.from('tarifario').select('*').order('nombre');
-      if (error) throw error;
-      setPlanesList(data || []);
-      if (data && data.length > 0) {
-        setSelectedPlanId(data[0].id);
+      // Intentar consultar catalogo_planes (o plans/tarifario)
+      const { data, error } = await supabase
+        .from('catalogo_planes')
+        .select('*');
+
+      if (!error && data && data.length > 0) {
+        // Normalizar nombres de columnas
+        const planesNormalizados = data.map((p: any) => ({
+          id: p.id,
+          nombre: p.nombre || p.name || 'Plan Kinésico',
+          sesiones: p.sessions_count || p.sesiones_count || 1,
+          precio: p.price_clp || p.precio_clp || 28000
+        }));
+        setPlanesDisponibles(planesNormalizados);
       }
-    } catch (err: any) {
-      toast.error('Error al cargar tarifario: ' + err.message);
+    } catch (err) {
+      console.warn('Usando catálogo de respaldo:', err);
     } finally {
       setLoadingPlanes(false);
     }
@@ -68,7 +89,7 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
       toast.error('Selecciona un plan o servicio.');
       return;
     }
-    const planElegido = planesList.find((x) => x.id === selectedPlanId);
+    const planElegido = planesDisponibles.find((x) => x.id === selectedPlanId);
     if (!planElegido) return;
 
     setSaving(true);
@@ -120,16 +141,16 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Paso 1: Venta / Asignación</h3>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Plan o Servicio</label>
+                <label className="text-xs font-bold text-slate-700 uppercase">Plan o Servicio</label>
                 <select
                   value={selectedPlanId}
-                  onChange={(e) => setSelectedPlanId(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm outline-none"
+                  onChange={(e) => handleSeleccionarPlan(e.target.value)}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
                 >
-                  <option value="" disabled>Seleccione un plan...</option>
-                  {planesList.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre} ({p.sesiones} sesiones) - ${p.precio.toLocaleString('es-CL')}
+                  <option value="" disabled>Seleccione un plan o servicio...</option>
+                  {planesDisponibles.map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.nombre} — ${plan.precio?.toLocaleString('es-CL')} ({plan.sesiones} ses.)
                     </option>
                   ))}
                 </select>
