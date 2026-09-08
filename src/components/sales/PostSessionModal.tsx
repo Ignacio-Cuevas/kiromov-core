@@ -39,6 +39,7 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
   // Form State
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [montoCustom, setMontoCustom] = useState<string>('');
+  const [abonarEvaluacion, setAbonarEvaluacion] = useState(false);
   const [decision, setDecision] = useState<'pagar_ahora' | 'pendiente'>('pagar_ahora');
   const [metodoPago, setMetodoPago] = useState('Transferencia');
   const [numeroBoleta, setNumeroBoleta] = useState('');
@@ -53,7 +54,9 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
     setSelectedPlanId(planId);
     const planEncontrado = planesDisponibles.find(p => p.id === planId);
     if (planEncontrado) {
-      setMontoCustom(planEncontrado.precio.toString());
+      const precioBase = planEncontrado.precio || 0;
+      const valorAbono = abonarEvaluacion && planEncontrado.sesiones > 1 ? 28000 : 0;
+      setMontoCustom(Math.max(0, precioBase - valorAbono).toString());
     }
   };
 
@@ -96,17 +99,20 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
     try {
       const montoClp = parseInt(montoCustom.replace(/\D/g, ''), 10) || 0;
 
+      const sesionesUsadasIniciales = abonarEvaluacion ? 2 : 1;
+
       const payload = {
         paciente_id: paciente.id,
         plan_id_ref: planElegido.id,
         nombre_plan: planElegido.nombre,
         sesiones_totales: planElegido.sesiones || 1,
-        sesiones_usadas: 0,
+        sesiones_usadas: sesionesUsadasIniciales,
         monto_clp: montoClp,
         estado_pago: decision === 'pagar_ahora' ? 'pagado' : 'pendiente',
         fecha_compra: getChileanDate(),
         metodo_pago: decision === 'pagar_ahora' ? metodoPago : null,
         numero_boleta: numeroBoleta || null,
+        notas: abonarEvaluacion ? 'Plan contratado con abono de evaluación previa ($28.000)' : null,
         estado: 'activo'
       };
 
@@ -164,6 +170,32 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
                   className="font-bold text-blue-700" 
                 />
               </div>
+
+              {selectedPlanId && (planesDisponibles.find((x) => x.id === selectedPlanId)?.sesiones > 1) && (
+                <div className="bg-blue-50/70 border border-blue-200 p-3 rounded-xl space-y-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={abonarEvaluacion}
+                      onChange={(e) => {
+                        const check = e.target.checked;
+                        setAbonarEvaluacion(check);
+                        const plan = planesDisponibles.find((x) => x.id === selectedPlanId);
+                        const precioBase = plan?.precio || 0;
+                        const valorAbono = check ? 28000 : 0;
+                        setMontoCustom(Math.max(0, precioBase - valorAbono).toString());
+                      }}
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                    />
+                    <span className="text-xs font-bold text-blue-900">
+                      Abonar Evaluación Inicial ya pagada (-$28.000 CLP)
+                    </span>
+                  </label>
+                  <p className="text-[11px] text-blue-700 pl-6">
+                    Resta $28.000 al total a cobrar y computa la evaluación como la 1ª sesión del tratamiento.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Paso 2 */}

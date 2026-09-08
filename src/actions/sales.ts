@@ -9,6 +9,7 @@ export async function createSale(data: {
   plan_id?: string | null;
   concept: string;
   sessions_quantity: number;
+  sesiones_usadas?: number;
   total_amount_clp: number;
   payment_method: 'transfer' | 'card' | 'cash' | 'agreement';
   payment_status: 'paid' | 'pending' | 'partial';
@@ -66,7 +67,7 @@ export async function createSale(data: {
             nombre_plan: conceptName,
             total_sesiones: sessionsQty,
             sesiones_totales: sessionsQty,
-            sesiones_usadas: 0,
+            sesiones_usadas: data.sesiones_usadas ?? 0,
             precio_base: totalAmount,
             valor_total: totalAmount,
             total_final_clp: totalAmount,

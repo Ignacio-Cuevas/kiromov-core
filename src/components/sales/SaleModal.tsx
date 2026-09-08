@@ -70,6 +70,7 @@ export function SaleModal({
   const [paymentStatus, setPaymentStatus] = useState<string>('pendiente');
   const [boletaNumber, setBoletaNumber] = useState('');
   const [notes, setNotes] = useState('');
+  const [abonarEvaluacion, setAbonarEvaluacion] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const targetPatientProp = selectedPatient || initialPatient;
@@ -149,7 +150,8 @@ export function SaleModal({
       if (plan) {
         setConcept(plan.name);
         setSessionsQuantity(plan.sessions_count);
-        setTotalAmountCLP(plan.price_clp);
+        const valorAbono = abonarEvaluacion && plan.sessions_count > 1 ? 28000 : 0;
+        setTotalAmountCLP(Math.max(0, plan.price_clp - valorAbono));
       }
     }
   };
@@ -248,17 +250,23 @@ export function SaleModal({
       const actionStatus: 'paid' | 'pending' | 'partial' =
         paymentStatus === 'pendiente' ? 'pending' : 'paid';
 
+      const userNotes = notes.trim();
+      const finalNotes = abonarEvaluacion 
+        ? `Plan contratado con abono de evaluación previa ($28.000)${userNotes ? ' - ' + userNotes : ''}`
+        : userNotes || null;
+
       const actionRes = await createSale({
         patient_id: patientId,
         plan_id: selectedPlanId !== 'custom' ? selectedPlanId : null,
         concept: planName,
         sessions_quantity: totalSessions,
+        sesiones_usadas: abonarEvaluacion ? 1 : 0,
         total_amount_clp: finalAmount,
         payment_method: actionMethod,
         payment_status: actionStatus,
         numero_boleta: cleanBoleta,
         receipt_number: cleanBoleta,
-        notes: notes.trim() || null,
+        notes: finalNotes,
       });
 
       if (actionRes.success && actionRes.data) {
@@ -494,6 +502,32 @@ export function SaleModal({
                   />
                 </div>
               </div>
+
+              {selectedPlanId && selectedPlanId !== 'custom' && plans.find((x) => x.id === selectedPlanId) && (plans.find((x) => x.id === selectedPlanId)!.sessions_count > 1) && (
+                <div className="bg-blue-50/70 border border-blue-200 p-3 rounded-xl space-y-1 mt-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={abonarEvaluacion}
+                      onChange={(e) => {
+                        const check = e.target.checked;
+                        setAbonarEvaluacion(check);
+                        const plan = plans.find((x) => x.id === selectedPlanId);
+                        const precioBase = plan?.price_clp || 0;
+                        const valorAbono = check ? 28000 : 0;
+                        setTotalAmountCLP(Math.max(0, precioBase - valorAbono));
+                      }}
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                    />
+                    <span className="text-xs font-bold text-blue-900">
+                      Abonar Evaluación Inicial ya pagada (-$28.000 CLP)
+                    </span>
+                  </label>
+                  <p className="text-[11px] text-blue-700 pl-6">
+                    Resta $28.000 al total a cobrar y computa la evaluación como la 1ª sesión del tratamiento.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Sección 3: MEDIO Y ESTADO DE PAGO */}
