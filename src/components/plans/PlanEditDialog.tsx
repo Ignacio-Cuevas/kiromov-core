@@ -113,42 +113,22 @@ export function PlanEditDialog({
 
     try {
       if (plan?.id) {
-        // 1. Actualización en tabla plans
         if (supabase) {
-          const { error: errorPlans } = await supabase
-            .from("plans")
-            .update({
-              name: cleanName,
-              type: tipo,
-              sessions_count: numericSessions,
-              price_clp: numericPrice,
-              description: descripcion.trim() || null,
-              is_active: activo,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", plan.id);
-
-          if (errorPlans) {
-            console.warn("Error updating plans table:", errorPlans.message);
-          }
-
-          // 2. Actualización en tabla catalogo_planes (compatibilidad dual)
           const { error: errorCat } = await supabase
             .from("catalogo_planes")
             .update({
-              nombre_plan: cleanName,
+              nombre: cleanName,
               categoria,
-              tipo,
               total_sesiones: numericSessions,
               precio_clp: numericPrice,
               activo,
               descripcion: descripcion.trim() || null,
-              updated_at: new Date().toISOString(),
             })
             .eq("id", plan.id);
 
           if (errorCat) {
-            console.warn("Error updating catalogo_planes table:", errorCat.message);
+            console.error("Error updating catalogo_planes:", errorCat.message);
+            throw new Error(errorCat.message);
           }
         }
 
@@ -173,46 +153,33 @@ export function PlanEditDialog({
         onSuccess?.();
         handleClose();
       } else {
-        // Creación de nuevo plan
         let newId = "plan-" + Date.now();
 
         if (supabase) {
-          const { data: newPlan, error: errorPlans } = await supabase
-            .from("plans")
+          const { data: newCatPlan, error: errorCat } = await supabase
+            .from("catalogo_planes")
             .insert([
               {
-                name: cleanName,
-                type: tipo,
-                sessions_count: numericSessions,
-                price_clp: numericPrice,
-                description: descripcion.trim() || null,
-                is_active: activo,
+                nombre: cleanName,
+                categoria,
+                tipo,
+                total_sesiones: numericSessions,
+                precio_clp: numericPrice,
+                activo,
+                descripcion: descripcion.trim() || null,
               },
             ])
             .select()
             .single();
 
-          if (newPlan?.id) {
-            newId = newPlan.id;
+          if (errorCat) {
+            console.error("Error inserting into catalogo_planes:", errorCat.message);
+            throw new Error(errorCat.message);
           }
 
-          if (errorPlans) {
-            console.warn("Error inserting into plans:", errorPlans.message);
+          if (newCatPlan?.id) {
+            newId = newCatPlan.id;
           }
-
-          // Insertar en catalogo_planes
-          await supabase.from("catalogo_planes").insert([
-            {
-              id: newId,
-              nombre_plan: cleanName,
-              categoria,
-              tipo,
-              total_sesiones: numericSessions,
-              precio_clp: numericPrice,
-              activo,
-              descripcion: descripcion.trim() || null,
-            },
-          ]);
         }
 
         const createdData: PlanCatalogo = {

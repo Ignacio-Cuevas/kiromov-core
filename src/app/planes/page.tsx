@@ -43,66 +43,23 @@ export default function PlanesPage() {
       let fetchedPlanes: PlanCatalogo[] = [];
 
       if (supabase) {
-        // Consultar tabla plans
-        const { data: plansData, error: plansError } = await supabase
-          .from("plans")
-          .select("*")
-          .order("category", { ascending: false })
-          .order("price_clp", { ascending: true });
+        const { data: catData, error } = await supabase
+          .from("catalogo_planes")
+          .select("id, nombre, categoria, total_sesiones, precio_clp, descripcion, activo")
+          .order("precio_clp", { ascending: true });
 
-        if (!plansError && plansData && plansData.length > 0) {
-          fetchedPlanes = plansData.map((p: any) => ({
-            id: p.id,
-            nombre_plan: p.name || p.nombre_plan,
-            categoria: (p.category || p.categoria || "General") as CategoriaPlan,
-            tipo: p.type || "plan",
-            total_sesiones: p.sessions_count ?? p.total_sesiones ?? 1,
-            precio_clp: Number(p.price_clp ?? p.precio_clp ?? 0),
-            activo: p.is_active !== undefined ? p.is_active : p.activo ?? true,
-            descripcion: p.description || p.descripcion,
-            created_at: p.created_at,
-            updated_at: p.updated_at,
-          }));
-        } else {
-          // Fallback a catalogo_planes
-          const { data: catData } = await supabase
-            .from("catalogo_planes")
-            .select("*")
-            .order("categoria", { ascending: false })
-            .order("precio_clp", { ascending: true });
-
-          if (catData && catData.length > 0) {
+        if (!error && catData && catData.length > 0) {
             fetchedPlanes = catData.map((c: any) => ({
               id: c.id,
-              nombre_plan: c.nombre_plan,
-              categoria: (c.categoria || "General") as CategoriaPlan,
-              tipo: c.tipo || (c.total_sesiones === 1 ? "single_session" : "plan"),
-              total_sesiones: c.total_sesiones,
-              precio_clp: Number(c.precio_clp),
-              activo: c.activo,
+              nombre_plan: c.nombre, // Map to internal type property
+              categoria: c.categoria || "General",
+              tipo: c.total_sesiones === 1 ? "single_session" : "plan",
+              total_sesiones: c.total_sesiones || 1,
+              precio_clp: Number(c.precio_clp || 0),
+              activo: c.activo !== undefined ? c.activo : true,
               descripcion: c.descripcion,
-              created_at: c.created_at,
-              updated_at: c.updated_at,
             }));
-          }
         }
-      }
-
-      // Si no hubo datos en cliente, invocar Server Action
-      if (fetchedPlanes.length === 0) {
-        const actionData = await getPlans();
-        fetchedPlanes = actionData.map((p) => ({
-          id: p.id,
-          nombre_plan: p.name,
-          categoria: (p.category || (p.type === "evaluation" ? "Promoción" : "General")) as CategoriaPlan,
-          tipo: p.type,
-          total_sesiones: p.sessions_count,
-          precio_clp: p.price_clp,
-          activo: p.is_active,
-          descripcion: p.description,
-          created_at: p.created_at,
-          updated_at: p.updated_at,
-        }));
       }
 
       setPlanes(fetchedPlanes);
@@ -125,11 +82,9 @@ export default function PlanesPage() {
     const nextState = !plan.activo;
     try {
       if (supabase) {
-        await supabase.from("plans").update({ is_active: nextState }).eq("id", plan.id);
         await supabase.from("catalogo_planes").update({ activo: nextState }).eq("id", plan.id);
       }
-      await togglePlanStatus(plan.id, nextState);
-
+      
       setPlanes((prev) =>
         prev.map((p) => (p.id === plan.id ? { ...p, activo: nextState } : p))
       );
