@@ -103,7 +103,8 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
 
       const payload = {
         paciente_id: paciente.id,
-        plan_id_ref: planElegido.id,
+        plan_id: planElegido.id,
+        catalogo_plan_id: planElegido.id,
         nombre_plan: planElegido.nombre,
         sesiones_totales: planElegido.sesiones || 1,
         sesiones_usadas: sesionesUsadasIniciales,

@@ -96,7 +96,8 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
 
       const payload = {
         paciente_id: paciente.id,
-        plan_id_ref: planElegido.id,
+        plan_id: planElegido.id,
+        catalogo_plan_id: planElegido.id,
         nombre_plan: planElegido.nombre,
         sesiones_totales: sesionesCustom,
         sesiones_usadas: 0,
