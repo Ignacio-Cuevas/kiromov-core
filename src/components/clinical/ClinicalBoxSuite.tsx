@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { getChileanDate } from '@/lib/utils';
 import { AppointmentModal } from '@/components/appointments/AppointmentModal';
+import { InitialEvaluationModal } from '@/components/clinical/InitialEvaluationModal';
 
 interface ClinicalBoxSuiteProps {
   pacienteId: string;
@@ -29,6 +30,8 @@ export default function ClinicalBoxSuite({
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [abrirAgendarModal, setAbrirAgendarModal] = useState(false);
+  const [abrirEvaluacionModal, setAbrirEvaluacionModal] = useState(false);
+  const [evaluacionInicialTMO, setEvaluacionInicialTMO] = useState<any>(null);
 
   // Estados del Formulario SOAP de hoy
   const [nivelDolor, setNivelDolor] = useState<number>(0);
@@ -88,6 +91,17 @@ export default function ClinicalBoxSuite({
         .maybeSingle();
       
       setProximaCita(proxima || null);
+
+      // Evaluación Inicial TMO
+      const { data: evalTmo } = await supabase
+        .from('evaluaciones_iniciales_tmo')
+        .select('*')
+        .eq('paciente_id', pacienteId)
+        .order('fecha_evaluacion', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      setEvaluacionInicialTMO(evalTmo || null);
 
     } catch (err) {
       console.error('Error cargando datos en suite:', err);
@@ -280,22 +294,54 @@ export default function ClinicalBoxSuite({
               </p>
             </div>
 
-            {/* Banderas Rojas / Alertas TMO */}
-            <div className="space-y-1">
-              <span className="text-[11px] font-semibold text-rose-600 uppercase flex items-center gap-1">
-                <span>🚩</span> Banderas Rojas & Seguridad TMO
-              </span>
-              <div className="bg-rose-50/70 border border-rose-200 p-3 rounded-xl text-xs text-rose-900 leading-relaxed">
-                {paciente?.alertas_seguridad || paciente?.antecedentes_morbidos || 'Sin contraindicaciones médicas registradas para manipulación o carga.'}
-              </div>
-            </div>
-
-            {/* Motivo de Consulta Inicial */}
-            <div className="space-y-1">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase">Motivo Inicial</span>
-              <p className="text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200 leading-relaxed italic">
-                "{paciente?.motivo_consulta || 'Evaluación Kinésica Inicial'}"
-              </p>
+            {/* Evaluación Inicial TMO */}
+            <div className="space-y-3 border-t border-slate-100 pt-3">
+              {evaluacionInicialTMO ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setAbrirEvaluacionModal(true)}
+                    className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
+                  >
+                    📋 Ver / Editar Evaluación TMO
+                  </button>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-500">💼 Ocupación</span>
+                      <span className="text-slate-800 font-medium">{evaluacionInicialTMO.ocupacion_laboral || 'No registrada'}</span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-500">🏥 Cirugías / Antecedentes</span>
+                      <span className="text-slate-800 font-medium">{evaluacionInicialTMO.cirugias_traumatismos || 'Sin cirugías'}</span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-500">💊 Fármacos</span>
+                      <span className="text-slate-800 font-medium">{evaluacionInicialTMO.farmacos_actuales || 'No registra'}</span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-500">🚩 Seguridad TMO</span>
+                      <span className={`inline-block w-max px-2 py-0.5 rounded font-bold text-[10px] ${evaluacionInicialTMO.apto_hvla ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                        {evaluacionInicialTMO.apto_hvla ? '⚡ Apto Manipulación HVLA' : '⚠️ Precaución HVLA'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-500">🎯 Diagnóstico Funcional</span>
+                      <span className="text-slate-800 font-medium">{evaluacionInicialTMO.hipotesis_diagnostica_tmo || 'Pendiente'}</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 text-center space-y-3">
+                  <p className="text-xs text-blue-800 font-medium">Paciente sin evaluación basal</p>
+                  <button
+                    type="button"
+                    onClick={() => setAbrirEvaluacionModal(true)}
+                    className="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    📋 Llenar Evaluación Inicial TMO
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Estimación de Alta */}
@@ -304,7 +350,7 @@ export default function ClinicalBoxSuite({
                 🎯 Estimación de Alta Funcional
               </span>
               <p className="text-xs font-bold text-slate-800">
-                {historialSOAP[0]?.pronostico_sesiones || '4 a 6 sesiones estimadas'}
+                {evaluacionInicialTMO?.estimacion_alta || historialSOAP[0]?.pronostico_sesiones || '4 a 6 sesiones estimadas'}
               </p>
               <p className="text-[11px] text-slate-500">
                 {planActivo ? `${Math.max(0, (planActivo.sesiones_totales || 0) - (planActivo.sesiones_usadas || 0))} sesiones disponibles en plan actual` : 'Sin plan activo'}
@@ -626,6 +672,19 @@ export default function ClinicalBoxSuite({
             setAbrirAgendarModal(false);
             await cargarDatos();
             toast.success('¡Próxima cita agendada y actualizada en la ficha!');
+          }}
+        />
+      )}
+
+      {abrirEvaluacionModal && paciente && (
+        <InitialEvaluationModal
+          isOpen={abrirEvaluacionModal}
+          paciente={paciente}
+          evaluacionExistente={evaluacionInicialTMO}
+          onClose={() => setAbrirEvaluacionModal(false)}
+          onSuccess={async () => {
+            setAbrirEvaluacionModal(false);
+            await cargarDatos();
           }}
         />
       )}
