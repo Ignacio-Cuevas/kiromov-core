@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState, useMemo } from "react";
 import { SettlePaymentModal } from "@/components/sales/SettlePaymentModal";
 import { createClient } from "@/utils/supabase/client";
 import { formatCLP, formatRut , getChileanDate } from '@/lib/utils';
-import { Loader2, Plus, CreditCard, TrendingUp, TrendingDown, DollarSign, CheckCircle2 } from "lucide-react";
+import { Loader2, Plus, CreditCard, TrendingUp, TrendingDown, DollarSign, CheckCircle2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 // Componentes UI dummy para no romper dependencias
@@ -203,20 +203,20 @@ function FinanzasContent() {
 
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 space-y-6 print:hidden">
+    <div className="min-h-screen bg-cloud pb-20 font-gilroy text-ink-navy">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 space-y-8 print:hidden">
         
         {/* HEADER Y FILTRO */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Finanzas & Caja</h1>
-            <p className="text-sm text-slate-500">Gestión de ingresos, egresos y cuentas por cobrar.</p>
+            <h1 className="text-[28px] font-bold text-ink-navy tracking-tight">Finanzas & Caja</h1>
+            <p className="text-[14px] text-slate-gray mt-1">Gestión de ingresos, egresos y cuentas por cobrar.</p>
           </div>
           <div className="flex items-center gap-2">
             <select
               value={periodo}
               onChange={(e) => setPeriodo(e.target.value as PeriodoFiltro)}
-              className="bg-white border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="bg-paper border border-hairline text-ink-navy text-[14px] font-semibold rounded-inputs px-4 py-2.5 shadow-calendly focus:outline-none"
             >
               <option value="este_mes">Este Mes</option>
               <option value="mes_anterior">Mes Anterior</option>
@@ -229,41 +229,41 @@ function FinanzasContent() {
 
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+          <div className="bg-paper rounded-cards p-6 shadow-calendly border border-hairline transition-all hover:shadow-calendly-lg hover:-translate-y-0.5">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"><TrendingUp className="w-4 h-4"/></div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase">Ingresos Reales</h3>
+              <div className="w-10 h-10 rounded-inputs bg-pebble flex items-center justify-center text-signal-blue"><TrendingUp className="w-5 h-5"/></div>
+              <h3 className="text-[12px] font-bold text-slate-gray uppercase">Ingresos Reales</h3>
             </div>
-            <p className="text-2xl font-black text-slate-800">{formatCLP(ingresosPeriodo)}</p>
+            <p className="text-[32px] font-bold text-ink-navy leading-tight">{formatCLP(ingresosPeriodo)}</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+          <div className="bg-paper rounded-cards p-6 shadow-calendly border border-hairline transition-all hover:shadow-calendly-lg hover:-translate-y-0.5">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600"><TrendingDown className="w-4 h-4"/></div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase">Egresos</h3>
+              <div className="w-10 h-10 rounded-inputs bg-pebble flex items-center justify-center text-ink-navy"><TrendingDown className="w-5 h-5"/></div>
+              <h3 className="text-[12px] font-bold text-slate-gray uppercase">Egresos</h3>
             </div>
-            <p className="text-2xl font-black text-slate-800">{formatCLP(egresosPeriodo)}</p>
+            <p className="text-[32px] font-bold text-ink-navy leading-tight">{formatCLP(egresosPeriodo)}</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+          <div className="bg-paper rounded-cards p-6 shadow-calendly border border-hairline transition-all hover:shadow-calendly-lg hover:-translate-y-0.5">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><DollarSign className="w-4 h-4"/></div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase">Flujo Neto</h3>
+              <div className="w-10 h-10 rounded-inputs bg-cloud flex items-center justify-center text-deep-cobalt"><DollarSign className="w-5 h-5"/></div>
+              <h3 className="text-[12px] font-bold text-slate-gray uppercase">Flujo Neto</h3>
             </div>
-            <p className={`text-2xl font-black ${flujoNetoPeriodo >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCLP(flujoNetoPeriodo)}</p>
+            <p className="text-[32px] font-bold text-ink-navy leading-tight">{formatCLP(flujoNetoPeriodo)}</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-amber-200 bg-amber-50/30">
+          <div className="bg-paper rounded-cards p-6 shadow-calendly border border-hairline transition-all hover:shadow-calendly-lg hover:-translate-y-0.5">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600"><CreditCard className="w-4 h-4"/></div>
-              <h3 className="text-xs font-bold text-amber-700 uppercase">Por Cobrar</h3>
+              <div className="w-10 h-10 rounded-inputs bg-pebble flex items-center justify-center text-slate-gray"><AlertTriangle className="w-5 h-5"/></div>
+              <h3 className="text-[12px] font-bold text-slate-gray uppercase">Cuentas por Cobrar</h3>
             </div>
-            <p className="text-2xl font-black text-amber-600">{formatCLP(porCobrarPeriodo)}</p>
-            <p className="text-[10px] font-bold text-amber-600/70 uppercase mt-1">{deudoresCount} PACIENTES PENDIENTES</p>
+            <p className="text-[32px] font-bold text-ink-navy leading-tight">{formatCLP(porCobrarPeriodo)}</p>
+            <p className="text-[12px] text-mist-gray mt-1">De {deudoresCount} pacientes</p>
           </div>
         </div>
 
         {/* TABS Y TABLAS */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
-          <div className="border-b border-slate-200/80 flex overflow-x-auto">
-            <button onClick={() => setActiveTab('asistencias')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'asistencias' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>🗓️ Quién Asistió</button>
+        <div className="bg-paper rounded-cards shadow-calendly border border-hairline overflow-hidden">
+          <div className="border-b border-hairline flex overflow-x-auto bg-cloud">
+            <button onClick={() => setActiveTab('asistencias')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'asistencias' ? 'border-signal-blue text-signal-blue bg-paper' : 'border-transparent text-slate-gray hover:text-ink-navy hover:bg-pebble'}`}>🗓️ Quién Asistió</button>
             <button onClick={() => setActiveTab('pagados')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'pagados' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>💰 Quién Pagó</button>
             <button onClick={() => setActiveTab('deben')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'deben' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>⚠️ Quién Debe {deudoresCount > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">{deudoresCount}</span>}</button>
             <button onClick={() => setActiveTab('egresos')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'egresos' ? 'border-rose-500 text-rose-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>📉 Egresos</button>

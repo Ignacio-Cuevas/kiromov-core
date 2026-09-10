@@ -602,12 +602,12 @@ export function SaleModal({
           </div>
 
           {/* Footer Fijo con Botón Submit */}
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/80 sticky bottom-0 z-10">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-hairline bg-cloud sticky bottom-0 z-10">
             <button
               type="button"
               onClick={handleCloseModal}
               disabled={isSubmitting}
-              className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 bg-white hover:bg-slate-100 font-medium text-sm transition-colors shadow-2xs disabled:opacity-50"
+              className="px-4 py-2.5 rounded-buttons border border-hairline text-slate-gray bg-paper hover:bg-pebble font-medium text-[14px] transition-colors shadow-calendly-btn disabled:opacity-50"
             >
               Cancelar
             </button>
@@ -615,7 +615,7 @@ export function SaleModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-2.5 rounded-buttons bg-signal-blue hover:bg-deep-cobalt text-white font-semibold text-[14px] shadow-calendly-btn transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>

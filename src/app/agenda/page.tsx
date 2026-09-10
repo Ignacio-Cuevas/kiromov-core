@@ -532,19 +532,19 @@ function AgendaContent() {
   const getEstiloSemaforoSemanal = (estado: string) => {
     switch (estado?.toLowerCase()) {
       case 'confirmada':
-        return 'border-l-4 border-emerald-500 bg-emerald-50/50 text-emerald-950 hover:bg-emerald-50';
+        return 'border-l-4 border-deep-cobalt bg-cloud text-ink-navy hover:bg-pebble';
       case 'pendiente':
-        return 'border-l-4 border-amber-500 bg-amber-50/50 text-amber-950 hover:bg-amber-50';
+        return 'border-l-4 border-slate-gray bg-cloud text-ink-navy hover:bg-pebble';
       case 'asistio':
       case 'asistió':
       case 'atendido':
       case 'en_sala':
-        return 'border-l-4 border-slate-300 bg-slate-50 text-slate-600 opacity-90';
+        return 'border-l-4 border-signal-blue bg-cloud text-ink-navy hover:bg-pebble opacity-90';
       case 'cancelada':
       case 'no_asistio':
-        return 'border-l-4 border-rose-500 bg-rose-50/40 text-rose-900 opacity-75 line-through';
+        return 'border-l-4 border-mist-gray bg-pebble text-slate-gray opacity-75 line-through';
       default:
-        return 'border-l-4 border-slate-200 bg-white text-slate-800';
+        return 'border-l-4 border-hairline bg-paper text-ink-navy';
     }
   };
 
@@ -552,30 +552,30 @@ function AgendaContent() {
     switch (estado?.toLowerCase()) {
       case 'confirmada':
         return {
-          card: 'bg-emerald-50/40 border-emerald-200/90 hover:border-emerald-300 shadow-sm',
-          hora: 'bg-emerald-100 text-emerald-950 border border-emerald-200'
+          card: 'bg-paper border-hairline hover:border-deep-cobalt shadow-calendly',
+          hora: 'bg-cloud text-deep-cobalt border border-hairline'
         };
       case 'pendiente':
         return {
-          card: 'bg-amber-50/40 border-amber-200/90 hover:border-amber-300 shadow-sm',
-          hora: 'bg-amber-100 text-amber-950 border border-amber-200'
+          card: 'bg-paper border-hairline hover:border-slate-gray shadow-calendly',
+          hora: 'bg-cloud text-slate-gray border border-hairline'
         };
       case 'asistio':
       case 'asistió':
       case 'atendido':
       case 'en_sala':
         return {
-          card: 'bg-slate-50/50 border-slate-200/80 hover:border-slate-300 opacity-95',
-          hora: 'bg-slate-100 text-slate-700 border border-slate-200'
+          card: 'bg-paper border-hairline hover:border-signal-blue shadow-calendly opacity-95',
+          hora: 'bg-cloud text-signal-blue border border-hairline'
         };
       case 'cancelada':
       case 'no_asistio':
         return {
-          card: 'bg-rose-50/30 border-rose-100 opacity-75 grayscale hover:grayscale-0',
-          hora: 'bg-rose-100 text-rose-900 border border-rose-200 line-through'
+          card: 'bg-pebble border-hairline opacity-75 grayscale hover:grayscale-0',
+          hora: 'bg-mist-gray text-paper border border-hairline line-through'
         };
       default:
-        return { card: 'bg-white', hora: 'bg-slate-50 text-slate-800' };
+        return { card: 'bg-paper border-hairline', hora: 'bg-cloud text-ink-navy' };
     }
   };
 
@@ -860,12 +860,12 @@ function AgendaContent() {
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
           <div className="flex flex-wrap items-center gap-2">
             {cleanPhone && (
-              <a href={generarMensajeConfirmacion(cita)} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer">
+              <a href={generarMensajeConfirmacion(cita)} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-buttons border border-hairline bg-paper hover:bg-pebble text-slate-gray text-[12px] font-semibold inline-flex items-center gap-1.5 shadow-calendly-btn transition-colors cursor-pointer">
                 💬 Solicitar Confirmación
               </a>
             )}
             {s === 'pendiente' && (
-              <button onClick={() => handleMarcarConfirmada(cita.id)} className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold active:scale-[0.98] transition-all duration-150 cursor-pointer shadow-sm">
+              <button onClick={() => handleMarcarConfirmada(cita.id)} className="px-3 py-1.5 rounded-buttons bg-signal-blue hover:bg-deep-cobalt text-white text-[12px] font-semibold transition-colors cursor-pointer shadow-calendly-btn">
                 ✓ Confirmar
               </button>
             )}
@@ -873,15 +873,15 @@ function AgendaContent() {
           <div className="flex flex-wrap items-center gap-2">
             {!['asistio', 'asistió', 'atendido', 'no_asistio', 'cancelada'].includes(s) && (
               <>
-                <button onClick={() => handleRegistrarAsistencia(cita)} className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer">
+                <button onClick={() => handleRegistrarAsistencia(cita)} className="px-3 py-1.5 rounded-buttons bg-signal-blue hover:bg-deep-cobalt text-white text-[12px] font-semibold flex items-center gap-1 shadow-calendly-btn transition-colors cursor-pointer">
                   ✓ Registrar Asistencia
                 </button>
-                <button onClick={() => handleRegistrarInasistencia(cita.id, p.id)} className="px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold active:scale-[0.98] transition-all duration-150 cursor-pointer">
+                <button onClick={() => handleRegistrarInasistencia(cita.id, p.id)} className="px-3 py-1.5 rounded-buttons border border-hairline bg-pebble hover:bg-mist-gray/30 text-slate-gray text-[12px] font-semibold transition-colors cursor-pointer">
                   🚫 No Asistió
                 </button>
               </>
             )}
-            <button onClick={() => { setSelectedPatientForDrawer(p); setSelectedCitaForSuite(cita); setIsDrawerOpen(true); }} className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-[0.98] transition-all duration-150 cursor-pointer">
+            <button onClick={() => { setSelectedPatientForDrawer(p); setSelectedCitaForSuite(cita); setIsDrawerOpen(true); }} className="px-3 py-1.5 rounded-buttons bg-ink-navy hover:bg-slate-gray text-white text-[12px] font-semibold flex items-center gap-1 shadow-calendly-btn transition-colors cursor-pointer">
               Ficha & SOAP →
             </button>
           </div>
@@ -892,11 +892,11 @@ function AgendaContent() {
 
   const renderDia = () => {
     return (
-      <div className="p-4 space-y-0 min-h-[400px]">
+      <div className="p-6 space-y-0 min-h-[400px]">
         {citas.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <CalendarDays className="w-12 h-12 mb-3 text-slate-300" />
-            <p className="text-base font-semibold text-slate-600">No hay citas para este día</p>
+          <div className="flex flex-col items-center justify-center py-24 text-mist-gray">
+            <CalendarDays className="w-12 h-12 mb-3 text-hairline" />
+            <p className="text-[16px] font-semibold text-slate-gray">No hay citas para este día</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -916,26 +916,26 @@ function AgendaContent() {
     });
 
     return (
-        <div className="overflow-x-auto min-h-[400px] bg-slate-50/50">
-            <div className="flex divide-x divide-slate-200 border-b border-slate-200/80 min-w-[900px]">
+        <div className="overflow-x-auto min-h-[400px] bg-cloud">
+            <div className="flex divide-x divide-hairline border-b border-hairline min-w-[900px]">
                 {dias.map((dia, idx) => {
                     const isToday = getFormattedLocalDate(dia) === getFormattedLocalDate(new Date());
                     const diaStr = getFormattedLocalDate(dia);
                     const citasDia = citas.filter(c => c.fecha === diaStr);
                     return (
-                        <div key={idx} className={`flex-1 min-w-[220px] ${isToday ? 'bg-blue-50/30' : ''}`}>
-                            <div className={`p-3 text-center border-b border-slate-200/80 sticky top-0 bg-white shadow-sm z-10 ${isToday ? 'text-blue-700 bg-blue-50' : 'text-slate-700'}`}>
-                                <p className="text-[10px] font-bold uppercase tracking-widest">{dia.toLocaleDateString('es-CL', { weekday: 'short' })}</p>
-                                <p className={`text-xl font-black inline-flex items-center justify-center w-8 h-8 rounded-full ${isToday ? 'bg-blue-600 text-white' : ''}`}>{dia.getDate()}</p>
+                        <div key={idx} className={`flex-1 min-w-[220px] ${isToday ? 'bg-signal-blue/5' : ''}`}>
+                            <div className={`p-4 text-center border-b border-hairline sticky top-0 shadow-sm z-10 ${isToday ? 'text-signal-blue bg-paper border-t-2 border-t-signal-blue' : 'text-slate-gray bg-paper'}`}>
+                                <p className="text-[12px] font-bold uppercase tracking-widest">{dia.toLocaleDateString('es-CL', { weekday: 'short' })}</p>
+                                <p className={`text-[24px] font-black inline-flex items-center justify-center w-10 h-10 rounded-full mt-1 ${isToday ? 'bg-signal-blue text-white' : ''}`}>{dia.getDate()}</p>
                             </div>
-                            <div className="p-3">
+                            <div className="p-4">
                                 {citasDia.length === 0 ? (
                                     <button 
                                       onClick={() => {
                                         setNewCita(prev => ({ ...prev, fecha: diaStr }));
                                         setShowNewCitaModal(true);
                                       }}
-                                      className="w-full py-6 rounded-xl border-2 border-dashed border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/40 text-xs font-medium flex items-center justify-center gap-1 transition-all cursor-pointer"
+                                      className="w-full py-8 rounded-inputs border-2 border-dashed border-hairline text-mist-gray hover:text-signal-blue hover:border-signal-blue hover:bg-signal-blue/5 text-[14px] font-medium flex items-center justify-center gap-1 transition-all cursor-pointer"
                                     >
                                       + Agendar
                                     </button>
@@ -956,7 +956,6 @@ function AgendaContent() {
     const lastDay = new Date(year, month + 1, 0);
     
     // Calcular días para la grilla (Lunes a Domingo)
-    // getDay() => Sun=0, Mon=1...
     let firstDayIndex = firstDay.getDay() - 1;
     if (firstDayIndex === -1) firstDayIndex = 6; // Si es domingo, índice 6
     
@@ -968,15 +967,15 @@ function AgendaContent() {
     const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
     return (
-        <div className="p-4 bg-white min-h-[500px]">
-            <div className="grid grid-cols-7 border-t border-l border-slate-200/80">
+        <div className="p-6 bg-paper min-h-[500px]">
+            <div className="grid grid-cols-7 border-t border-l border-hairline rounded-cards overflow-hidden">
                 {weekDays.map(wd => (
-                    <div key={wd} className="p-2 border-b border-r border-slate-200/80 text-center bg-slate-50/50 text-[10px] font-bold uppercase text-slate-500 tracking-wider">
+                    <div key={wd} className="p-3 border-b border-r border-hairline text-center bg-cloud text-[12px] font-bold uppercase text-slate-gray tracking-wider">
                         {wd}
                     </div>
                 ))}
                 {daysArray.map((dia, idx) => {
-                    if (!dia) return <div key={idx} className="border-b border-r border-slate-200/80 bg-slate-50/50 h-[115px]"></div>;
+                    if (!dia) return <div key={idx} className="border-b border-r border-hairline bg-cloud/50 h-[120px]"></div>;
                     
                     const diaStr = getFormattedLocalDate(dia);
                     const isToday = diaStr === getFormattedLocalDate(new Date());
@@ -991,38 +990,38 @@ function AgendaContent() {
                                 setFechaBase(dia);
                                 setVista('dia');
                             }}
-                            className={`p-1 border-b border-r border-slate-200/80 h-[115px] overflow-hidden relative cursor-pointer hover:bg-slate-50/50 transition-colors ${isToday ? 'bg-blue-50/20' : ''}`}
+                            className={`p-2 border-b border-r border-hairline h-[130px] overflow-hidden relative cursor-pointer hover:bg-pebble transition-colors ${isToday ? 'bg-signal-blue/5' : 'bg-paper'}`}
                         >
-                            <div className="text-right p-1 mb-1">
-                                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'text-slate-600'}`}>{dia.getDate()}</span>
+                            <div className="text-right mb-2">
+                                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-[14px] font-bold ${isToday ? 'bg-signal-blue text-white' : 'text-slate-gray'}`}>{dia.getDate()}</span>
                             </div>
-                            <div className="space-y-1">
+                            <div className="space-y-1.5">
                                 {citasToShow.map(c => {
                                     const s = c.estado?.toLowerCase() || 'pendiente';
-                                    let bg = 'bg-slate-100 text-slate-700 border border-slate-200';
-                                    if (s === 'confirmada') bg = 'bg-emerald-100 text-emerald-900 border border-emerald-300 font-semibold';
-                                    else if (s === 'pendiente') bg = 'bg-amber-100 text-amber-900 border border-amber-300 font-semibold';
-                                    else if (['cancelada', 'no_asistio'].includes(s)) bg = 'bg-rose-100 text-rose-800 line-through opacity-75 border-transparent';
+                                    let bg = 'bg-pebble text-ink-navy border border-hairline';
+                                    if (s === 'confirmada') bg = 'bg-cloud text-deep-cobalt border border-deep-cobalt/30 font-semibold';
+                                    else if (s === 'pendiente') bg = 'bg-cloud text-slate-gray border border-slate-gray/30 font-semibold';
+                                    else if (['cancelada', 'no_asistio'].includes(s)) bg = 'bg-pebble text-mist-gray line-through opacity-75 border-transparent';
                                     
                                     const primerNombre = c.pacientes?.nombre_completo?.split(' ')[0] || '';
                                     const { tienePlan, sesionesUsadas, sesionesTotales } = getResumenPlan(c.pacientes || {});
                                     const planStr = tienePlan ? `${c.pacientes?.nombre_plan} (${sesionesUsadas}/${sesionesTotales} ses)` : 'Sin plan';
 
                                     return (
-                                        <div key={c.id} className={`px-1.5 py-0.5 rounded-full text-[9px] truncate relative group ${bg}`}>
+                                        <div key={c.id} className={`px-2 py-1 rounded-inputs text-[10px] truncate relative group ${bg}`}>
                                             {c.hora?.slice(0,5)} • {primerNombre}
                                             
                                             {/* Hover Tooltip */}
-                                            <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-48 bg-slate-900 text-white p-2 rounded-lg shadow-xl z-[60] text-xs whitespace-normal pointer-events-none">
-                                                <p className="font-bold">{c.pacientes?.nombre_completo}</p>
-                                                <p className="text-slate-300 text-[10px] mt-0.5">{c.pacientes?.prevision || 'Particular'} • {c.pacientes?.telefono}</p>
-                                                <p className="text-blue-300 text-[10px] mt-1">{planStr}</p>
+                                            <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-48 bg-ink-navy text-paper p-3 rounded-lg shadow-calendly-lg z-[60] text-[12px] whitespace-normal pointer-events-none">
+                                                <p className="font-bold text-[14px]">{c.pacientes?.nombre_completo}</p>
+                                                <p className="text-mist-gray text-[11px] mt-1">{c.pacientes?.prevision || 'Particular'} • {c.pacientes?.telefono}</p>
+                                                <p className="text-signal-blue text-[11px] mt-1.5 font-semibold">{planStr}</p>
                                             </div>
                                         </div>
                                     );
                                 })}
                                 {hasMore && (
-                                    <div className="text-[10px] text-center font-bold text-slate-400 mt-1 hover:text-slate-600 transition-colors">+{citasDia.length - 3} citas más</div>
+                                    <div className="text-[11px] text-center font-bold text-mist-gray mt-2 hover:text-slate-gray transition-colors">+{citasDia.length - 3} citas más</div>
                                 )}
                             </div>
                         </div>
@@ -1034,59 +1033,59 @@ function AgendaContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20">
+    <div className="min-h-screen bg-cloud pb-20 font-gilroy text-ink-navy">
       
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 space-y-6 print:hidden">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 space-y-8 print:hidden">
         
         {/* Barra de Navegación de Fecha */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-paper p-6 rounded-cards border border-hairline shadow-calendly">
           <div className="flex items-center gap-2">
-            <button onClick={() => changeDate(-1)} className="p-2 border border-slate-200/80 rounded-xl hover:bg-slate-50/50 text-slate-600 transition-colors">
+            <button onClick={() => changeDate(-1)} className="p-2 border border-hairline rounded-buttons hover:bg-pebble text-slate-gray transition-colors">
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <button onClick={setToday} className="px-4 py-2 border border-slate-200/80 rounded-xl hover:bg-slate-50/50 font-semibold text-slate-700 text-sm transition-colors">
+            <button onClick={setToday} className="px-4 py-2 border border-hairline rounded-buttons hover:bg-pebble font-semibold text-slate-gray text-sm transition-colors">
               Hoy
             </button>
-            <button onClick={() => changeDate(1)} className="p-2 border border-slate-200/80 rounded-xl hover:bg-slate-50/50 text-slate-600 transition-colors">
+            <button onClick={() => changeDate(1)} className="p-2 border border-hairline rounded-buttons hover:bg-pebble text-slate-gray transition-colors">
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
           
           <div className="text-center md:text-left flex-1 md:pl-4">
-            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">{formattedTitleDate}</h2>
+            <h2 className="text-[28px] leading-tight font-bold text-ink-navy">{formattedTitleDate}</h2>
           </div>
           
-          <div className="flex items-center gap-2 border border-slate-200/80 p-1 rounded-xl bg-slate-50/50">
-            <button onClick={() => setVista('dia')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${vista === 'dia' ? 'bg-white shadow-sm text-blue-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-900'}`}>Día</button>
-            <button onClick={() => setVista('semana')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${vista === 'semana' ? 'bg-white shadow-sm text-blue-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-900'}`}>Semana</button>
-            <button onClick={() => setVista('mes')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${vista === 'mes' ? 'bg-white shadow-sm text-blue-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-900'}`}>Mes</button>
+          <div className="flex items-center gap-2 border border-hairline p-1 rounded-inputs bg-pebble">
+            <button onClick={() => setVista('dia')} className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${vista === 'dia' ? 'bg-paper shadow-calendly text-ink-navy border border-hairline' : 'text-slate-gray hover:text-ink-navy'}`}>Día</button>
+            <button onClick={() => setVista('semana')} className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${vista === 'semana' ? 'bg-paper shadow-calendly text-ink-navy border border-hairline' : 'text-slate-gray hover:text-ink-navy'}`}>Semana</button>
+            <button onClick={() => setVista('mes')} className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${vista === 'mes' ? 'bg-paper shadow-calendly text-ink-navy border border-hairline' : 'text-slate-gray hover:text-ink-navy'}`}>Mes</button>
           </div>
         </div>
 
         {/* KPIs del Rango */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300/80"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Citados</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.citadosHoy}</span></div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300/80"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pendientes</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.pendientes}</span></div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300/80"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Confirmadas</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.confirmadas}</span></div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300/80"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">En Box / Sala</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.enSala}</span></div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300/80"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Atendidos</span><span className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.asistio}</span></div>
+          <div className="bg-paper p-6 rounded-cards border border-hairline shadow-calendly flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg"><span className="text-[12px] font-semibold text-slate-gray uppercase tracking-wider">Citados</span><span className="text-[38px] font-bold text-ink-navy leading-tight">{kpis.citadosHoy}</span></div>
+          <div className="bg-paper p-6 rounded-cards border border-hairline shadow-calendly flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg"><span className="text-[12px] font-semibold text-slate-gray uppercase tracking-wider">Pendientes</span><span className="text-[38px] font-bold text-ink-navy leading-tight">{kpis.pendientes}</span></div>
+          <div className="bg-paper p-6 rounded-cards border border-hairline shadow-calendly flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg"><span className="text-[12px] font-semibold text-slate-gray uppercase tracking-wider">Confirmadas</span><span className="text-[38px] font-bold text-ink-navy leading-tight">{kpis.confirmadas}</span></div>
+          <div className="bg-paper p-6 rounded-cards border border-hairline shadow-calendly flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg"><span className="text-[12px] font-semibold text-slate-gray uppercase tracking-wider">En Box / Sala</span><span className="text-[38px] font-bold text-ink-navy leading-tight">{kpis.enSala}</span></div>
+          <div className="bg-paper p-6 rounded-cards border border-hairline shadow-calendly flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg"><span className="text-[12px] font-semibold text-slate-gray uppercase tracking-wider">Atendidos</span><span className="text-[38px] font-bold text-ink-navy leading-tight">{kpis.asistio}</span></div>
         </div>
 
         {/* Contenedor Principal Agenda */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
-          <div className="p-4 bg-slate-50/50 border-b border-slate-200/80 flex justify-between items-center">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <CalendarDays className="w-5 h-5 text-slate-500" /> Citas Programadas
+        <div className="bg-paper rounded-cards shadow-calendly border border-hairline overflow-hidden">
+          <div className="p-6 bg-cloud border-b border-hairline flex justify-between items-center">
+            <h3 className="text-[24px] font-semibold text-ink-navy flex items-center gap-2">
+              <CalendarDays className="w-6 h-6 text-slate-gray" /> Citas Programadas
             </h3>
-            <Button onClick={() => setShowNewCitaModal(true)} className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm">
-              <Plus className="w-4 h-4 mr-1.5" /> Agendar Cita
+            <Button onClick={() => setShowNewCitaModal(true)} className="bg-signal-blue hover:bg-deep-cobalt text-white rounded-buttons text-[16px] font-semibold px-4 py-2 shadow-calendly-btn">
+              <Plus className="w-5 h-5 mr-1.5" /> Agendar Cita
             </Button>
           </div>
 
           {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400 min-h-[400px]">
-                <Loader2 className="w-8 h-8 animate-spin mb-3 text-blue-600" />
-                <p className="text-sm font-medium">Cargando agenda clínica...</p>
+              <div className="flex flex-col items-center justify-center py-24 text-mist-gray min-h-[400px]">
+                <Loader2 className="w-8 h-8 animate-spin mb-3 text-signal-blue" />
+                <p className="text-[16px] font-medium text-slate-gray">Cargando agenda clínica...</p>
               </div>
           ) : (
               vista === 'dia' ? renderDia() : vista === 'semana' ? renderSemana() : renderMes()

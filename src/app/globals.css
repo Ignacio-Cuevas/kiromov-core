@@ -4,7 +4,6 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    @apply bg-cloud text-ink-navy antialiased;
   }
 }

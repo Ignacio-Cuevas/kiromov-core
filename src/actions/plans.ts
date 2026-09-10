@@ -10,58 +10,28 @@ export async function getPlans(): Promise<Plan[]> {
 
   if (supabase) {
     try {
-      // 1. Consultar tabla plans
-      const { data, error } = await supabase
-        .from('plans')
-        .select('*')
-        .order('category', { ascending: false })
-        .order('price_clp', { ascending: true });
-
-      if (!error && data && data.length > 0) {
-        return data.map((p: any) => ({
-          id: p.id,
-          name: p.name || p.nombre_plan,
-          type: p.type || (p.sessions_count === 1 ? 'single_session' : 'plan'),
-          category: p.category || p.categoria || 'General',
-          sessions_count: p.sessions_count ?? p.total_sesiones ?? 1,
-          price_clp: Number(p.price_clp ?? p.precio_clp ?? 0),
-          description: p.description || p.descripcion,
-          is_active: p.is_active !== undefined ? p.is_active : p.activo ?? true,
-          created_at: p.created_at,
-          updated_at: p.updated_at,
-          // alias
-          nombre_plan: p.name || p.nombre_plan,
-          categoria: p.category || p.categoria || 'General',
-          total_sesiones: p.sessions_count ?? p.total_sesiones ?? 1,
-          precio_clp: Number(p.price_clp ?? p.precio_clp ?? 0),
-          activo: p.is_active !== undefined ? p.is_active : p.activo ?? true,
-        }));
-      }
-
-      // 2. Fallback a catalogo_planes
-      const { data: catData } = await supabase
+      const { data: catData, error } = await supabase
         .from('catalogo_planes')
         .select('*')
-        .order('categoria', { ascending: false })
         .order('precio_clp', { ascending: true });
 
-      if (catData && catData.length > 0) {
+      if (!error && catData && catData.length > 0) {
         return catData.map((c: any) => ({
           id: c.id,
-          name: c.nombre_plan,
+          name: c.nombre || c.nombre_plan,
           type: (c.tipo || (c.total_sesiones === 1 ? 'single_session' : 'plan')) as any,
           category: c.categoria || 'General',
-          sessions_count: c.total_sesiones,
-          price_clp: Number(c.precio_clp),
+          sessions_count: c.total_sesiones || 1,
+          price_clp: Number(c.precio_clp || 0),
           description: c.descripcion,
-          is_active: c.activo,
+          is_active: c.activo !== undefined ? c.activo : true,
           created_at: c.created_at,
           updated_at: c.updated_at,
-          nombre_plan: c.nombre_plan,
+          nombre_plan: c.nombre || c.nombre_plan,
           categoria: c.categoria || 'General',
-          total_sesiones: c.total_sesiones,
-          precio_clp: Number(c.precio_clp),
-          activo: c.activo,
+          total_sesiones: c.total_sesiones || 1,
+          precio_clp: Number(c.precio_clp || 0),
+          activo: c.activo !== undefined ? c.activo : true,
         }));
       }
     } catch (err) {
@@ -69,21 +39,23 @@ export async function getPlans(): Promise<Plan[]> {
     }
   }
 
-  // Fallback local
-  return initialMockCatalogoPlanes.map((c) => ({
-    id: c.id,
-    name: c.nombre_plan,
-    type: (c.total_sesiones === 1 ? 'single_session' : 'plan') as any,
-    category: c.categoria || 'General',
-    sessions_count: c.total_sesiones,
-    price_clp: c.precio_clp,
-    description: c.descripcion,
-    is_active: c.activo,
-    nombre_plan: c.nombre_plan,
-    categoria: c.categoria || 'General',
-    total_sesiones: c.total_sesiones,
-    precio_clp: c.precio_clp,
-    activo: c.activo,
+  // 3. Fallback a mock si no hay BBDD o falló
+  return initialMockCatalogoPlanes.map(p => ({
+    id: p.id,
+    name: p.nombre_plan,
+    type: p.tipo as any,
+    category: p.categoria,
+    sessions_count: p.total_sesiones,
+    price_clp: p.precio_clp,
+    description: p.descripcion,
+    is_active: p.activo,
+    created_at: p.created_at,
+    updated_at: p.updated_at,
+    nombre_plan: p.nombre_plan,
+    categoria: p.categoria,
+    total_sesiones: p.total_sesiones,
+    precio_clp: p.precio_clp,
+    activo: p.activo
   }));
 }
 

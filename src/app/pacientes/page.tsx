@@ -97,37 +97,34 @@ export default function PacientesPage() {
   }, [pacientes, busqueda, filtroTab]);
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-16">
+    <div className="min-h-screen bg-cloud pb-16 font-gilroy text-ink-navy">
       
-      {/* Header Clínico Superior */}
-      
-
       {/* Contenedor Principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8 print:hidden">
         
         {/* Título y Acciones Globales */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Directorio Clínico y Pacientes</h1>
-            <p className="text-sm text-slate-500 mt-1">Control de tratamientos activos, saldos de sesiones y fichas clínicas.</p>
+            <h1 className="text-[28px] font-bold text-ink-navy tracking-tight">Directorio Clínico y Pacientes</h1>
+            <p className="text-[14px] text-slate-gray mt-1">Control de tratamientos activos, saldos de sesiones y fichas clínicas.</p>
           </div>
 
           <div className="flex items-center gap-2.5">
             <button 
               onClick={() => cargarPacientes()}
-              className="px-3.5 py-2 rounded-xl border border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50/50 text-xs font-semibold transition-colors shadow-sm"
+              className="px-4 py-2 rounded-buttons border border-hairline bg-paper text-slate-gray hover:bg-pebble text-[14px] font-semibold transition-colors shadow-calendly-btn"
             >
               ⟳ Actualizar
             </button>
             <button 
               onClick={() => setIsSaleModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors shadow-sm"
+              className="px-4 py-2 rounded-buttons bg-ink-navy hover:bg-slate-gray text-white text-[14px] font-semibold transition-colors shadow-calendly-btn"
             >
               + Registrar Venta
             </button>
             <button 
               onClick={() => setIsPatientModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
+              className="px-4 py-2 rounded-buttons bg-signal-blue hover:bg-deep-cobalt text-white text-[14px] font-semibold transition-colors shadow-calendly-btn flex items-center gap-1.5"
             >
               + Nuevo Paciente
             </button>
@@ -136,65 +133,65 @@ export default function PacientesPage() {
 
         {/* Tarjetas KPI Superiores */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div className="bg-paper p-6 rounded-cards border border-hairline shadow-calendly flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg">
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Planes Vigentes</p>
-              <p className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.vigentes}</p>
-              <p className="text-xs text-slate-400 mt-0.5">En tratamiento activo</p>
+              <p className="text-[12px] font-semibold text-slate-gray uppercase tracking-wider">Planes Vigentes</p>
+              <p className="text-[38px] font-bold text-ink-navy tracking-tight leading-tight">{kpis.vigentes}</p>
+              <p className="text-[12px] text-mist-gray mt-0.5">En tratamiento activo</p>
             </div>
-            <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">
+            <div className="w-12 h-12 rounded-inputs bg-pebble text-signal-blue flex items-center justify-center font-bold text-xl">
               ✓
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div className="bg-paper p-6 rounded-cards border border-hairline shadow-calendly flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg">
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Por Renovar</p>
-              <p className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.porRenovar}</p>
-              <p className="text-xs text-slate-400 mt-0.5">1 sesión restante</p>
+              <p className="text-[12px] font-semibold text-slate-gray uppercase tracking-wider">Por Renovar</p>
+              <p className="text-[38px] font-bold text-ink-navy tracking-tight leading-tight">{kpis.porRenovar}</p>
+              <p className="text-[12px] text-mist-gray mt-0.5">1 sesión restante</p>
             </div>
-            <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-lg">
+            <div className="w-12 h-12 rounded-inputs bg-pebble text-ink-navy flex items-center justify-center font-bold text-xl">
               ⚠️
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div className="bg-paper p-6 rounded-cards border border-hairline shadow-calendly flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg">
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Pacientes</p>
-              <p className="text-2xl font-bold text-slate-900 tracking-tight">{kpis.total}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{kpis.finalizados} planes finalizados</p>
+              <p className="text-[12px] font-semibold text-slate-gray uppercase tracking-wider">Total Pacientes</p>
+              <p className="text-[38px] font-bold text-ink-navy tracking-tight leading-tight">{kpis.total}</p>
+              <p className="text-[12px] text-mist-gray mt-0.5">{kpis.finalizados} planes finalizados</p>
             </div>
-            <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-lg">
+            <div className="w-12 h-12 rounded-inputs bg-cloud text-slate-gray flex items-center justify-center font-bold text-xl">
               👥
             </div>
           </div>
         </div>
 
         {/* Barra de Filtros y Búsqueda */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-white p-2 rounded-2xl border border-slate-200/80 shadow-sm">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-paper p-3 rounded-cards border border-hairline shadow-calendly">
           {/* Pestañas */}
-          <div className="flex items-center gap-1 overflow-x-auto p-1">
+          <div className="flex items-center gap-1 overflow-x-auto p-1 bg-pebble rounded-inputs border border-hairline">
             <button
               onClick={() => setFiltroTab('todos')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${filtroTab === 'todos' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+              className={`px-4 py-2 rounded-md text-[14px] font-semibold whitespace-nowrap transition-colors ${filtroTab === 'todos' ? 'bg-paper text-ink-navy shadow-calendly' : 'text-slate-gray hover:text-ink-navy'}`}
             >
               Todos ({kpis.total})
             </button>
             <button
               onClick={() => setFiltroTab('vigentes')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${filtroTab === 'vigentes' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+              className={`px-4 py-2 rounded-md text-[14px] font-semibold whitespace-nowrap transition-colors ${filtroTab === 'vigentes' ? 'bg-paper text-signal-blue shadow-calendly' : 'text-slate-gray hover:text-ink-navy'}`}
             >
               Vigentes ({kpis.vigentes})
             </button>
             <button
               onClick={() => setFiltroTab('renovar')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${filtroTab === 'renovar' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+              className={`px-4 py-2 rounded-md text-[14px] font-semibold whitespace-nowrap transition-colors ${filtroTab === 'renovar' ? 'bg-paper text-deep-cobalt shadow-calendly' : 'text-slate-gray hover:text-ink-navy'}`}
             >
               Por Renovar ({kpis.porRenovar})
             </button>
             <button
               onClick={() => setFiltroTab('finalizados')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${filtroTab === 'finalizados' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+              className={`px-4 py-2 rounded-md text-[14px] font-semibold whitespace-nowrap transition-colors ${filtroTab === 'finalizados' ? 'bg-paper text-slate-gray shadow-calendly' : 'text-slate-gray hover:text-ink-navy'}`}
             >
               Finalizados ({kpis.finalizados})
             </button>
