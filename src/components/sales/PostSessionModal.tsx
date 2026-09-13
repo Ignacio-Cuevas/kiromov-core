@@ -103,22 +103,28 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
 
       const payload = {
         paciente_id: paciente.id,
-        plan_id: planElegido.id,
-        catalogo_plan_id: planElegido.id,
-        nombre_plan: planElegido.nombre,
-        sesiones_totales: planElegido.sesiones || 1,
+        plan_id: planElegido.id || null,
+        plan_id_ref: planElegido.id || null,
+        catalogo_plan_id: planElegido.id || null,
+        nombre_plan: planElegido.nombre || 'Plan Kinésico',
+        plan_nombre: planElegido.nombre || 'Plan Kinésico',
+        sesiones_totales: Number(planElegido.sesiones) || 1,
         sesiones_usadas: sesionesUsadasIniciales,
         monto_clp: montoClp,
+        metodo_pago: decision === 'pagar_ahora' ? metodoPago : null,
         estado_pago: decision === 'pagar_ahora' ? 'pagado' : 'pendiente',
         fecha_compra: getChileanDate(),
-        metodo_pago: decision === 'pagar_ahora' ? metodoPago : null,
         numero_boleta: numeroBoleta || null,
         notas: abonarEvaluacion ? 'Plan contratado con abono de evaluación previa ($28.000)' : null,
-        estado: 'activo'
+        estado: 'activo',
+        created_at: new Date().toISOString()
       };
 
       const { error } = await supabase.from('compras_planes').insert([payload]);
-      if (error) throw error;
+      if (error) {
+        toast.error('Error al registrar plan: ' + error.message);
+        return;
+      }
 
       toast.success(decision === 'pagar_ahora' ? 'Cobro y plan registrados exitosamente' : 'Plan registrado y dejado pendiente de pago');
       onSuccess();

@@ -96,21 +96,27 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
 
       const payload = {
         paciente_id: paciente.id,
-        plan_id: planElegido.id,
-        catalogo_plan_id: planElegido.id,
-        nombre_plan: planElegido.nombre,
-        sesiones_totales: sesionesCustom,
+        plan_id: planElegido.id || null,
+        plan_id_ref: planElegido.id || null,
+        catalogo_plan_id: planElegido.id || null,
+        nombre_plan: planElegido.nombre || 'Plan Kinésico',
+        plan_nombre: planElegido.nombre || 'Plan Kinésico',
+        sesiones_totales: Number(sesionesCustom) || 1,
         sesiones_usadas: 0,
         monto_clp: montoClp,
+        metodo_pago: null,
         estado_pago: 'pendiente',
         fecha_compra: getChileanDate(),
-        metodo_pago: null,
         numero_boleta: null,
-        estado: 'activo'
+        estado: 'activo',
+        created_at: new Date().toISOString()
       };
 
       const { error } = await supabase.from('compras_planes').insert([payload]);
-      if (error) throw error;
+      if (error) {
+        toast.error('Error al asignar plan: ' + error.message);
+        return;
+      }
 
       toast.success('Tratamiento asignado exitosamente (Pendiente de pago)');
       onSuccess();

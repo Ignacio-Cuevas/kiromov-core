@@ -141,21 +141,45 @@ function AgendaContent() {
       if (pacIds.length > 0) {
         const { data: vistaData } = await supabase.from('vista_resumen_pacientes').select('*').in('id', pacIds);
         
-        const planIds = vistaData?.map(v => v.plan_id).filter(Boolean) || [];
-        const { data: planesData } = planIds.length > 0 
-          ? await supabase.from('planes').select('id, numero_boleta, monto_clp').in('id', planIds)
-          : { data: [] };
+        // Obtener planes reales directamente desde compras_planes para asegurar consistencia
+        const { data: rawPlans } = await supabase
+          .from('compras_planes')
+          .select('*')
+          .in('paciente_id', pacIds)
+          .order('created_at', { ascending: false });
 
         if (vistaData) {
           citasData?.forEach(c => {
             const vistaP = vistaData.find(v => v.id === c.paciente_id);
             if (vistaP && c.pacientes) {
-              const plan = planesData?.find(pl => pl.id === vistaP.plan_id);
-              c.pacientes = { 
-                ...(c.pacientes as any), 
-                ...vistaP, 
-                numero_boleta: plan?.numero_boleta || null 
-              };
+              const patientPlans = rawPlans?.filter(p => p.paciente_id === c.paciente_id) || [];
+              const activePlan = patientPlans.find(p => p.estado === 'activo');
+              const latestPlan = patientPlans[0];
+              const planElegido = activePlan || latestPlan;
+
+              let enriched = { ...(c.pacientes as any), ...vistaP };
+              if (planElegido) {
+                const tot = planElegido.sesiones_totales ?? planElegido.total_sesiones ?? 1;
+                const us = planElegido.sesiones_usadas ?? 0;
+                const rest = Math.max(0, tot - us);
+                const estPlan = (planElegido.estado === 'completado' || planElegido.estado === 'finalizado' || us >= tot)
+                  ? 'finalizado'
+                  : 'vigente';
+
+                enriched = {
+                  ...enriched,
+                  plan_id: planElegido.id,
+                  nombre_plan: planElegido.nombre_plan || planElegido.plan_nombre || vistaP.nombre_plan || 'Plan Kinésico',
+                  sesiones_totales: tot,
+                  sesiones_usadas: us,
+                  sesiones_restantes: rest,
+                  estado_plan: estPlan,
+                  estado_pago: planElegido.estado_pago || vistaP.estado_pago || 'pendiente',
+                  monto_clp: planElegido.monto_clp ?? planElegido.total_final_clp ?? vistaP.monto_clp ?? 0,
+                  numero_boleta: planElegido.numero_boleta || null
+                };
+              }
+              c.pacientes = enriched;
             }
           });
         }
@@ -230,7 +254,7 @@ function AgendaContent() {
       }
       return `Semana del ${diaIni} de ${mesIni} al ${diaFin} de ${mesFin} de ${ano}`;
     } else {
-      return fechaBase.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+      return fechaBase.toLocaleDateString('es-CL', { year: 'numeric', month: 'long' });
     }
   }, [fechaBase, vista]);
 
@@ -264,12 +288,25 @@ function AgendaContent() {
       if (errCita) throw errCita;
 
       const resumen = cita.pacientes;
+      const quedanSesiones = (resumen?.sesiones_restantes || 1) - 1;
 
       // B. Descontar 1 sesión en compras_planes si tiene plan activo
+      // PROHIBICIÓN ESTRICTA: NUNCA autoasignar plan ni insertar en compras_planes.
+      // Si consume la última sesión (quedanSesiones <= 0), marcar estado = 'completado'.
       if (resumen?.plan_id && (resumen?.sesiones_restantes || 0) > 0) {
+        const nuevasUsadas = (resumen.sesiones_usadas || 0) + 1;
+        const finalizaPlan = nuevasUsadas >= (resumen.sesiones_totales || 1) || quedanSesiones <= 0;
+
+        const updatePayload: Record<string, any> = {
+          sesiones_usadas: nuevasUsadas
+        };
+        if (finalizaPlan) {
+          updatePayload.estado = 'completado';
+        }
+
         const { error: errPlan } = await supabase
           .from('compras_planes')
-          .update({ sesiones_usadas: (resumen.sesiones_usadas || 0) + 1 })
+          .update(updatePayload)
           .eq('id', resumen.plan_id);
 
         if (errPlan) throw errPlan;
@@ -277,23 +314,20 @@ function AgendaContent() {
 
       // C. Actualizar estado local reactivo en pantalla INMEDIATAMENTE
       setCitas((prev) =>
-        prev.map((c) => (c.id === cita.id ? { ...c, estado: 'asistio' } : c))
+        prev.map((c) => (c.id === cita.id ? {
+          ...c,
+          estado: 'asistio',
+          pacientes: c.pacientes ? {
+            ...c.pacientes,
+            sesiones_usadas: (c.pacientes.sesiones_usadas || 0) + 1,
+            sesiones_restantes: Math.max(0, (c.pacientes.sesiones_restantes || 1) - 1),
+            estado_plan: quedanSesiones <= 0 ? 'finalizado' : c.pacientes.estado_plan
+          } : c.pacientes
+        } : c))
       );
 
       toast.success('¡Asistencia confirmada exitosamente!');
-
-      // D. Evaluar si completó su plan o no tiene plan
-      const quedanSesiones = (resumen?.sesiones_restantes || 1) - 1;
-      if (!resumen?.plan_id || quedanSesiones <= 0) {
-        // Abrir modal unificado de Atención-Venta-Cobro
-        if (cita.pacientes) {
-          setModalPostAtencion({
-            isOpen: true,
-            paciente: cita.pacientes,
-            motivo: quedanSesiones <= 0 ? 'plan_completado' : 'sin_plan'
-          });
-        }
-      }
+      loadAgenda();
     } catch (err) {
       console.error('Error al registrar asistencia:', err);
       toast.error(`Error: ${(err as Error).message}`);
@@ -529,53 +563,64 @@ function AgendaContent() {
     return pacientes.filter(p => p.nombre_completo?.toLowerCase().includes(q) || p.rut?.toLowerCase().includes(q)).slice(0, 50);
   }, [pacientes, pacienteSearch]);
 
-  const getEstiloSemaforoSemanal = (estado: string) => {
-    switch (estado?.toLowerCase()) {
-      case 'confirmada':
-        return 'border-l-4 border-deep-cobalt bg-cloud text-ink-navy hover:bg-pebble';
-      case 'pendiente':
-        return 'border-l-4 border-slate-gray bg-cloud text-ink-navy hover:bg-pebble';
-      case 'asistio':
-      case 'asistió':
-      case 'atendido':
-      case 'en_sala':
-        return 'border-l-4 border-signal-blue bg-cloud text-ink-navy hover:bg-pebble opacity-90';
-      case 'cancelada':
-      case 'no_asistio':
-        return 'border-l-4 border-mist-gray bg-pebble text-slate-gray opacity-75 line-through';
-      default:
-        return 'border-l-4 border-hairline bg-paper text-ink-navy';
-    }
-  };
-
-  const getCardSemaforoStyles = (estado: string) => {
-    switch (estado?.toLowerCase()) {
+  // ─── Sistema Cromático Semafórico Unificado ─────────────────────────────────
+  const getCitaColorTokens = (estado: string) => {
+    const s = estado?.toLowerCase() || '';
+    switch (s) {
       case 'confirmada':
         return {
-          card: 'bg-paper border-hairline hover:border-deep-cobalt shadow-calendly',
-          hora: 'bg-cloud text-deep-cobalt border border-hairline'
+          cardBg:      'bg-emerald-50/60 border-emerald-200 hover:border-emerald-300 border-l-4 border-l-emerald-500',
+          badge:       'bg-emerald-100 text-emerald-900 border-emerald-200',
+          dot:         'bg-emerald-500',
+          hora:        'bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold',
+          select:      'bg-emerald-50 text-emerald-800 border-emerald-300',
+          pillMensual: 'bg-emerald-100/90 text-emerald-900 border border-emerald-300',
+          compact:     'border-l-4 border-l-emerald-500 bg-emerald-50/60 text-ink-navy hover:bg-emerald-50',
         };
       case 'pendiente':
         return {
-          card: 'bg-paper border-hairline hover:border-slate-gray shadow-calendly',
-          hora: 'bg-cloud text-slate-gray border border-hairline'
+          cardBg:      'bg-amber-50/50 border-amber-200 hover:border-amber-300 border-l-4 border-l-amber-500',
+          badge:       'bg-amber-100 text-amber-900 border-amber-200',
+          dot:         'bg-amber-500',
+          hora:        'bg-amber-100 text-amber-900 border border-amber-300 font-bold',
+          select:      'bg-amber-50 text-amber-800 border-amber-300',
+          pillMensual: 'bg-amber-100/90 text-amber-900 border border-amber-300',
+          compact:     'border-l-4 border-l-amber-500 bg-amber-50/50 text-ink-navy hover:bg-amber-50',
         };
       case 'asistio':
       case 'asistió':
       case 'atendido':
       case 'en_sala':
         return {
-          card: 'bg-paper border-hairline hover:border-signal-blue shadow-calendly opacity-95',
-          hora: 'bg-cloud text-signal-blue border border-hairline'
+          cardBg:      'bg-slate-50/80 border-slate-200 hover:border-slate-300 border-l-4 border-l-slate-400 opacity-95',
+          badge:       'bg-slate-100 text-slate-700 border-slate-200',
+          dot:         'bg-slate-500',
+          hora:        'bg-slate-100 text-slate-800 border border-slate-300 font-bold',
+          select:      'bg-slate-100 text-slate-700 border-slate-300',
+          pillMensual: 'bg-slate-100 text-slate-700 border border-slate-300',
+          compact:     'border-l-4 border-l-slate-400 bg-slate-50/80 text-ink-navy hover:bg-slate-100 opacity-90',
         };
       case 'cancelada':
       case 'no_asistio':
         return {
-          card: 'bg-pebble border-hairline opacity-75 grayscale hover:grayscale-0',
-          hora: 'bg-mist-gray text-paper border border-hairline line-through'
+          cardBg:      'bg-rose-50/50 border-rose-200 hover:border-rose-300 border-l-4 border-l-rose-500 opacity-75',
+          badge:       'bg-rose-100 text-rose-800 border-rose-200',
+          dot:         'bg-rose-500',
+          hora:        'bg-rose-100 text-rose-900 border border-rose-300 font-bold line-through',
+          select:      'bg-rose-50 text-rose-800 border-rose-300',
+          pillMensual: 'bg-rose-100 text-rose-800 border border-rose-200 line-through opacity-75',
+          compact:     'border-l-4 border-l-rose-500 bg-rose-50/50 text-rose-900 hover:bg-rose-50 opacity-75',
         };
       default:
-        return { card: 'bg-paper border-hairline', hora: 'bg-cloud text-ink-navy' };
+        return {
+          cardBg:      'bg-paper border-hairline hover:border-slate-gray border-l-4 border-l-hairline',
+          badge:       'bg-pebble text-slate-gray border-hairline',
+          dot:         'bg-slate-gray',
+          hora:        'bg-cloud text-ink-navy border border-hairline font-bold',
+          select:      'bg-pebble text-slate-gray border-hairline',
+          pillMensual: 'bg-pebble text-slate-gray',
+          compact:     'border-l-4 border-l-hairline bg-paper text-ink-navy hover:bg-pebble',
+        };
     }
   };
 
@@ -584,35 +629,24 @@ function AgendaContent() {
     if (!p) return null;
     
     const s = cita.estado?.toLowerCase() || 'pendiente';
-    let stateColors = 'bg-slate-50/50 text-slate-600 border-slate-200/80';
-    let stateLabel = 'Pendiente';
-    if (s === 'en_sala') { stateColors = 'bg-amber-50 text-amber-700 border-amber-200'; stateLabel = 'En Sala'; }
-    else if (['asistio', 'asistió', 'atendido'].includes(s)) { stateColors = 'bg-emerald-50 text-emerald-700 border-emerald-200'; stateLabel = 'Asistió'; }
-    else if (s === 'confirmada') { stateColors = 'bg-indigo-50 text-indigo-700 border-indigo-200'; stateLabel = 'Confirmada'; }
-    else if (s === 'cancelada') { stateColors = 'bg-red-50 text-red-700 border-red-200 line-through'; stateLabel = 'Cancelada'; }
+    const tokens = getCitaColorTokens(s);
     const cleanPhone = p.telefono ? p.telefono.replace(/\D/g, '').slice(-9) : '';
 
     if (compact) {
-        const semaforoClass = getEstiloSemaforoSemanal(s);
         const { tienePlan: tienePlanCompact, sesionesUsadas, sesionesTotales } = getResumenPlan(p);
-        
-        let badgePrevision = '';
-        if (p.prevision) {
-          if (p.prevision.toLowerCase().includes('convenio')) badgePrevision = '[Conv]';
-          else if (p.prevision.toLowerCase().includes('isapre')) badgePrevision = '[Isapre]';
-          else if (p.prevision.toLowerCase().includes('fonasa')) badgePrevision = '[Fonasa]';
-          else badgePrevision = '[Part]';
-        }
 
         return (
-            <div key={cita.id} className={`rounded-xl border p-3 space-y-2 transition-all hover:shadow-sm mb-2 ${semaforoClass}`}>
-                {/* Nivel 1: Hora y Selector de Estado */}
-                <div className="flex items-center justify-between border-b border-slate-200/50 pb-1.5">
-                    <span className="font-bold text-xs font-mono text-slate-900">{cita.hora?.slice(0, 5)}</span>
+            <div key={cita.id} className={`rounded-inputs border p-3 space-y-2 transition-all hover:shadow-sm mb-2 ${tokens.compact}`}>
+                {/* Nivel 1: Dot + Hora + Selector de Estado */}
+                <div className="flex items-center justify-between border-b border-black/10 pb-1.5">
+                    <div className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${tokens.dot}`} />
+                        <span className="font-bold text-xs font-mono">{cita.hora?.slice(0, 5)}</span>
+                    </div>
                     <select
                       value={['asistió', 'atendido'].includes(s) ? 'asistio' : s}
                       onChange={(e) => handleCambiarEstadoCita(cita, e.target.value)}
-                      className="text-[10px] font-bold rounded-lg px-2 py-0.5 border bg-white/90 shadow-xs cursor-pointer focus:outline-none"
+                      className={`text-[10px] font-bold rounded-md px-2 py-0.5 border cursor-pointer focus:outline-none ${tokens.select}`}
                     >
                       <option value="pendiente">⏳ Pendiente</option>
                       <option value="confirmada">✓ Confirmada</option>
@@ -622,35 +656,35 @@ function AgendaContent() {
                     </select>
                 </div>
 
-                {/* Nivel 2: Nombre Completo y Saldo de Sesiones */}
+                {/* Nivel 2: Nombre y Saldo */}
                 <div>
-                    <p className="font-bold text-slate-900 text-xs truncate" title={p.nombre_completo}>
+                    <p className="font-bold text-ink-navy text-xs truncate" title={p.nombre_completo}>
                       {p.nombre_completo}
                     </p>
                     <div className="flex items-center justify-between mt-1 text-[10px]">
-                      <span className="font-semibold text-slate-500 bg-white/80 px-1.5 py-0.5 rounded border border-slate-200/50">
+                      <span className="font-semibold text-slate-gray">
                         {p.prevision || 'Particular'}
                       </span>
-                      <span className="font-bold text-slate-700">
+                      <span className="font-bold text-ink-navy">
                         {tienePlanCompact ? `${sesionesUsadas}/${sesionesTotales} ses.` : 'Sin plan'}
                       </span>
                     </div>
                 </div>
 
                 {/* Nivel 3: Botones Rápidos */}
-                <div className="flex items-center justify-between pt-1 border-t border-slate-200/40">
+                <div className="flex items-center justify-between pt-1 border-t border-black/10">
                     <a
                       href={cleanPhone ? generarMensajeConfirmacion(cita) : '#'}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[11px] text-slate-600 hover:text-emerald-700 font-medium"
+                      className="text-[11px] text-slate-gray hover:text-signal-blue font-medium transition-colors"
                       title="WhatsApp"
                     >
                       💬 WhatsApp
                     </a>
                     <button
                       onClick={() => { setSelectedPatientForDrawer(p); setSelectedCitaForSuite(cita); setIsDrawerOpen(true); }}
-                      className="text-[11px] text-blue-700 font-semibold hover:underline"
+                      className="text-[11px] text-signal-blue font-semibold hover:underline"
                     >
                       Ficha →
                     </button>
@@ -663,19 +697,21 @@ function AgendaContent() {
     const pct = tienePlan ? Math.min(100, Math.round(((p.sesiones_usadas || 0) / (p.sesiones_totales || 1)) * 100)) : 0;
     const debePago = p.estado_pago === 'pendiente';
     const montoPendiente = formatCLP(p.monto_clp || 0);
-    const styles = getCardSemaforoStyles(s);
 
     return (
-      <div key={cita.id} className={`rounded-2xl border p-4 sm:p-5 space-y-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md mb-3 ${styles.card}`}>
+      <div key={cita.id} className={`rounded-cards border p-4 sm:p-5 space-y-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg mb-3 shadow-calendly ${tokens.cardBg}`}>
         {/* Cabecera y acciones de gestión */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-black/10 pb-3">
           <div className="flex items-center gap-3">
-            <span className={`font-bold text-lg sm:text-xl px-3 py-1.5 rounded-xl font-mono shadow-sm ${styles.hora}`}>
-              {cita.hora?.slice(0, 5)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`w-3 h-3 rounded-full shrink-0 ${tokens.dot}`} />
+              <span className={`font-bold text-lg sm:text-xl px-3 py-1.5 rounded-inputs font-mono shadow-sm ${tokens.hora}`}>
+                {cita.hora?.slice(0, 5)}
+              </span>
+            </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h4 className="font-bold text-slate-900 text-sm sm:text-base">{cita.pacientes?.nombre_completo || p.nombre_completo}</h4>
+                <h4 className="font-bold text-ink-navy text-sm sm:text-base">{cita.pacientes?.nombre_completo || p.nombre_completo}</h4>
                 {p.prevision && (
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
                     p.prevision.toLowerCase().includes('convenio')
@@ -684,7 +720,7 @@ function AgendaContent() {
                       ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                       : p.prevision.toLowerCase().includes('fonasa')
                       ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                      : 'bg-slate-100 text-slate-700'
+                      : 'bg-pebble text-slate-gray'
                   }`}>
                     {p.prevision}
                   </span>
@@ -692,17 +728,7 @@ function AgendaContent() {
                 <select
                   value={['asistió', 'atendido'].includes(s) ? 'asistio' : s}
                   onChange={(e) => handleCambiarEstadoCita(cita, e.target.value)}
-                  className={`text-[11px] font-bold rounded-xl px-2 py-0.5 border shadow-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ml-1 ${
-                    s === 'confirmada'
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                      : s === 'pendiente'
-                      ? 'bg-amber-50 text-amber-800 border-amber-300'
-                      : ['asistio', 'asistió', 'atendido'].includes(s)
-                      ? 'bg-slate-100 text-slate-700 border-slate-300'
-                      : s === 'no_asistio'
-                      ? 'bg-rose-50 text-rose-800 border-rose-300'
-                      : 'bg-slate-50 text-slate-500 border-slate-200'
-                  }`}
+                  className={`text-[11px] font-bold rounded-buttons px-2 py-0.5 border cursor-pointer focus:outline-none transition-all ml-1 ${tokens.select}`}
                 >
                   <option value="pendiente">⏳ Pendiente</option>
                   <option value="confirmada">✓ Confirmada</option>
@@ -711,11 +737,11 @@ function AgendaContent() {
                   <option value="cancelada">✕ Cancelada</option>
                 </select>
               </div>
-              <p className="text-xs text-slate-500 font-mono mt-1">
+              <p className="text-xs text-slate-gray font-mono mt-1">
                 {formatRut(p.rut) || 'Sin RUT'} • <span className="font-sans italic">{cita.motivo_consulta || 'Sesión Kinésica'}</span>
               </p>
               {(p.alertas_seguridad || p.antecedentes_morbidos) && (
-                <div className="bg-rose-50 border border-rose-200 text-rose-800 px-3 py-1.5 rounded-xl text-xs flex flex-wrap items-center gap-1.5 mt-2 max-w-full">
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 px-3 py-1.5 rounded-inputs text-xs flex flex-wrap items-center gap-1.5 mt-2 max-w-full">
                   <span className="font-bold whitespace-nowrap">🚩 Alerta Seguridad TMO:</span>
                   <span className="truncate">{p.alertas_seguridad || p.antecedentes_morbidos}</span>
                 </div>
@@ -998,21 +1024,19 @@ function AgendaContent() {
                             <div className="space-y-1.5">
                                 {citasToShow.map(c => {
                                     const s = c.estado?.toLowerCase() || 'pendiente';
-                                    let bg = 'bg-pebble text-ink-navy border border-hairline';
-                                    if (s === 'confirmada') bg = 'bg-cloud text-deep-cobalt border border-deep-cobalt/30 font-semibold';
-                                    else if (s === 'pendiente') bg = 'bg-cloud text-slate-gray border border-slate-gray/30 font-semibold';
-                                    else if (['cancelada', 'no_asistio'].includes(s)) bg = 'bg-pebble text-mist-gray line-through opacity-75 border-transparent';
+                                    const tokens = getCitaColorTokens(s);
                                     
                                     const primerNombre = c.pacientes?.nombre_completo?.split(' ')[0] || '';
                                     const { tienePlan, sesionesUsadas, sesionesTotales } = getResumenPlan(c.pacientes || {});
                                     const planStr = tienePlan ? `${c.pacientes?.nombre_plan} (${sesionesUsadas}/${sesionesTotales} ses)` : 'Sin plan';
 
                                     return (
-                                        <div key={c.id} className={`px-2 py-1 rounded-inputs text-[10px] truncate relative group ${bg}`}>
+                                        <div key={c.id} className={`px-1.5 py-0.5 rounded-md text-[10px] truncate relative group font-medium ${tokens.pillMensual}`}>
+                                            <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle ${tokens.dot}`} />
                                             {c.hora?.slice(0,5)} • {primerNombre}
                                             
                                             {/* Hover Tooltip */}
-                                            <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-48 bg-ink-navy text-paper p-3 rounded-lg shadow-calendly-lg z-[60] text-[12px] whitespace-normal pointer-events-none">
+                                            <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-48 bg-ink-navy text-paper p-3 rounded-inputs shadow-calendly-lg z-[60] text-[12px] whitespace-normal pointer-events-none">
                                                 <p className="font-bold text-[14px]">{c.pacientes?.nombre_completo}</p>
                                                 <p className="text-mist-gray text-[11px] mt-1">{c.pacientes?.prevision || 'Particular'} • {c.pacientes?.telefono}</p>
                                                 <p className="text-signal-blue text-[11px] mt-1.5 font-semibold">{planStr}</p>
