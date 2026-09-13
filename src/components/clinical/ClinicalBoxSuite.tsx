@@ -6,6 +6,9 @@ import { toast } from 'sonner';
 import { getChileanDate } from '@/lib/utils';
 import { AppointmentModal } from '@/components/appointments/AppointmentModal';
 import { InitialEvaluationModal } from '@/components/clinical/InitialEvaluationModal';
+import { DischargeReportModal } from '@/components/clinical/DischargeReportModal';
+import { ReimbursementCertificate } from '@/components/clinical/ReimbursementCertificate';
+import { FileText, Printer } from 'lucide-react';
 
 interface ClinicalBoxSuiteProps {
   pacienteId: string;
@@ -31,6 +34,8 @@ export default function ClinicalBoxSuite({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [abrirAgendarModal, setAbrirAgendarModal] = useState(false);
   const [abrirEvaluacionModal, setAbrirEvaluacionModal] = useState(false);
+  const [abrirDischargeModal, setAbrirDischargeModal] = useState(false);
+  const [abrirCertificadoModal, setAbrirCertificadoModal] = useState(false);
   const [evaluacionInicialTMO, setEvaluacionInicialTMO] = useState<any>(null);
 
   // Estados del Formulario SOAP de hoy
@@ -213,6 +218,26 @@ export default function ClinicalBoxSuite({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setAbrirCertificadoModal(true)}
+              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Emitir certificado médico para reembolso"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Certificado Reembolso</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAbrirDischargeModal(true)}
+              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Generar informe oficial de alta médica y reintegro funcional"
+            >
+              <FileText className="w-3.5 h-3.5 text-emerald-600" />
+              <span>📄 Informe de Alta Médica</span>
+            </button>
+
             <button
               type="button"
               onClick={onClose}
@@ -686,6 +711,25 @@ export default function ClinicalBoxSuite({
             setAbrirEvaluacionModal(false);
             await cargarDatos();
           }}
+        />
+      )}
+
+      {abrirDischargeModal && paciente && (
+        <DischargeReportModal
+          isOpen={abrirDischargeModal}
+          patient={paciente}
+          soaps={historialSOAP}
+          onClose={() => setAbrirDischargeModal(false)}
+        />
+      )}
+
+      {abrirCertificadoModal && paciente && (
+        <ReimbursementCertificate
+          isOpen={abrirCertificadoModal}
+          patient={paciente}
+          evoluciones={historialSOAP}
+          numeroBoleta={planActivo?.numero_boleta || null}
+          onClose={() => setAbrirCertificadoModal(false)}
         />
       )}
     </div>

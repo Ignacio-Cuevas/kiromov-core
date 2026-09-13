@@ -2,9 +2,10 @@
 
 import { Suspense, useEffect, useState, useMemo } from "react";
 import { SettlePaymentModal } from "@/components/sales/SettlePaymentModal";
+import { CancelPlanModal } from "@/components/sales/CancelPlanModal";
 import { createClient } from "@/utils/supabase/client";
 import { formatCLP, formatRut , getChileanDate } from '@/lib/utils';
-import { Loader2, Plus, CreditCard, TrendingUp, TrendingDown, DollarSign, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Loader2, Plus, CreditCard, TrendingUp, TrendingDown, DollarSign, CheckCircle2, AlertTriangle, X } from "lucide-react";
 import { toast } from "sonner";
 
 // Componentes UI dummy para no romper dependencias
@@ -31,8 +32,9 @@ function FinanzasContent() {
   const [savingEgreso, setSavingEgreso] = useState(false);
   const [egresoForm, setEgresoForm] = useState({ concepto: '', categoria: 'Insumos Clínicos', monto: '', formaPago: 'Débito', fecha: '' });
 
-  // Modal Settle
+  // Modal Settle & Cancel
   const [settlingPlan, setSettlingPlan] = useState<any>(null);
+  const [cancelingPlan, setCancelingPlan] = useState<any>(null);
 
   const getRangoFechas = (tipo: string) => {
     const ahora = new Date();
@@ -378,9 +380,22 @@ function FinanzasContent() {
                                 {formatCLP(Number(c.monto_clp || c.valor_total) || 0)}
                               </td>
                               <td className="py-3 px-4 text-right">
-                                <Button onClick={() => setSettlingPlan(c)} className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm h-8">
-                                  <CreditCard className="w-3.5 h-3.5 mr-1.5" /> Cobrar Plan
-                                </Button>
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button 
+                                    onClick={() => setCancelingPlan(c)} 
+                                    variant="outline" 
+                                    className="border-rose-200 text-rose-700 hover:bg-rose-50 rounded-xl text-xs font-bold shadow-2xs h-8 cursor-pointer"
+                                    title="Ajustar monto a sesiones realizadas o anular el plan"
+                                  >
+                                    <X className="w-3.5 h-3.5 mr-1 text-rose-600" /> Ajustar / Cancelar Plan
+                                  </Button>
+                                  <Button 
+                                    onClick={() => setSettlingPlan(c)} 
+                                    className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm h-8 cursor-pointer"
+                                  >
+                                    <CreditCard className="w-3.5 h-3.5 mr-1.5" /> Cobrar Plan
+                                  </Button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -489,6 +504,14 @@ function FinanzasContent() {
         onClose={() => setSettlingPlan(null)} 
         planEnUso={settlingPlan}
         onSuccess={() => { setSettlingPlan(null); loadData(); }}
+      />
+
+      <CancelPlanModal
+        isOpen={!!cancelingPlan}
+        onClose={() => setCancelingPlan(null)}
+        plan={cancelingPlan}
+        patientName={cancelingPlan?.pacientes?.nombre_completo}
+        onSuccess={() => { setCancelingPlan(null); loadData(); }}
       />
     </div>
   );

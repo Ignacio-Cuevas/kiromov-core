@@ -15,6 +15,7 @@ import {
   AlertCircle,
   CheckCircle2,
   DollarSign,
+  X,
 } from "lucide-react";
 
 interface PlansHistoryTabProps {
@@ -24,6 +25,7 @@ interface PlansHistoryTabProps {
   onOpenRenewModal?: () => void;
   onEmitCertificate?: (plan?: CompraPlan) => void;
   onPayPlan?: (plan: CompraPlan) => void;
+  onCancelPlan?: (plan: CompraPlan) => void;
 }
 
 export function PlansHistoryTab({
@@ -33,6 +35,7 @@ export function PlansHistoryTab({
   onOpenRenewModal,
   onEmitCertificate,
   onPayPlan,
+  onCancelPlan,
 }: PlansHistoryTabProps) {
   if (isLoading) {
     return (
@@ -170,15 +173,28 @@ export function PlansHistoryTab({
 
                 {/* Acciones del Plan: Registrar Cobro si está pendiente, o Emitir Certificado */}
                 <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                  <div>
+                  <div className="flex flex-wrap items-center gap-2">
                     {pending && onPayPlan && (
                       <Button
                         size="sm"
                         onClick={() => onPayPlan(plan)}
-                        className="h-8 gap-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs"
+                        className="h-8 gap-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs cursor-pointer"
                       >
                         <CreditCard className="h-3.5 w-3.5" />
                         <span>💳 Registrar Cobro / Pago</span>
+                      </Button>
+                    )}
+
+                    {onCancelPlan && plan.estado !== 'cancelado' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onCancelPlan(plan)}
+                        className="h-8 gap-1 text-xs font-bold text-rose-700 border-rose-200 hover:bg-rose-50 rounded-xl cursor-pointer"
+                        title="Ajustar el plan a sesiones realizadas o anularlo"
+                      >
+                        <X className="h-3.5 w-3.5 text-rose-600" />
+                        <span>✕ Ajustar / Cancelar Plan</span>
                       </Button>
                     )}
                   </div>
@@ -188,7 +204,7 @@ export function PlansHistoryTab({
                       size="sm"
                       variant="outline"
                       onClick={() => onEmitCertificate(plan)}
-                      className="h-8 gap-1.5 text-xs font-bold text-blue-700 border-blue-200 hover:bg-blue-50 rounded-xl"
+                      className="h-8 gap-1.5 text-xs font-bold text-blue-700 border-blue-200 hover:bg-blue-50 rounded-xl cursor-pointer"
                     >
                       <FileText className="h-3.5 w-3.5" />
                       <span>Emitir Certificado Reembolso</span>

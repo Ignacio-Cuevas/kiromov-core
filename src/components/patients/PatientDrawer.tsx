@@ -18,6 +18,8 @@ import { RenewPlanDialog } from "./RenewPlanDialog";
 import { PayPlanModal } from "./PayPlanModal";
 import { EditPatientDialog } from "./EditPatientDialog";
 import { ReimbursementCertificate } from "@/components/clinical/ReimbursementCertificate";
+import { DischargeReportModal } from "@/components/clinical/DischargeReportModal";
+import { CancelPlanModal } from "@/components/sales/CancelPlanModal";
 import { SOAPModal } from "@/components/clinical/SOAPModal";
 import { SoapTimelineAccordion } from "./SoapTimelineAccordion";
 import {
@@ -109,6 +111,9 @@ export function PatientDrawer({
   const [selectedPlanToPay, setSelectedPlanToPay] = useState<CompraPlan | null>(null);
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   const [selectedBoletaForCert, setSelectedBoletaForCert] = useState<string | null>(null);
+  const [isDischargeOpen, setIsDischargeOpen] = useState(false);
+  const [isCancelPlanOpen, setIsCancelPlanOpen] = useState(false);
+  const [selectedPlanToCancel, setSelectedPlanToCancel] = useState<CompraPlan | null>(null);
   const [isEditPatientOpen, setIsEditPatientOpen] = useState(false);
   const [isSOAPModalOpen, setIsSOAPModalOpen] = useState(false);
 
@@ -332,11 +337,21 @@ export function PatientDrawer({
                     setSelectedBoletaForCert(activePlan?.numero_boleta || null);
                     setIsCertificateOpen(true);
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:text-blue-800 transition-colors border border-blue-200 shadow-2xs"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:text-blue-800 transition-colors border border-blue-200 shadow-2xs cursor-pointer"
                   title="Generar certificado médico para reembolso"
                 >
                   <FileText className="h-3.5 w-3.5" />
                   <span>📄 Certificado Reembolso</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsDischargeOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100 hover:text-emerald-900 transition-colors border border-emerald-300 shadow-2xs cursor-pointer"
+                  title="Generar informe oficial de alta médica y reintegro funcional"
+                >
+                  <FileText className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>📄 Informe de Alta Médica</span>
                 </button>
               </div>
             </div>
@@ -569,6 +584,10 @@ export function PatientDrawer({
                   setSelectedPlanToPay(plan);
                   setIsPayPlanOpen(true);
                 }}
+                onCancelPlan={(plan) => {
+                  setSelectedPlanToCancel(plan);
+                  setIsCancelPlanOpen(true);
+                }}
               />
             </TabsContent>
           </Tabs>
@@ -603,6 +622,22 @@ export function PatientDrawer({
         />
       )}
 
+      {isCancelPlanOpen && selectedPlanToCancel && (
+        <CancelPlanModal
+          isOpen={isCancelPlanOpen}
+          plan={selectedPlanToCancel}
+          patientName={currentPatient.nombre_completo || currentPatient.full_name}
+          onClose={() => {
+            setIsCancelPlanOpen(false);
+            setSelectedPlanToCancel(null);
+          }}
+          onSuccess={() => {
+            loadPatientData();
+            onAttendanceRegistered?.(currentPatient.id);
+          }}
+        />
+      )}
+
       {isCertificateOpen && (
         <ReimbursementCertificate
           isOpen={isCertificateOpen}
@@ -614,6 +649,16 @@ export function PatientDrawer({
           evoluciones={evoluciones}
           citas={citasPrevias}
           numeroBoleta={selectedBoletaForCert}
+        />
+      )}
+
+      {isDischargeOpen && (
+        <DischargeReportModal
+          isOpen={isDischargeOpen}
+          onClose={() => setIsDischargeOpen(false)}
+          patient={currentPatient}
+          soaps={evoluciones}
+          citas={citasPrevias}
         />
       )}
 

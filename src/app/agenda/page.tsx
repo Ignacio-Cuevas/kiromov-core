@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import SaleModal from "@/components/sales/SaleModal";
 import { SettlePaymentModal } from "@/components/sales/SettlePaymentModal";
+import { CancelPlanModal } from "@/components/sales/CancelPlanModal";
 import { PostSessionModal } from "@/components/sales/PostSessionModal";
 import { AssignTreatmentModal } from "@/components/sales/AssignTreatmentModal";
 import ClinicalBoxSuite from "@/components/clinical/ClinicalBoxSuite";
@@ -64,6 +65,7 @@ function AgendaContent() {
   const [assignTreatmentModal, setAssignTreatmentModal] = useState<{isOpen: boolean, paciente: Paciente} | null>(null);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
   const [settlingPlan, setSettlingPlan] = useState<any>(null);
+  const [cancelingPlan, setCancelingPlan] = useState<any>(null);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -751,12 +753,31 @@ function AgendaContent() {
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
                   🔴 Debe ({montoPendiente})
                 </span>
-                <button
-                  onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.monto_clp, paciente_id: p.id }); }}
-                  className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold shadow-sm transition-colors"
-                >
-                  💳 Registrar Cobro
-                </button>
+                <div className="mt-2 space-y-1.5">
+                  <button
+                    onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.monto_clp, paciente_id: p.id }); }}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold shadow-sm transition-colors cursor-pointer"
+                  >
+                    💳 Registrar Cobro
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCancelingPlan({
+                        id: p.plan_id,
+                        nombre_plan: p.nombre_plan,
+                        sesiones_totales: p.sesiones_totales,
+                        sesiones_usadas: p.sesiones_usadas,
+                        monto_clp: p.monto_clp,
+                        paciente_id: p.id,
+                        pacientes: p
+                      });
+                    }}
+                    className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg border border-rose-200 bg-rose-50/50 hover:bg-rose-100 text-rose-700 text-[10px] font-semibold transition-colors cursor-pointer"
+                    title="Ajustar sesiones realizadas o anular el plan"
+                  >
+                    ✕ Ajustar / Cancelar Plan
+                  </button>
+                </div>
               </div>
             )}
 
@@ -768,12 +789,31 @@ function AgendaContent() {
                 </span>
                 
                 {p.estado_pago === 'pendiente' ? (
-                  <button
-                    onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.monto_clp, paciente_id: p.id }); }}
-                    className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold shadow-sm transition-colors"
-                  >
-                    💳 Cobrar ({montoPendiente})
-                  </button>
+                  <div className="mt-2 space-y-1.5">
+                    <button
+                      onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.monto_clp, paciente_id: p.id }); }}
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold shadow-sm transition-colors cursor-pointer"
+                    >
+                      💳 Cobrar ({montoPendiente})
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCancelingPlan({
+                          id: p.plan_id,
+                          nombre_plan: p.nombre_plan,
+                          sesiones_totales: p.sesiones_totales,
+                          sesiones_usadas: p.sesiones_usadas,
+                          monto_clp: p.monto_clp,
+                          paciente_id: p.id,
+                          pacientes: p
+                        });
+                      }}
+                      className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg border border-rose-200 bg-rose-50/50 hover:bg-rose-100 text-rose-700 text-[10px] font-semibold transition-colors cursor-pointer"
+                      title="Ajustar sesiones realizadas o anular el plan"
+                    >
+                      ✕ Ajustar / Cancelar Plan
+                    </button>
+                  </div>
                 ) : (
                   <button
                     onClick={() => { setAssignTreatmentModal({ isOpen: true, paciente: p }); }}
@@ -1105,6 +1145,14 @@ function AgendaContent() {
         onClose={() => setSettlingPlan(null)} 
         planEnUso={settlingPlan}
         onSuccess={() => { setSettlingPlan(null); loadAgenda(); }}
+      />
+
+      <CancelPlanModal
+        isOpen={!!cancelingPlan}
+        plan={cancelingPlan}
+        patientName={cancelingPlan?.pacientes?.nombre_completo}
+        onClose={() => setCancelingPlan(null)}
+        onSuccess={() => { setCancelingPlan(null); loadAgenda(); }}
       />
 
       {modalPostAtencion && (
