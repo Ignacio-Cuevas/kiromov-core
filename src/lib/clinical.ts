@@ -81,3 +81,53 @@ export const getResumenPlan = (p: any) => {
     porcentajeUso: sesionesTotales > 0 ? Math.min(100, Math.round((sesionesUsadas / sesionesTotales) * 100)) : 0
   };
 };
+
+export const getCitaColorTokens = (estado: string) => {
+  const s = estado?.toLowerCase() || '';
+  switch (s) {
+    case 'confirmada':
+      return {
+        cardBg: 'bg-emerald-50/50 border-emerald-200 hover:border-emerald-300 border-l-4 border-l-emerald-500',
+        badge: 'bg-emerald-100 text-emerald-900 border-emerald-200',
+        dot: 'bg-emerald-500',
+        hora: 'text-emerald-950 font-bold',
+        pillMensual: 'bg-emerald-100/90 text-emerald-900 border border-emerald-300'
+      };
+    case 'pendiente':
+      return {
+        cardBg: 'bg-amber-50/50 border-amber-200 hover:border-amber-300 border-l-4 border-l-amber-500',
+        badge: 'bg-amber-100 text-amber-900 border-amber-200',
+        dot: 'bg-amber-500',
+        hora: 'text-amber-950 font-bold',
+        pillMensual: 'bg-amber-100/90 text-amber-900 border border-amber-300'
+      };
+    case 'asistio':
+    case 'asistió':
+    case 'atendido':
+    case 'en_sala':
+      return {
+        cardBg: 'bg-slate-50/80 border-slate-200 hover:border-slate-300 border-l-4 border-l-slate-400 opacity-90',
+        badge: 'bg-slate-100 text-slate-700 border-slate-200',
+        dot: 'bg-slate-500',
+        hora: 'text-slate-800 font-bold',
+        pillMensual: 'bg-slate-100 text-slate-700 border border-slate-300'
+      };
+    case 'cancelada':
+    case 'no_asistio':
+      return {
+        cardBg: 'bg-rose-50/50 border-rose-200 hover:border-rose-300 border-l-4 border-l-rose-500 opacity-75',
+        badge: 'bg-rose-100 text-rose-800 border-rose-200',
+        dot: 'bg-rose-500',
+        hora: 'text-rose-900 line-through',
+        pillMensual: 'bg-rose-100 text-rose-800 border border-rose-200 line-through opacity-75'
+      };
+    default:
+      return {
+        cardBg: 'bg-white border-slate-200 hover:border-slate-300 border-l-4 border-l-slate-300',
+        badge: 'bg-slate-100 text-slate-700 border-slate-200',
+        dot: 'bg-slate-400',
+        hora: 'text-slate-900 font-bold',
+        pillMensual: 'bg-slate-100 text-slate-700'
+      };
+  }
+};

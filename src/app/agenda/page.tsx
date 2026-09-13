@@ -11,7 +11,7 @@ import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { markAppointmentNoShow, markAppointmentAttended } from '@/actions/appointments';
 import { CitaAtencion, Paciente, VistaResumenPaciente, CompraPlan } from '@/types/database';
-import { requiereReevaluacion, getResumenPlan } from '@/lib/clinical';
+import { requiereReevaluacion, getResumenPlan, getCitaColorTokens } from '@/lib/clinical';
 
 type CitaExtendida = CitaAtencion & {
   pacientes?: (Paciente & VistaResumenPaciente & { numero_boleta?: string | null }) | any;
@@ -563,67 +563,6 @@ function AgendaContent() {
     return pacientes.filter(p => p.nombre_completo?.toLowerCase().includes(q) || p.rut?.toLowerCase().includes(q)).slice(0, 50);
   }, [pacientes, pacienteSearch]);
 
-  // ─── Sistema Cromático Semafórico Unificado ─────────────────────────────────
-  const getCitaColorTokens = (estado: string) => {
-    const s = estado?.toLowerCase() || '';
-    switch (s) {
-      case 'confirmada':
-        return {
-          cardBg:      'bg-emerald-50/60 border-emerald-200 hover:border-emerald-300 border-l-4 border-l-emerald-500',
-          badge:       'bg-emerald-100 text-emerald-900 border-emerald-200',
-          dot:         'bg-emerald-500',
-          hora:        'bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold',
-          select:      'bg-emerald-50 text-emerald-800 border-emerald-300',
-          pillMensual: 'bg-emerald-100/90 text-emerald-900 border border-emerald-300',
-          compact:     'border-l-4 border-l-emerald-500 bg-emerald-50/60 text-ink-navy hover:bg-emerald-50',
-        };
-      case 'pendiente':
-        return {
-          cardBg:      'bg-amber-50/50 border-amber-200 hover:border-amber-300 border-l-4 border-l-amber-500',
-          badge:       'bg-amber-100 text-amber-900 border-amber-200',
-          dot:         'bg-amber-500',
-          hora:        'bg-amber-100 text-amber-900 border border-amber-300 font-bold',
-          select:      'bg-amber-50 text-amber-800 border-amber-300',
-          pillMensual: 'bg-amber-100/90 text-amber-900 border border-amber-300',
-          compact:     'border-l-4 border-l-amber-500 bg-amber-50/50 text-ink-navy hover:bg-amber-50',
-        };
-      case 'asistio':
-      case 'asistió':
-      case 'atendido':
-      case 'en_sala':
-        return {
-          cardBg:      'bg-slate-50/80 border-slate-200 hover:border-slate-300 border-l-4 border-l-slate-400 opacity-95',
-          badge:       'bg-slate-100 text-slate-700 border-slate-200',
-          dot:         'bg-slate-500',
-          hora:        'bg-slate-100 text-slate-800 border border-slate-300 font-bold',
-          select:      'bg-slate-100 text-slate-700 border-slate-300',
-          pillMensual: 'bg-slate-100 text-slate-700 border border-slate-300',
-          compact:     'border-l-4 border-l-slate-400 bg-slate-50/80 text-ink-navy hover:bg-slate-100 opacity-90',
-        };
-      case 'cancelada':
-      case 'no_asistio':
-        return {
-          cardBg:      'bg-rose-50/50 border-rose-200 hover:border-rose-300 border-l-4 border-l-rose-500 opacity-75',
-          badge:       'bg-rose-100 text-rose-800 border-rose-200',
-          dot:         'bg-rose-500',
-          hora:        'bg-rose-100 text-rose-900 border border-rose-300 font-bold line-through',
-          select:      'bg-rose-50 text-rose-800 border-rose-300',
-          pillMensual: 'bg-rose-100 text-rose-800 border border-rose-200 line-through opacity-75',
-          compact:     'border-l-4 border-l-rose-500 bg-rose-50/50 text-rose-900 hover:bg-rose-50 opacity-75',
-        };
-      default:
-        return {
-          cardBg:      'bg-paper border-hairline hover:border-slate-gray border-l-4 border-l-hairline',
-          badge:       'bg-pebble text-slate-gray border-hairline',
-          dot:         'bg-slate-gray',
-          hora:        'bg-cloud text-ink-navy border border-hairline font-bold',
-          select:      'bg-pebble text-slate-gray border-hairline',
-          pillMensual: 'bg-pebble text-slate-gray',
-          compact:     'border-l-4 border-l-hairline bg-paper text-ink-navy hover:bg-pebble',
-        };
-    }
-  };
-
   const renderCardCita = (cita: CitaExtendida, compact = false) => {
     const p = cita.pacientes;
     if (!p) return null;
@@ -636,24 +575,24 @@ function AgendaContent() {
         const { tienePlan: tienePlanCompact, sesionesUsadas, sesionesTotales } = getResumenPlan(p);
 
         return (
-            <div key={cita.id} className={`rounded-inputs border p-3 space-y-2 transition-all hover:shadow-sm mb-2 ${tokens.compact}`}>
-                {/* Nivel 1: Dot + Hora + Selector de Estado */}
+            <div key={cita.id} className={`rounded-xl border p-3 space-y-2 transition-all hover:shadow-sm mb-2 ${tokens.cardBg}`}>
+                {/* Nivel 1: Hora y Badge de Estado con dot */}
                 <div className="flex items-center justify-between border-b border-black/10 pb-1.5">
-                    <div className="flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${tokens.dot}`} />
-                        <span className="font-bold text-xs font-mono">{cita.hora?.slice(0, 5)}</span>
+                    <span className={`font-bold text-xs font-mono ${tokens.hora}`}>{cita.hora?.slice(0, 5)}</span>
+                    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${tokens.badge}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tokens.dot}`} />
+                      <select
+                        value={['asistió', 'atendido'].includes(s) ? 'asistio' : s}
+                        onChange={(e) => handleCambiarEstadoCita(cita, e.target.value)}
+                        className="bg-transparent border-none cursor-pointer focus:outline-none text-[10px] font-semibold"
+                      >
+                        <option value="pendiente" className="bg-white text-ink-navy">⏳ Pendiente</option>
+                        <option value="confirmada" className="bg-white text-ink-navy">✓ Confirmada</option>
+                        <option value="asistio" className="bg-white text-ink-navy">✓ Asistió</option>
+                        <option value="no_asistio" className="bg-white text-ink-navy">⚠️ No Asistió</option>
+                        <option value="cancelada" className="bg-white text-ink-navy">✕ Cancelada</option>
+                      </select>
                     </div>
-                    <select
-                      value={['asistió', 'atendido'].includes(s) ? 'asistio' : s}
-                      onChange={(e) => handleCambiarEstadoCita(cita, e.target.value)}
-                      className={`text-[10px] font-bold rounded-md px-2 py-0.5 border cursor-pointer focus:outline-none ${tokens.select}`}
-                    >
-                      <option value="pendiente">⏳ Pendiente</option>
-                      <option value="confirmada">✓ Confirmada</option>
-                      <option value="asistio">✓ Asistió</option>
-                      <option value="no_asistio">⚠️ No Asistió</option>
-                      <option value="cancelada">✕ Cancelada</option>
-                    </select>
                 </div>
 
                 {/* Nivel 2: Nombre y Saldo */}
@@ -703,12 +642,9 @@ function AgendaContent() {
         {/* Cabecera y acciones de gestión */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-black/10 pb-3">
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className={`w-3 h-3 rounded-full shrink-0 ${tokens.dot}`} />
-              <span className={`font-bold text-lg sm:text-xl px-3 py-1.5 rounded-inputs font-mono shadow-sm ${tokens.hora}`}>
-                {cita.hora?.slice(0, 5)}
-              </span>
-            </div>
+            <span className={`font-bold text-lg sm:text-xl font-mono px-3 py-1.5 rounded-inputs shadow-xs ${tokens.hora}`}>
+              {cita.hora?.slice(0, 5)}
+            </span>
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h4 className="font-bold text-ink-navy text-sm sm:text-base">{cita.pacientes?.nombre_completo || p.nombre_completo}</h4>
@@ -725,17 +661,21 @@ function AgendaContent() {
                     {p.prevision}
                   </span>
                 )}
-                <select
-                  value={['asistió', 'atendido'].includes(s) ? 'asistio' : s}
-                  onChange={(e) => handleCambiarEstadoCita(cita, e.target.value)}
-                  className={`text-[11px] font-bold rounded-buttons px-2 py-0.5 border cursor-pointer focus:outline-none transition-all ml-1 ${tokens.select}`}
-                >
-                  <option value="pendiente">⏳ Pendiente</option>
-                  <option value="confirmada">✓ Confirmada</option>
-                  <option value="asistio">✓ Asistió</option>
-                  <option value="no_asistio">⚠️ No Asistió</option>
-                  <option value="cancelada">✕ Cancelada</option>
-                </select>
+                {/* Badge de Estado con dot */}
+                <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${tokens.badge}`}>
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${tokens.dot}`} />
+                  <select
+                    value={['asistió', 'atendido'].includes(s) ? 'asistio' : s}
+                    onChange={(e) => handleCambiarEstadoCita(cita, e.target.value)}
+                    className="bg-transparent border-none cursor-pointer focus:outline-none font-semibold text-[11px]"
+                  >
+                    <option value="pendiente" className="bg-white text-ink-navy">⏳ Pendiente</option>
+                    <option value="confirmada" className="bg-white text-ink-navy">✓ Confirmada</option>
+                    <option value="asistio" className="bg-white text-ink-navy">✓ Asistió</option>
+                    <option value="no_asistio" className="bg-white text-ink-navy">⚠️ No Asistió</option>
+                    <option value="cancelada" className="bg-white text-ink-navy">✕ Cancelada</option>
+                  </select>
+                </div>
               </div>
               <p className="text-xs text-slate-gray font-mono mt-1">
                 {formatRut(p.rut) || 'Sin RUT'} • <span className="font-sans italic">{cita.motivo_consulta || 'Sesión Kinésica'}</span>
