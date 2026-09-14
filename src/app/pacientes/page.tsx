@@ -13,6 +13,7 @@ import {
 import { AppointmentModal } from "@/components/appointments/AppointmentModal";
 import { AssignTreatmentModal } from "@/components/sales/AssignTreatmentModal";
 import { RenewPlanDialog } from "@/components/patients/RenewPlanDialog";
+import { EditPatientDialog } from "@/components/patients/EditPatientDialog";
 import { DischargeReportModal } from "@/components/clinical/DischargeReportModal";
 import { toast } from 'sonner';
 import { 
@@ -102,6 +103,8 @@ export default function PacientesPage() {
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
   const [pacienteParaAgendar, setPacienteParaAgendar] = useState<any>(null);
   const [isAgendarModalOpen, setIsAgendarModalOpen] = useState(false);
+  const [pacienteParaEditar, setPacienteParaEditar] = useState<PacienteResumen | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Modales interactivos del Tablero Kanban
   const [pacienteParaAsignarPlan, setPacienteParaAsignarPlan] = useState<PacienteResumen | null>(null);
@@ -112,6 +115,11 @@ export default function PacientesPage() {
 
   const [pacienteParaAlta, setPacienteParaAlta] = useState<PacienteResumen | null>(null);
   const [isDischargeModalOpen, setIsDischargeModalOpen] = useState(false);
+
+  const handleAbrirEditar = (p: PacienteResumen) => {
+    setPacienteParaEditar(p);
+    setIsEditModalOpen(true);
+  };
 
   // 1. Carga de datos directa enriquecida con diagnóstico clínico TMO y filtrado de fantasmas sin RUT
   const cargarPacientes = async () => {
@@ -866,6 +874,14 @@ export default function PacientesPage() {
                           <td className="px-5 py-3.5 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-2">
                               <button
+                                type="button"
+                                onClick={() => handleAbrirEditar(p)}
+                                className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
+                                title="Editar datos del paciente"
+                              >
+                                ✏️
+                              </button>
+                              <button
                                 onClick={() => {
                                   setPacienteParaAgendar({
                                     id: p.id,
@@ -968,6 +984,20 @@ export default function PacientesPage() {
               setPacienteParaAlta(null);
             }}
             patient={pacienteParaAlta}
+          />
+        )}
+
+        {isEditModalOpen && pacienteParaEditar && (
+          <EditPatientDialog
+            isOpen={isEditModalOpen}
+            onClose={() => {
+              setIsEditModalOpen(false);
+              setPacienteParaEditar(null);
+            }}
+            patient={pacienteParaEditar}
+            onPatientUpdated={(updated) => {
+              cargarPacientes();
+            }}
           />
         )}
       </main>

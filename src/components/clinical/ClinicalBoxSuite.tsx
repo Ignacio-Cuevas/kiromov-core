@@ -9,6 +9,7 @@ import { InitialEvaluationModal } from '@/components/clinical/InitialEvaluationM
 import { DischargeReportModal } from '@/components/clinical/DischargeReportModal';
 import { ReimbursementCertificate } from '@/components/clinical/ReimbursementCertificate';
 import { FileText, Printer } from 'lucide-react';
+import { EditPatientDialog } from '@/components/patients/EditPatientDialog';
 
 interface ClinicalBoxSuiteProps {
   pacienteId: string;
@@ -34,6 +35,7 @@ export default function ClinicalBoxSuite({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [abrirAgendarModal, setAbrirAgendarModal] = useState(false);
   const [abrirEvaluacionModal, setAbrirEvaluacionModal] = useState(false);
+  const [abrirEditarPaciente, setAbrirEditarPaciente] = useState(false);
   const [abrirDischargeModal, setAbrirDischargeModal] = useState(false);
   const [abrirCertificadoModal, setAbrirCertificadoModal] = useState(false);
   const [evaluacionInicialTMO, setEvaluacionInicialTMO] = useState<any>(null);
@@ -318,6 +320,14 @@ export default function ClinicalBoxSuite({
                 {paciente?.prevision || 'Particular'}
               </p>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setAbrirEditarPaciente(true)}
+              className="w-full py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
+            >
+              ✏️ Editar Datos / RUT
+            </button>
 
             {/* Evaluación Inicial TMO */}
             <div className="space-y-3 border-t border-slate-100 pt-3">
@@ -730,6 +740,17 @@ export default function ClinicalBoxSuite({
           evoluciones={historialSOAP}
           numeroBoleta={planActivo?.numero_boleta || null}
           onClose={() => setAbrirCertificadoModal(false)}
+        />
+      )}
+
+      {abrirEditarPaciente && paciente && (
+        <EditPatientDialog
+          isOpen={abrirEditarPaciente}
+          onClose={() => setAbrirEditarPaciente(false)}
+          patient={paciente}
+          onPatientUpdated={(updated) => {
+            cargarDatos();
+          }}
         />
       )}
     </div>

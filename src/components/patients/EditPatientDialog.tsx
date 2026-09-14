@@ -48,9 +48,12 @@ export function EditPatientDialog({
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
   const [fechaNacimiento, setFechaNacimiento] = useState('');
+  const [prevision, setPrevision] = useState('Particular');
+  const [motivoConsulta, setMotivoConsulta] = useState('');
   const [diagnostico, setDiagnostico] = useState('');
   const [antecedentes, setAntecedentes] = useState('');
   const [banderasRojas, setBanderasRojas] = useState('');
+  const [estado, setEstado] = useState('activo');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -60,9 +63,12 @@ export function EditPatientDialog({
       setTelefono(patient.telefono || patient.phone || '');
       setEmail(patient.email || '');
       setFechaNacimiento(patient.fecha_nacimiento || patient.birth_date || '');
+      setPrevision(patient.prevision || patient.prevision_salud || 'Particular');
+      setMotivoConsulta(patient.motivo_consulta || '');
       setDiagnostico(patient.diagnostico_medico || patient.diagnostico_principal || patient.medical_notes || '');
-      setAntecedentes(patient.antecedentes_medicos || '');
-      setBanderasRojas(patient.banderas_rojas || '');
+      setAntecedentes(patient.antecedentes_medicos || patient.antecedentes_morbidos || '');
+      setBanderasRojas(patient.banderas_rojas || patient.alertas_seguridad || '');
+      setEstado(patient.estado || 'activo');
     }
   }, [patient]);
 
@@ -91,23 +97,21 @@ export function EditPatientDialog({
       telefono: telefono.trim() || null,
       email: email.trim().toLowerCase() || null,
       fecha_nacimiento: fechaNacimiento || null,
+      prevision: prevision || 'Particular',
+      prevision_salud: prevision || 'Particular',
+      motivo_consulta: motivoConsulta.trim() || null,
       diagnostico_medico: diagnostico.trim() || null,
       diagnostico_principal: diagnostico.trim() || null,
       antecedentes_medicos: antecedentes.trim() || null,
+      antecedentes_morbidos: antecedentes.trim() || null,
       banderas_rojas: banderasRojas.trim() || null,
+      alertas_seguridad: banderasRojas.trim() || null,
+      estado: estado || 'activo'
     };
 
     if (supabase) {
       try {
         await supabase.from('pacientes').update(updatePayload).eq('id', patient.id);
-        await supabase.from('patients').update({
-          full_name: updatePayload.nombre_completo,
-          rut: updatePayload.rut,
-          phone: updatePayload.telefono,
-          email: updatePayload.email,
-          birth_date: updatePayload.fecha_nacimiento,
-          medical_notes: updatePayload.diagnostico_medico,
-        }).eq('id', patient.id);
       } catch (err) {
         console.warn('Excepción actualizando paciente en Supabase:', err);
       }
@@ -121,9 +125,12 @@ export function EditPatientDialog({
       rut: updatePayload.rut || patient.rut,
       telefono: updatePayload.telefono || patient.telefono,
       email: updatePayload.email,
+      prevision: updatePayload.prevision,
+      motivo_consulta: updatePayload.motivo_consulta,
       diagnostico_medico: updatePayload.diagnostico_medico,
       diagnostico_principal: updatePayload.diagnostico_principal,
       medical_notes: updatePayload.diagnostico_medico,
+      estado: updatePayload.estado
     };
 
     onPatientUpdated(updatedPatientObj);
@@ -210,6 +217,33 @@ export function EditPatientDialog({
                   className="bg-white rounded-xl text-sm"
                 />
               </div>
+              
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">Previsión</label>
+                <select
+                  value={prevision}
+                  onChange={(e) => setPrevision(e.target.value)}
+                  className="flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="Particular">Particular</option>
+                  <option value="Fonasa">Fonasa</option>
+                  <option value="Isapre">Isapre</option>
+                  <option value="Convenio">Convenio</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">Estado</label>
+                <select
+                  value={estado}
+                  onChange={(e) => setEstado(e.target.value)}
+                  className="flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="activo">Activo</option>
+                  <option value="inactivo">Inactivo</option>
+                  <option value="alta">Alta</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -220,6 +254,19 @@ export function EditPatientDialog({
             </span>
 
             <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">
+                  Motivo de Consulta
+                </label>
+                <Input
+                  type="text"
+                  placeholder="Ej: Dolor lumbar irradiado..."
+                  value={motivoConsulta}
+                  onChange={(e) => setMotivoConsulta(e.target.value)}
+                  className="bg-white rounded-xl text-sm"
+                />
+              </div>
+
               <div className="space-y-1">
                 <label className="text-xs font-bold text-blue-800">
                   Diagnóstico Médico / Kinésico Principal
