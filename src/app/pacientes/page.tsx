@@ -138,13 +138,8 @@ export default function PacientesPage() {
         resPacientes.data.forEach((p: any) => pMap.set(p.id, p));
       }
 
-      // Descartar registros fantasma sin RUT y enriquecer diagnósticos para el filtro TMO
+      // Enriquecer diagnósticos para el filtro TMO, sin descartar pacientes sin RUT
       const listaLimpia = ((resVista.data as PacienteResumen[]) || [])
-        .filter((p) => {
-          const raw = pMap.get(p.id) || {};
-          const rutVal = p.rut || raw.rut;
-          return !!rutVal && rutVal.trim() !== '';
-        })
         .map((p) => {
           const raw = pMap.get(p.id) || {};
           return {
@@ -182,6 +177,7 @@ export default function PacientesPage() {
       // Filtro de texto (nombre, rut o teléfono)
       const term = busqueda.toLowerCase().trim();
       const matchText = 
+        !term ||
         (p.nombre_completo && p.nombre_completo.toLowerCase().includes(term)) ||
         (p.rut && p.rut.toLowerCase().includes(term)) ||
         (p.telefono && p.telefono.includes(term));
