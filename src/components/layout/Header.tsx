@@ -50,9 +50,9 @@ export function Header() {
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
               />
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <span className="font-extrabold text-slate-900 text-base tracking-tight leading-none group-hover:text-blue-600 transition-colors">KIROMOV</span>
-              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest leading-tight">Centro Clínico</span>
+              <span className="hidden sm:inline-block text-[10px] font-semibold text-slate-500 uppercase tracking-widest leading-tight">Centro Clínico</span>
             </div>
           </Link>
 
@@ -77,19 +77,19 @@ export function Header() {
         </div>
 
         {/* Perfil Profesional */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <div className="hidden sm:flex flex-col items-end text-right">
             <span className="text-sm font-bold text-slate-900">Klgo. Ignacio Cuevas Silva</span>
             <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider">Director Clínico — TMO</span>
           </div>
-          <div className="w-9 h-9 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden shrink-0">
             <img 
               src="https://ui-avatars.com/api/?name=Ignacio+Cuevas&background=0D8ABC&color=fff&bold=true" 
               alt="Avatar" 
               className="w-full h-full object-cover"
             />
           </div>
-          <div className="h-6 w-px bg-slate-200 mx-1"></div>
+          <div className="h-5 sm:h-6 w-px bg-slate-200 mx-0.5 sm:mx-1"></div>
           <button 
             onClick={async () => {
               try {
@@ -100,8 +100,9 @@ export function Header() {
                 window.location.href = '/login';
               }
             }}
-            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
             title="Cerrar Sesión"
+            aria-label="Cerrar Sesión"
           >
             <LogOut className="h-4 w-4" />
           </button>
