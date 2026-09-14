@@ -124,7 +124,7 @@ export default function PacientesPage() {
       const [resVista, resPacientes] = await Promise.all([
         supabase
           .from('vista_resumen_pacientes')
-          .select('*')
+          .select('*') // Sin límite (.limit) para mostrar el directorio completo (~122 pacientes)
           .order('nombre_completo', { ascending: true }),
         supabase
           .from('pacientes')
