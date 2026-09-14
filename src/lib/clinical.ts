@@ -54,6 +54,35 @@ export const evaluarRiesgoDesercion = (p: Partial<VistaResumenPaciente>): Alerta
   return { nivel: null, etiqueta: '', badgeClass: '', mensajeWhatsApp: '' };
 };
 
+export const detectarSegmentoTMO = (p: any): string => {
+  const texto = `${p.motivo_consulta || ''} ${p.diagnostico_principal || ''} ${p.diagnostico_medico || ''}`.toLowerCase();
+
+  if (/lumb|ciat|sacr|l5|s1|espalda baja|gluteo/i.test(texto)) return 'lumbar';
+  if (/cervic|cuello|nuca|dorsal|escapul|trapecio/i.test(texto)) return 'cervical';
+  if (/hombro|manguito|codo|muñeca|mano|brazo|tendinopatia hombro/i.test(texto)) return 'hombro';
+  if (/rodilla|menisc|patelar|cadera|tobillo|pie|aquil|fascia/i.test(texto)) return 'eeii';
+  if (/atm|mandibul|brux/i.test(texto)) return 'atm';
+
+  return 'otro';
+};
+
+export const getSegmentoTMOLabel = (segmento: string) => {
+  switch (segmento) {
+    case 'lumbar':
+      return { label: '🦴 Lumbar / Pelvis', shortLabel: 'Lumbar', colorClass: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+    case 'cervical':
+      return { label: '💆 Cervical / Dorsal', shortLabel: 'Cervical', colorClass: 'bg-teal-50 text-teal-700 border-teal-200' };
+    case 'hombro':
+      return { label: '💪 Hombro / EESS', shortLabel: 'Hombro', colorClass: 'bg-sky-50 text-sky-700 border-sky-200' };
+    case 'eeii':
+      return { label: '🦵 Rodilla / Tobillo', shortLabel: 'EEII / Rodilla', colorClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    case 'atm':
+      return { label: '🦷 ATM', shortLabel: 'ATM', colorClass: 'bg-purple-50 text-purple-700 border-purple-200' };
+    default:
+      return { label: 'Otros / General', shortLabel: 'General', colorClass: 'bg-slate-100 text-slate-700 border-slate-200' };
+  }
+};
+
 export const requiereReevaluacion = (p: any): boolean => {
   const usadas = Number(p.sesiones_usadas || p.sesiones_consumidas) || 0;
   const dolor = Number(p.ultimo_dolor_ena);

@@ -2,13 +2,17 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/utils/supabase/client';
+import { createBrowserClient } from '@supabase/ssr';
 import { Lock, Mail, ShieldAlert, ShieldCheck, ArrowRight, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
   const router = useRouter();
-  const supabase = createClient();
+  
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+  );
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,39 +30,35 @@ export default function LoginPage() {
       return;
     }
 
+    console.log('Intentando login con:', email);
+
     try {
-      if (supabase) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim().toLowerCase(),
-          password,
-        });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
 
-        if (!error && data?.session) {
-          toast.success('¡Bienvenido a Kiromov Core!');
-          // Forzar redirección completa con envío de cookies al servidor
-          window.location.href = '/pacientes';
-          return;
-        }
-
-        if (error) {
-          console.warn('Supabase Auth error:', error.message);
-          const msg = error.message === 'Invalid login credentials'
-            ? 'Credenciales incorrectas. Verifica tu email y contraseña.'
-            : error.message;
-          setErrorMsg(msg);
-          toast.error(msg);
-          setLoading(false);
-          return;
-        }
+      if (error) {
+        console.error('Error Supabase Login:', error);
+        const msg = error.message === 'Invalid login credentials'
+          ? 'Credenciales incorrectas. Verifica tu email y contraseña.'
+          : error.message;
+        setErrorMsg(msg);
+        toast.error(`Error: ${msg}`);
+        setLoading(false);
+        return;
       }
 
-      // Fallback para desarrollo local / offline si no hay credenciales de Supabase
-      toast.success('Acceso autorizado (Modo Clínico Local)');
+      console.log('Login exitoso en cliente:', data?.user?.email);
+      toast.success('¡Sesión iniciada!');
+      
+      // Redirección dura a /pacientes para forzar lectura de cookies en el servidor
       window.location.href = '/pacientes';
     } catch (err: any) {
       console.error('Error durante inicio de sesión:', err);
-      setErrorMsg('Error al conectar con el servicio de autenticación');
-      toast.error('Error al conectar con el servicio de autenticación');
+      const msg = err?.message || 'Error al conectar con el servicio de autenticación';
+      setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
