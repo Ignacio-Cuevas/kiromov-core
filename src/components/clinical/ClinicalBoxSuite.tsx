@@ -38,10 +38,16 @@ export default function ClinicalBoxSuite({
   const [abrirEditarPaciente, setAbrirEditarPaciente] = useState(false);
   const [abrirDischargeModal, setAbrirDischargeModal] = useState(false);
   const [abrirCertificadoModal, setAbrirCertificadoModal] = useState(false);
+  const [evaluacionesTMO, setEvaluacionesTMO] = useState<any[]>([]);
+  const [evaluacionActivaIndex, setEvaluacionActivaIndex] = useState<number>(0);
+  const [modoEvaluacion, setModoEvaluacion] = useState<'nueva' | 'editar'>('editar');
   const [evaluacionInicialTMO, setEvaluacionInicialTMO] = useState<any>(null);
 
-  // Estados del Formulario SOAP de hoy
-  const [nivelDolor, setNivelDolor] = useState<number>(0);
+  // Formulario SOAP
+  const [fechaSesion, setFechaSesion] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
+  const [nivelDolor, setNivelDolor] = useState(5);
   const [segmentosSeleccionados, setSegmentosSeleccionados] = useState<string[]>([]);
   const [tecnicasSeleccionadas, setTecnicasSeleccionadas] = useState<string[]>([]);
   const [sSubjetivo, setSSubjetivo] = useState('');
@@ -99,16 +105,22 @@ export default function ClinicalBoxSuite({
       
       setProximaCita(proxima || null);
 
-      // Evaluación Inicial TMO
-      const { data: evalTmo } = await supabase
+      // Evaluaciones Iniciales TMO
+      const { data: evals } = await supabase
         .from('evaluaciones_iniciales_tmo')
         .select('*')
         .eq('paciente_id', pacienteId)
         .order('fecha_evaluacion', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
       
-      setEvaluacionInicialTMO(evalTmo || null);
+      if (evals && evals.length > 0) {
+        setEvaluacionesTMO(evals);
+        setEvaluacionActivaIndex(0);
+        setEvaluacionInicialTMO(evals[0]);
+      } else {
+        setEvaluacionesTMO([]);
+        setEvaluacionInicialTMO(null);
+      }
 
     } catch (err) {
       console.error('Error cargando datos en suite:', err);
@@ -120,6 +132,12 @@ export default function ClinicalBoxSuite({
   useEffect(() => {
     cargarDatos();
   }, [pacienteId]);
+
+  useEffect(() => {
+    if (evaluacionesTMO.length > 0 && evaluacionActivaIndex >= 0 && evaluacionActivaIndex < evaluacionesTMO.length) {
+      setEvaluacionInicialTMO(evaluacionesTMO[evaluacionActivaIndex]);
+    }
+  }, [evaluacionActivaIndex, evaluacionesTMO]);
 
   // Manejador de toggles para chips
   const toggleSegmento = (seg: string) => {
@@ -143,7 +161,7 @@ export default function ClinicalBoxSuite({
     try {
       const payload = {
         paciente_id: pacienteId,
-        fecha: getChileanDate(),
+        fecha: fechaSesion, // Utiliza la fecha elegida (sea de hoy o del pasado)
         nivel_dolor_ena: Number(nivelDolor),
         s_subjetivo: sSubjetivo.trim(),
         o_objetivo: `[Segmentos: ${segmentosSeleccionados.join(', ') || 'General'}] ${oObjetivo.trim()}`,
@@ -331,50 +349,78 @@ export default function ClinicalBoxSuite({
 
             {/* Evaluación Inicial TMO */}
             <div className="space-y-3 border-t border-slate-100 pt-3">
-              {evaluacionInicialTMO ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setAbrirEvaluacionModal(true)}
-                    className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
-                  >
-                    📋 Ver / Editar Evaluación TMO
-                  </button>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] uppercase font-bold text-slate-500">💼 Ocupación</span>
-                      <span className="text-slate-800 font-medium">{evaluacionInicialTMO.ocupacion_laboral || 'No registrada'}</span>
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] uppercase font-bold text-slate-500">🏥 Cirugías / Antecedentes</span>
-                      <span className="text-slate-800 font-medium">{evaluacionInicialTMO.cirugias_traumatismos || 'Sin cirugías'}</span>
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] uppercase font-bold text-slate-500">💊 Fármacos</span>
-                      <span className="text-slate-800 font-medium">{evaluacionInicialTMO.farmacos_actuales || 'No registra'}</span>
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] uppercase font-bold text-slate-500">🚩 Seguridad TMO</span>
-                      <span className={`inline-block w-max px-2 py-0.5 rounded font-bold text-[10px] ${evaluacionInicialTMO.apto_hvla ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                        {evaluacionInicialTMO.apto_hvla ? '⚡ Apto Manipulación HVLA' : '⚠️ Precaución HVLA'}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] uppercase font-bold text-slate-500">🎯 Diagnóstico Funcional</span>
-                      <span className="text-slate-800 font-medium">{evaluacionInicialTMO.hipotesis_diagnostica_tmo || 'Pendiente'}</span>
-                    </div>
+              <div className="space-y-2">
+                {/* Botón para registrar un Reingreso con nuevo diagnóstico */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModoEvaluacion('nueva');
+                    setAbrirEvaluacionModal(true);
+                  }}
+                  className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  + Nueva Evaluación TMO (Reingreso)
+                </button>
+
+                {/* Si el paciente tiene más de 1 evaluación histórica, permitir alternar */}
+                {evaluacionesTMO.length > 1 && (
+                  <div className="pt-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                      Historial de Evaluaciones ({evaluacionesTMO.length})
+                    </label>
+                    <select
+                      value={evaluacionActivaIndex}
+                      onChange={(e) => setEvaluacionActivaIndex(Number(e.target.value))}
+                      className="w-full text-xs p-1.5 rounded-lg border border-slate-200 bg-slate-50 font-medium text-slate-800"
+                    >
+                      {evaluacionesTMO.map((ev, idx) => (
+                        <option key={ev.id || idx} value={idx}>
+                          {ev.fecha_evaluacion || ev.fecha} — {ev.hipotesis_diagnostica?.slice(0, 30) || ev.hipotesis_diagnostica_tmo?.slice(0, 30) || 'Evaluación'}...
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                </>
-              ) : (
-                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 text-center space-y-3">
-                  <p className="text-xs text-blue-800 font-medium">Paciente sin evaluación basal</p>
+                )}
+
+                {/* Botón para ver/editar la evaluación seleccionada */}
+                {evaluacionesTMO.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setAbrirEvaluacionModal(true)}
-                    className="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setModoEvaluacion('editar');
+                      setAbrirEvaluacionModal(true);
+                    }}
+                    className="w-full py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl flex items-center justify-center gap-1 transition-colors cursor-pointer border border-slate-200"
                   >
-                    📋 Llenar Evaluación Inicial TMO
+                    👁️ Ver / Editar Evaluación ({evaluacionesTMO[evaluacionActivaIndex]?.fecha_evaluacion || 'Activa'})
                   </button>
+                )}
+              </div>
+
+              {evaluacionInicialTMO && (
+                <div className="space-y-2 text-xs pt-2">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-500">💼 Ocupación</span>
+                    <span className="text-slate-800 font-medium">{evaluacionInicialTMO.ocupacion_laboral || 'No registrada'}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-500">🏥 Cirugías / Antecedentes</span>
+                    <span className="text-slate-800 font-medium">{evaluacionInicialTMO.cirugias_traumatismos || 'Sin cirugías'}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-500">💊 Fármacos</span>
+                    <span className="text-slate-800 font-medium">{evaluacionInicialTMO.farmacos_actuales || 'No registra'}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-500">🚩 Seguridad TMO</span>
+                    <span className={`inline-block w-max px-2 py-0.5 rounded font-bold text-[10px] ${evaluacionInicialTMO.apto_hvla ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                      {evaluacionInicialTMO.apto_hvla ? '⚡ Apto Manipulación HVLA' : '⚠️ Precaución HVLA'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-500">🎯 Diagnóstico Funcional</span>
+                    <span className="text-slate-800 font-medium">{evaluacionInicialTMO.hipotesis_diagnostica || evaluacionInicialTMO.hipotesis_diagnostica_tmo || 'Pendiente'}</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -405,9 +451,15 @@ export default function ClinicalBoxSuite({
                   <span className="text-blue-600 font-bold text-lg">📝</span>
                   <h3 className="font-bold text-slate-900 text-sm">Registro de Evolución Clínica (SOAP)</h3>
                 </div>
-                <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
-                  Sesión de Hoy
-                </span>
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase">Fecha Sesión:</label>
+                  <input
+                    type="date"
+                    value={fechaSesion}
+                    onChange={(e) => setFechaSesion(e.target.value)}
+                    className="text-xs p-1.5 rounded-lg border border-slate-300 bg-white font-medium focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
               </div>
 
               {/* Componente Visual de Gráfica ENA */}
@@ -716,6 +768,7 @@ export default function ClinicalBoxSuite({
           isOpen={abrirEvaluacionModal}
           paciente={paciente}
           evaluacionExistente={evaluacionInicialTMO}
+          modo={modoEvaluacion}
           onClose={() => setAbrirEvaluacionModal(false)}
           onSuccess={async () => {
             setAbrirEvaluacionModal(false);

@@ -14,11 +14,12 @@ interface InitialEvaluationModalProps {
   isOpen: boolean;
   paciente: any;
   evaluacionExistente?: any | null;
+  modo?: 'nueva' | 'editar';
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, onClose, onSuccess }: InitialEvaluationModalProps) {
+export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, modo = 'editar', onClose, onSuccess }: InitialEvaluationModalProps) {
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
 
@@ -55,10 +56,8 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
   const [altaEstimada, setAltaEstimada] = useState('4 a 6 sesiones');
 
   useEffect(() => {
-    if (evaluacionExistente) {
-      if (evaluacionExistente.fecha_evaluacion) {
-        setFechaEvaluacion(evaluacionExistente.fecha_evaluacion);
-      }
+    if (modo === 'editar' && evaluacionExistente) {
+      setFechaEvaluacion(evaluacionExistente.fecha_evaluacion || getChileanDate());
       setOcupacion(evaluacionExistente.ocupacion_laboral || '');
       setActividadFisica(evaluacionExistente.actividad_fisica || '');
       setCirugias(evaluacionExistente.cirugias_traumatismos || '');
@@ -74,11 +73,31 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
       setMovilidad(evaluacionExistente.movilidad_activa || '');
       setNeurodinamia(evaluacionExistente.neurodinamia || '');
       setHallazgos(evaluacionExistente.hallazgos_fisicos || '');
-      setDiagnostico(evaluacionExistente.hipotesis_diagnostica_tmo || '');
+      setDiagnostico(evaluacionExistente.hipotesis_diagnostica_tmo || evaluacionExistente.hipotesis_diagnostica || '');
       setObjetivos(evaluacionExistente.objetivos_terapeuticos || '');
       setAltaEstimada(evaluacionExistente.estimacion_alta || '4 a 6 sesiones');
+    } else if (modo === 'nueva') {
+      setFechaEvaluacion(getChileanDate());
+      setOcupacion('');
+      setActividadFisica('');
+      setCirugias('');
+      setFarmacos('');
+      setBanderasRojas([]);
+      setAptoHvla(true);
+      setNotasContraindicaciones('');
+      setMecanismo('Insidioso');
+      setEvolucion('Agudo <6 sem');
+      setComportamiento24h('');
+      setDolorInicial(5);
+      setJuegoArticular('Normal Gr. 3');
+      setMovilidad('');
+      setNeurodinamia('');
+      setHallazgos('');
+      setDiagnostico('');
+      setObjetivos('');
+      setAltaEstimada('4 a 6 sesiones');
     }
-  }, [evaluacionExistente]);
+  }, [evaluacionExistente, modo, isOpen]);
 
   const toggleBandera = (bandera: string) => {
     setBanderasRojas(prev => prev.includes(bandera) ? prev.filter(b => b !== bandera) : [...prev, bandera]);
@@ -122,7 +141,7 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
         updated_at: new Date().toISOString()
       };
 
-      if (evaluacionExistente?.id) {
+      if (modo === 'editar' && evaluacionExistente?.id) {
         const { error } = await supabase.from('evaluaciones_iniciales_tmo').update(payload).eq('id', evaluacionExistente.id);
         if (error) throw error;
       } else {
