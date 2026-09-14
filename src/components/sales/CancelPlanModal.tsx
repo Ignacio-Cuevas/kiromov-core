@@ -67,12 +67,10 @@ export function CancelPlanModal({
           .from('compras_planes')
           .update({
             nombre_plan: `Sesión Individual (${sesionesUsadas} realizada(s))`,
-            sesiones_totales: sesionesUsadas,
-            total_sesiones: sesionesUsadas,
+            sesiones_totales: Number(sesionesUsadas) || 1,
+            total_sesiones: Number(sesionesUsadas) || 1,
             monto_clp: montoAjustado,
             valor_total: montoAjustado,
-            total_final_clp: montoAjustado,
-            precio_base: montoAjustado,
             estado: 'finalizado', // Cierra el plan
             notas: `Cancelación anticipada: paciente realizó ${sesionesUsadas} sesión(es). Se ajustó el cobro a ${formatCLP(montoAjustado)}. Motivo: ${motivo.trim() || 'No especificado'}.`,
             updated_at: new Date().toISOString()
@@ -87,13 +85,12 @@ export function CancelPlanModal({
       } else {
         // Opción 2: Anular plan completo
         if (sesionesUsadas === 0) {
-          // Si no usó sesiones, podemos eliminar o marcar cancelado con monto 0
+          // Si no usó sesiones, podemos anular o marcar cancelado con monto 0
           const { error } = await supabase
             .from('compras_planes')
             .update({
               monto_clp: 0,
               valor_total: 0,
-              total_final_clp: 0,
               estado: 'cancelado',
               estado_pago: 'pagado', // Salda para que no aparezca como deuda
               notas: `Plan anulado por completo sin sesiones realizadas. Motivo: ${motivo.trim() || 'Error de asignación o desistimiento antes de iniciar'}.`,
@@ -101,25 +98,24 @@ export function CancelPlanModal({
             })
             .eq('id', planId);
 
-          if (error) throw error;
+        if (error) throw error;
 
-          toast.success('Plan anulado por completo', {
-            description: 'Se eliminó la deuda del paciente y el plan quedó cancelado.'
-          });
-        } else {
-          // Si usó sesiones pero el profesional decide anularlo sin cobro
-          const { error } = await supabase
-            .from('compras_planes')
-            .update({
-              monto_clp: 0,
-              valor_total: 0,
-              total_final_clp: 0,
-              estado: 'cancelado',
-              estado_pago: 'pagado',
-              notas: `Plan cancelado sin cobro adicional por criterio profesional (${sesionesUsadas} sesión(es) condonadas). Motivo: ${motivo.trim() || 'Condonación'}.`,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', planId);
+        toast.success('Plan anulado por completo', {
+          description: 'Se eliminó la deuda del paciente y el plan quedó cancelado.'
+        });
+      } else {
+        // Si usó sesiones pero el profesional decide anularlo sin cobro
+        const { error } = await supabase
+          .from('compras_planes')
+          .update({
+            monto_clp: 0,
+            valor_total: 0,
+            estado: 'cancelado',
+            estado_pago: 'pagado',
+            notas: `Plan cancelado sin cobro adicional por criterio profesional (${sesionesUsadas} sesión(es) condonadas). Motivo: ${motivo.trim() || 'Condonación'}.`,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', planId);
 
           if (error) throw error;
 
