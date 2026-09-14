@@ -132,7 +132,7 @@ export function AppointmentModal({
       const { data: nuevaCita, error } = await supabase
          .from('citas_atenciones')
          .insert([payload])
-         .select('id, pacientes(nombre_completo)')
+         .select('id, pacientes(nombre_completo, telefono)')
          .single();
 
       if (error) {
@@ -142,8 +142,9 @@ export function AppointmentModal({
 
       // 2. Sincronizar hacia Google Calendar (Dirección Kiromov -> Google)
       try {
-        const nombrePaciente = preselectedPatient?.nombre_completo || 
-           (Array.isArray(nuevaCita.pacientes) ? nuevaCita.pacientes[0]?.nombre_completo : (nuevaCita.pacientes as any)?.nombre_completo);
+        const pacienteData = Array.isArray(nuevaCita.pacientes) ? nuevaCita.pacientes[0] : (nuevaCita.pacientes as any);
+        const nombrePaciente = preselectedPatient?.nombre_completo || pacienteData?.nombre_completo;
+        const telefonoPaciente = preselectedPatient?.telefono || pacienteData?.telefono;
 
         const { syncEventToGoogleCalendar } = await import('@/actions/calendar');
         const syncRes = await syncEventToGoogleCalendar({
@@ -152,6 +153,7 @@ export function AppointmentModal({
           fecha,
           hora,
           paciente_nombre: nombrePaciente || 'Paciente Kiromov',
+          paciente_telefono: telefonoPaciente,
           motivo_consulta: payload.motivo_consulta
         });
         

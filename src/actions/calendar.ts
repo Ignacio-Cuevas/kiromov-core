@@ -1,5 +1,7 @@
 'use server';
 
+import { crearEventoGoogleCalendar, eliminarEventoGoogleCalendar } from '@/utils/google-calendar';
+
 export async function syncEventToGoogleCalendar(payload: {
   action: 'create_event' | 'update_event' | 'cancel_event';
   cita_id: string; // Supabase ID
@@ -7,30 +9,60 @@ export async function syncEventToGoogleCalendar(payload: {
   fecha?: string;
   hora?: string;
   paciente_nombre?: string;
+  paciente_telefono?: string | null;
   motivo_consulta?: string;
 }) {
-  const url = process.env.GOOGLE_APPS_SCRIPT_URL;
-  
-  if (!url) {
-    console.warn('Falta GOOGLE_APPS_SCRIPT_URL en .env.local. Saltando sincronización a Calendar.');
-    return { success: false, error: 'Falta GOOGLE_APPS_SCRIPT_URL' };
-  }
-
   try {
-    console.log('[SYNC CALENDAR] Enviando payload a Apps Script:', payload);
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+    if (payload.action === 'create_event') {
+      if (!payload.fecha || !payload.hora) {
+        return { success: false, error: 'Falta fecha u hora para crear evento en Google Calendar' };
+      }
 
-    const data = await response.json();
-    console.log('[SYNC CALENDAR] Respuesta de Apps Script:', data);
-    return data; 
+      const eventId = await crearEventoGoogleCalendar({
+        pacienteNombre: payload.paciente_nombre || 'Paciente Kiromov',
+        pacienteTelefono: payload.paciente_telefono,
+        fecha: payload.fecha,
+        hora: payload.hora,
+        motivo: payload.motivo_consulta,
+      });
+
+      if (eventId) {
+        return { success: true, google_event_id: eventId };
+      }
+      return { success: false, error: 'No se pudo generar el ID del evento en Google Calendar' };
+    }
+
+    if (payload.action === 'cancel_event') {
+      if (!payload.google_event_id) {
+        return { success: false, error: 'Falta google_event_id para cancelar evento' };
+      }
+
+      const eliminado = await eliminarEventoGoogleCalendar(payload.google_event_id);
+      return { success: eliminado };
+    }
+
+    if (payload.action === 'update_event') {
+      if (payload.google_event_id) {
+        await eliminarEventoGoogleCalendar(payload.google_event_id);
+      }
+      if (payload.fecha && payload.hora) {
+        const nuevoEventId = await crearEventoGoogleCalendar({
+          pacienteNombre: payload.paciente_nombre || 'Paciente Kiromov',
+          pacienteTelefono: payload.paciente_telefono,
+          fecha: payload.fecha,
+          hora: payload.hora,
+          motivo: payload.motivo_consulta,
+        });
+        if (nuevoEventId) {
+          return { success: true, google_event_id: nuevoEventId };
+        }
+      }
+      return { success: true };
+    }
+
+    return { success: false, error: 'Acción no soportada' };
   } catch (error: any) {
-    console.error('[SYNC CALENDAR] Error al sincronizar con Google Calendar via Apps Script:', error);
+    console.error('[SYNC CALENDAR] Error en syncEventToGoogleCalendar:', error);
     return { success: false, error: error.message };
   }
 }
