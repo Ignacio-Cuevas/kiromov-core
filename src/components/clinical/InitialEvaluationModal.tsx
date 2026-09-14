@@ -22,6 +22,10 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
 
+  const [fechaEvaluacion, setFechaEvaluacion] = useState<string>(
+    evaluacionExistente?.fecha_evaluacion || new Date().toISOString().split('T')[0]
+  );
+
   // Blq 1: Perfil Laboral
   const [ocupacion, setOcupacion] = useState('');
   const [actividadFisica, setActividadFisica] = useState('');
@@ -52,6 +56,9 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
 
   useEffect(() => {
     if (evaluacionExistente) {
+      if (evaluacionExistente.fecha_evaluacion) {
+        setFechaEvaluacion(evaluacionExistente.fecha_evaluacion);
+      }
       setOcupacion(evaluacionExistente.ocupacion_laboral || '');
       setActividadFisica(evaluacionExistente.actividad_fisica || '');
       setCirugias(evaluacionExistente.cirugias_traumatismos || '');
@@ -89,11 +96,15 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
     try {
       const payload = {
         paciente_id: paciente.id,
+        fecha_evaluacion: fechaEvaluacion,
+        fecha: fechaEvaluacion,
+        kinesiologo: 'Klgo. Ignacio Cuevas Silva',
         ocupacion_laboral: ocupacion,
         actividad_fisica: actividadFisica,
         cirugias_traumatismos: cirugias,
         farmacos_actuales: farmacos,
         banderas_rojas: banderasRojas,
+        banderas_rojas_alerta: banderasRojas, // Mapeo solicitado
         apto_hvla: aptoHvla,
         notas_contraindicaciones: notasContraindicaciones,
         mecanismo_inicio: mecanismo,
@@ -105,9 +116,10 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
         neurodinamia: neurodinamia,
         hallazgos_fisicos: hallazgos,
         hipotesis_diagnostica_tmo: diagnostico,
+        hipotesis_diagnostica: diagnostico, // Mapeo solicitado
         objetivos_terapeuticos: objetivos,
         estimacion_alta: altaEstimada,
-        fecha_evaluacion: getChileanDate(),
+        updated_at: new Date().toISOString()
       };
 
       if (evaluacionExistente?.id) {
@@ -160,6 +172,27 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
       </DialogHeader>
 
       <DialogBody className="max-h-[70vh] overflow-y-auto space-y-6 p-1">
+        {/* Cabecera del Formulario: Fecha y Evaluador */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div className="flex-1 space-y-1 w-full sm:w-auto">
+            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+              📅 Fecha de Evaluación Inicial
+            </label>
+            <input
+              type="date"
+              value={fechaEvaluacion}
+              onChange={(e) => setFechaEvaluacion(e.target.value)}
+              className="text-xs p-2 rounded-lg border border-slate-300 bg-white font-medium focus:ring-2 focus:ring-blue-500/20 w-full"
+            />
+          </div>
+          <div className="flex-1 space-y-1">
+            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+              Evaluador Responsable
+            </span>
+            <p className="text-xs text-slate-600 font-semibold pt-1 sm:pt-2">Klgo. Ignacio Cuevas Silva</p>
+          </div>
+        </div>
+
         {/* Bloque 1 */}
         <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
           <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
