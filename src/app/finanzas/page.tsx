@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, useMemo } from "react";
 import { SettlePaymentModal } from "@/components/sales/SettlePaymentModal";
 import { CancelPlanModal } from "@/components/sales/CancelPlanModal";
+import { EditExpenseModal } from "@/components/finanzas/EditExpenseModal";
 import { createClient } from "@/utils/supabase/client";
 import { formatCLP, formatRut , getChileanDate } from '@/lib/utils';
 import { Loader2, Plus, CreditCard, TrendingUp, TrendingDown, DollarSign, CheckCircle2, AlertTriangle, X } from "lucide-react";
@@ -31,6 +32,7 @@ function FinanzasContent() {
   const [showEgresoModal, setShowEgresoModal] = useState(false);
   const [savingEgreso, setSavingEgreso] = useState(false);
   const [egresoForm, setEgresoForm] = useState({ concepto: '', categoria: 'Insumos Clínicos', monto: '', formaPago: 'Débito', fecha: '' });
+  const [editingEgreso, setEditingEgreso] = useState<any | null>(null);
 
   // Modal Settle & Cancel
   const [settlingPlan, setSettlingPlan] = useState<any>(null);
@@ -137,6 +139,25 @@ function FinanzasContent() {
     }
   };
 
+  const handleAbrirEditarEgreso = (egreso: any) => {
+    setEditingEgreso(egreso);
+  };
+
+  const handleEliminarEgreso = async (egresoId: string) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este gasto / egreso? Esta acción no se puede deshacer.')) {
+      return;
+    }
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.from('egresos_caja').delete().eq('id', egresoId);
+      if (error) throw error;
+      toast.success('Egreso eliminado correctamente');
+      loadData();
+    } catch (err: any) {
+      toast.error('Error al eliminar egreso: ' + (err.message || ''));
+    }
+  };
+
   const getRangoFechasStrings = (tipo: string) => {
     const { inicio, fin } = getRangoFechas(tipo);
     const formatDateStr = (d: Date) => {
@@ -167,8 +188,12 @@ function FinanzasContent() {
   }, [compras, periodo]);
 
   const egresosFiltrados = useMemo(() => {
+    const { inicioStr, finStr } = getRangoFechasStrings(periodo);
     const { inicio, fin } = getRangoFechas(periodo);
     return egresos.filter((e) => {
+      if (e.fecha) {
+        return e.fecha >= inicioStr && e.fecha <= finStr;
+      }
       if (!e.created_at) return false;
       const f = new Date(e.created_at);
       return f >= inicio && f <= fin;
@@ -425,6 +450,7 @@ function FinanzasContent() {
                               <th className="py-3 px-4">Categoría</th>
                               <th className="py-3 px-4">Medio</th>
                               <th className="py-3 px-4 text-right">Monto CLP</th>
+                              <th className="py-3 px-4 text-right">Acción</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -438,6 +464,24 @@ function FinanzasContent() {
                                 <td className="py-3 px-4 text-xs text-slate-500 font-medium">{e.medio_pago || 'Débito'}</td>
                                 <td className="py-3 px-4 text-right font-black text-rose-600">
                                   {formatCLP(e.monto_clp)}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      onClick={() => handleAbrirEditarEgreso(e)}
+                                      className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                      title="Editar gasto"
+                                    >
+                                      ✏️
+                                    </button>
+                                    <button
+                                      onClick={() => handleEliminarEgreso(e.id)}
+                                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                      title="Eliminar gasto"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ))}
@@ -512,6 +556,13 @@ function FinanzasContent() {
         plan={cancelingPlan}
         patientName={cancelingPlan?.pacientes?.nombre_completo}
         onSuccess={() => { setCancelingPlan(null); loadData(); }}
+      />
+
+      <EditExpenseModal
+        isOpen={!!editingEgreso}
+        onClose={() => setEditingEgreso(null)}
+        egreso={editingEgreso}
+        onSuccess={loadData}
       />
     </div>
   );

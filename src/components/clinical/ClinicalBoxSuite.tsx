@@ -10,6 +10,8 @@ import { DischargeReportModal } from '@/components/clinical/DischargeReportModal
 import { ReimbursementCertificate } from '@/components/clinical/ReimbursementCertificate';
 import { FileText, Printer } from 'lucide-react';
 import { EditPatientDialog } from '@/components/patients/EditPatientDialog';
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface ClinicalBoxSuiteProps {
   pacienteId: string;
@@ -58,6 +60,29 @@ export default function ClinicalBoxSuite({
 
   // Control de acordeón en timeline histórico
   const [notaExpandidaId, setNotaExpandidaId] = useState<string | null>(null);
+
+  // Edición rápida de nota en timeline
+  const [notaEditando, setNotaEditando] = useState<any | null>(null);
+  const [editFecha, setEditFecha] = useState<string>('');
+  const [editEna, setEditEna] = useState<number>(5);
+  const [editS, setEditS] = useState<string>('');
+  const [editO, setEditO] = useState<string>('');
+  const [editA, setEditA] = useState<string>('');
+  const [editP, setEditP] = useState<string>('');
+  const [savingNotaEdit, setSavingNotaEdit] = useState<boolean>(false);
+
+  // Orden cronológico estricto: S1 (antigua) -> Sn (reciente)
+  const notasCronologicas = useMemo(() => {
+    return [...historialSOAP].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+  }, [historialSOAP]);
+
+  const dolorInicial = notasCronologicas[0]?.nivel_dolor_ena ?? 0;
+  const dolorActual = notasCronologicas[notasCronologicas.length - 1]?.nivel_dolor_ena ?? 0;
+
+  // Solo calcular porcentaje si el dolor inicial fue mayor a 0
+  const pctMejoria = dolorInicial > 0 
+    ? Math.round(((dolorInicial - dolorActual) / dolorInicial) * 100) 
+    : 0;
 
   // 1. Carga de datos de Supabase
   const cargarDatos = async () => {
@@ -190,6 +215,62 @@ export default function ClinicalBoxSuite({
       toast.error(`Error al guardar: ${err.message}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleIniciarEdicionNota = (nota: any) => {
+    setNotaEditando(nota);
+    setEditFecha(nota.fecha || getChileanDate());
+    setEditEna(Number(nota.nivel_dolor_ena) ?? 0);
+    setEditS(nota.s_subjetivo || '');
+    setEditO(nota.o_objetivo || '');
+    setEditA(nota.a_analisis || '');
+    setEditP(nota.p_plan || '');
+  };
+
+  const handleGuardarEdicionNota = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notaEditando?.id || !supabase) return;
+    setSavingNotaEdit(true);
+    try {
+      const { error } = await supabase
+        .from('evoluciones_soap')
+        .update({
+          fecha: editFecha,
+          nivel_dolor_ena: Number(editEna),
+          s_subjetivo: editS.trim(),
+          o_objetivo: editO.trim(),
+          a_analisis: editA.trim(),
+          p_plan: editP.trim(),
+        })
+        .eq('id', notaEditando.id);
+
+      if (error) throw error;
+
+      toast.success('Nota clínica y fecha actualizadas');
+      setNotaEditando(null);
+      await cargarDatos();
+    } catch (err: any) {
+      console.error('Error al actualizar nota:', err);
+      toast.error('Error al actualizar nota: ' + (err.message || ''));
+    } finally {
+      setSavingNotaEdit(false);
+    }
+  };
+
+  const handleEliminarNota = async (notaId: string) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar esta evolución clínica del historial? Esta acción no se puede deshacer.')) {
+      return;
+    }
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.from('evoluciones_soap').delete().eq('id', notaId);
+      if (error) throw error;
+      toast.success('Evolución eliminada exitosamente');
+      await cargarDatos();
+    } catch (err: any) {
+      console.error('Error al eliminar evolución:', err);
+      toast.error('Error al eliminar evolución: ' + (err.message || ''));
     }
   };
 
@@ -468,22 +549,26 @@ export default function ClinicalBoxSuite({
                   <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                     Evolución del Dolor (Escala ENA 0 - 10)
                   </span>
-                  {historialSOAP.length > 1 && (
-                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                      {Math.round(((historialSOAP[historialSOAP.length - 1].nivel_dolor_ena - historialSOAP[0].nivel_dolor_ena) / Math.max(1, historialSOAP[historialSOAP.length - 1].nivel_dolor_ena)) * 100)}% de mejoría
+                  {notasCronologicas.length > 1 && (
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${
+                      pctMejoria >= 0 
+                        ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                        : 'text-rose-700 bg-rose-50 border-rose-200'
+                    }`}>
+                      {pctMejoria >= 0 ? `${pctMejoria}% de mejoría` : `${Math.abs(pctMejoria)}% aumento de dolor`}
                     </span>
                   )}
                 </div>
 
                 {/* Gráfico de Barras y Puntos */}
-                {historialSOAP.length === 0 ? (
+                {notasCronologicas.length === 0 ? (
                   <p className="text-xs text-slate-400 italic py-3 text-center">
                     Primera sesión. El gráfico comenzará a trazarse al guardar la primera nota de hoy.
                   </p>
                 ) : (
                   <div className="space-y-2 pt-2">
                     <div className="h-28 flex items-end justify-between gap-2 px-2 border-b border-slate-200 pb-1">
-                      {[...historialSOAP].reverse().map((nota, idx) => {
+                      {notasCronologicas.map((nota, idx) => {
                         const ena = Number(nota.nivel_dolor_ena) || 0;
                         const alturaPct = Math.max(10, (ena / 10) * 100);
                         const colorBarra = ena <= 3 ? 'bg-emerald-500' : ena <= 6 ? 'bg-amber-500' : 'bg-rose-500';
@@ -695,15 +780,33 @@ export default function ClinicalBoxSuite({
                       key={nota.id}
                       className="border border-slate-200 rounded-xl p-3 text-xs space-y-2 hover:border-slate-300 transition-colors bg-slate-50/40"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-800">{nota.fecha}</span>
-                        <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-800 font-mono text-xs">{nota.fecha}</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                           (nota.nivel_dolor_ena || 0) <= 3 
                             ? 'bg-emerald-100 text-emerald-800' 
-                            : 'bg-amber-100 text-amber-800'
+                            : (nota.nivel_dolor_ena || 0) <= 6
+                            ? 'bg-amber-100 text-amber-900'
+                            : 'bg-rose-100 text-rose-900'
                         }`}>
                           ENA {nota.nivel_dolor_ena ?? 0}/10
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => handleIniciarEdicionNota(nota)}
+                          className="p-1 text-slate-400 hover:text-blue-600 rounded ml-auto cursor-pointer text-xs hover:bg-blue-50 transition-colors"
+                          title="Editar fecha o nota"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarNota(nota.id)}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer text-xs hover:bg-rose-50 transition-colors"
+                          title="Eliminar nota duplicada"
+                        >
+                          🗑️
+                        </button>
                       </div>
 
                       {/* Resumen o Despliegue Completo */}
@@ -805,6 +908,117 @@ export default function ClinicalBoxSuite({
             cargarDatos();
           }}
         />
+      )}
+
+      {/* Modal Ligero de Edición de Nota Clínica SOAP */}
+      {notaEditando && (
+        <Dialog open={!!notaEditando} onOpenChange={(open) => !open && setNotaEditando(null)}>
+          <DialogHeader>
+            <DialogTitle>Editar Evolución Clínica & Fecha</DialogTitle>
+            <DialogDescription>
+              Modifica la fecha de atención, nivel de dolor ENA o las notas SOAP de esta sesión.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleGuardarEdicionNota} className="space-y-4 pt-2">
+            <DialogBody className="space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                    📅 Fecha de la Sesión
+                  </label>
+                  <input
+                    type="date"
+                    value={editFecha}
+                    onChange={(e) => setEditFecha(e.target.value)}
+                    required
+                    className="w-full text-xs p-2 rounded-lg border border-slate-300 bg-white font-medium focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                    Nivel de Dolor ENA (0 a 10): <span className="font-extrabold text-blue-600 font-mono text-sm">{editEna}/10</span>
+                  </label>
+                  <div className="flex items-center gap-1 pt-1">
+                    {[0,1,2,3,4,5,6,7,8,9,10].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setEditEna(num)}
+                        className={`flex-1 h-7 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                          editEna === num 
+                            ? 'bg-blue-600 text-white shadow-xs' 
+                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">S — Subjetivo (Relato)</label>
+                  <textarea
+                    rows={2}
+                    value={editS}
+                    onChange={(e) => setEditS(e.target.value)}
+                    placeholder="Relato del paciente..."
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none bg-slate-50/50 focus:bg-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">O — Objetivo (Examen Físico)</label>
+                  <textarea
+                    rows={2}
+                    value={editO}
+                    onChange={(e) => setEditO(e.target.value)}
+                    placeholder="Examen físico, arcos, pruebas..."
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none bg-slate-50/50 focus:bg-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">A — Análisis (Evolución Kinésica)</label>
+                  <textarea
+                    rows={2}
+                    value={editA}
+                    onChange={(e) => setEditA(e.target.value)}
+                    placeholder="Juicio funcional..."
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none bg-slate-50/50 focus:bg-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">P — Plan (Pauta y Próxima Sesión)</label>
+                  <textarea
+                    rows={2}
+                    value={editP}
+                    onChange={(e) => setEditP(e.target.value)}
+                    placeholder="Pauta de ejercicios, dosificación..."
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none bg-slate-50/50 focus:bg-white"
+                  />
+                </div>
+              </div>
+            </DialogBody>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setNotaEditando(null)}
+                disabled={savingNotaEdit}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={savingNotaEdit}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold"
+              >
+                {savingNotaEdit ? 'Guardando...' : 'Guardar Cambios'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Dialog>
       )}
     </div>
   );
