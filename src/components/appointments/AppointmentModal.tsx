@@ -10,6 +10,7 @@ import { Search } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { formatRut } from '@/lib/utils';
+import { crearEventoGoogleCalendar } from '@/actions/calendar';
 
 interface AppointmentModalProps {
   isOpen: boolean;
@@ -48,8 +49,8 @@ export function AppointmentModal({
 
   const [fecha, setFecha] = useState(initialDate || getFormattedLocalDate(new Date()));
   const [hora, setHora] = useState('09:00');
-  const [motivo, setMotivo] = useState('Sesión Kinésica');
-  const [profesional, setProfesional] = useState('Klgo. Ignacio Cuevas');
+  const [motivo, setMotivo] = useState('Atención Kinésica TMO');
+  const [profesional, setProfesional] = useState('Klgo. Ignacio Cuevas Silva');
   
   const [pacientes, setPacientes] = useState<any[]>([]);
   const [pacienteSearch, setPacienteSearch] = useState('');
@@ -77,7 +78,7 @@ export function AppointmentModal({
     if (!supabase) return;
     const { data } = await supabase
       .from('pacientes')
-      .select('id, nombre_completo, rut')
+      .select('id, nombre_completo, rut, telefono')
       .order('nombre_completo', { ascending: true });
     if (data) setPacientes(data);
   };
@@ -120,51 +121,46 @@ export function AppointmentModal({
         return;
       }
       
-      const payload = {
-         paciente_id: selectedPatientId,
-         fecha, 
-         hora,
-         profesional,
-         motivo_consulta: motivo || 'Sesión de Tratamiento Kinésico',
-         estado: 'pendiente'
-      };
+      const pacienteSeleccionado = preselectedPatient || pacientes.find(p => p.id === selectedPatientId);
+      const fechaSeleccionada = fecha;
+      const horaSeleccionada = hora;
+      const motivoConsulta = motivo || 'Atención Kinésica TMO';
 
-      const { data: nuevaCita, error } = await supabase
-         .from('citas_atenciones')
-         .insert([payload])
-         .select('id, pacientes(nombre_completo, telefono)')
-         .single();
+      // Al confirmar la cita:
+      const { data: nuevaCita, error: errCita } = await supabase
+        .from('citas_atenciones')
+        .insert([{
+          paciente_id: selectedPatientId,
+          fecha: fechaSeleccionada,
+          hora: horaSeleccionada,
+          profesional: profesional || 'Klgo. Ignacio Cuevas Silva',
+          motivo_consulta: motivoConsulta,
+          estado: 'pendiente'
+        }])
+        .select()
+        .single();
 
-      if (error) {
-         toast.error(`No se pudo agendar: ${error.message}`);
-         return;
-      }
+      if (errCita) throw errCita;
 
-      // 2. Sincronizar hacia Google Calendar (Dirección Kiromov -> Google)
+      // DISPARAR SINCRONIZACIÓN CON GOOGLE CALENDAR EN SEGUNDO PLANO
       try {
-        const pacienteData = Array.isArray(nuevaCita.pacientes) ? nuevaCita.pacientes[0] : (nuevaCita.pacientes as any);
-        const nombrePaciente = preselectedPatient?.nombre_completo || pacienteData?.nombre_completo;
-        const telefonoPaciente = preselectedPatient?.telefono || pacienteData?.telefono;
-
-        const { syncEventToGoogleCalendar } = await import('@/actions/calendar');
-        const syncRes = await syncEventToGoogleCalendar({
-          action: 'create_event',
-          cita_id: nuevaCita.id,
-          fecha,
-          hora,
-          paciente_nombre: nombrePaciente || 'Paciente Kiromov',
-          paciente_telefono: telefonoPaciente,
-          motivo_consulta: payload.motivo_consulta
+        const googleEventId = await crearEventoGoogleCalendar({
+          pacienteNombre: pacienteSeleccionado?.nombre_completo || 'Paciente Kiromov',
+          pacienteTelefono: pacienteSeleccionado?.telefono || null,
+          fecha: fechaSeleccionada,
+          hora: horaSeleccionada,
+          motivo: motivoConsulta
         });
-        
-        if (syncRes?.success && syncRes?.google_event_id) {
-           await supabase
-             .from('citas_atenciones')
-             .update({ google_event_id: syncRes.google_event_id })
-             .eq('id', nuevaCita.id);
+
+        if (googleEventId) {
+          // Vincular el ID del evento de Google en Supabase
+          await supabase
+            .from('citas_atenciones')
+            .update({ google_event_id: googleEventId })
+            .eq('id', nuevaCita.id);
         }
-      } catch (syncErr) {
-         console.error('Error no bloqueante en sync calendar:', syncErr);
+      } catch (gErr) {
+        console.warn('[Google Calendar Sync] Falló el envío en segundo plano:', gErr);
       }
 
       toast.success('¡Cita agendada exitosamente!');

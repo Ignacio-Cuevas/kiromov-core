@@ -134,7 +134,7 @@ function AgendaContent() {
 
       const { data: pacData, error: pacError } = await supabase
         .from('pacientes')
-        .select('id, nombre_completo, rut')
+        .select('id, nombre_completo, rut, telefono')
         .order('nombre_completo', { ascending: true });
 
       if (!pacError && pacData) setPacientes(pacData as Paciente[]);
@@ -446,27 +446,25 @@ function AgendaContent() {
 
       // Sincronizar hacia Google Calendar
       try {
-        const paciente = pacientesOptions.find(p => p.id === newCita.pacienteId);
+        const paciente = pacientes.find(p => p.id === newCita.pacienteId) || pacientesOptions.find(p => p.id === newCita.pacienteId);
         const pacienteObj = Array.isArray(data.pacientes) ? data.pacientes[0] : (data.pacientes as any);
         const nombrePaciente = paciente?.nombre_completo || pacienteObj?.nombre_completo;
-        const telefonoPaciente = (paciente as any)?.telefono || pacienteObj?.telefono;
+        const telefonoPaciente = paciente?.telefono || pacienteObj?.telefono;
 
-        const { syncEventToGoogleCalendar } = await import('@/actions/calendar');
-        const syncRes = await syncEventToGoogleCalendar({
-          action: 'create_event',
-          cita_id: data.id,
+        const { crearEventoGoogleCalendar } = await import('@/actions/calendar');
+        const googleEventId = await crearEventoGoogleCalendar({
+          pacienteNombre: nombrePaciente || 'Paciente Kiromov',
+          pacienteTelefono: telefonoPaciente || null,
           fecha: newCita.fecha,
           hora: newCita.hora,
-          paciente_nombre: nombrePaciente || 'Paciente Kiromov',
-          paciente_telefono: telefonoPaciente,
-          motivo_consulta: newCita.motivo
+          motivo: newCita.motivo || 'Atención Kinésica TMO'
         });
         
-        if (syncRes?.success && syncRes?.google_event_id) {
-           await supabase.from('citas_atenciones').update({ google_event_id: syncRes.google_event_id }).eq('id', data.id);
+        if (googleEventId) {
+           await supabase.from('citas_atenciones').update({ google_event_id: googleEventId }).eq('id', data.id);
         }
       } catch (syncErr) {
-         console.error('Error al sincronizar con Google Calendar:', syncErr);
+         console.warn('[Google Calendar Sync] Falló el envío en segundo plano desde agenda:', syncErr);
       }
 
       toast.success('¡Cita agendada exitosamente!');

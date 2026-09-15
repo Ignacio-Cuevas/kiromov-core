@@ -1,6 +1,23 @@
 'use server';
 
-import { crearEventoGoogleCalendar, eliminarEventoGoogleCalendar } from '@/utils/google-calendar';
+import { 
+  crearEventoGoogleCalendar as crearEventoGoogleCalendarUtil, 
+  eliminarEventoGoogleCalendar as eliminarEventoGoogleCalendarUtil 
+} from '@/utils/google-calendar';
+
+export async function crearEventoGoogleCalendar(params: {
+  pacienteNombre: string;
+  pacienteTelefono?: string | null;
+  fecha: string;
+  hora: string;
+  motivo?: string | null;
+}) {
+  return await crearEventoGoogleCalendarUtil(params);
+}
+
+export async function eliminarEventoGoogleCalendar(googleEventId: string) {
+  return await eliminarEventoGoogleCalendarUtil(googleEventId);
+}
 
 export async function syncEventToGoogleCalendar(payload: {
   action: 'create_event' | 'update_event' | 'cancel_event';
@@ -18,7 +35,7 @@ export async function syncEventToGoogleCalendar(payload: {
         return { success: false, error: 'Falta fecha u hora para crear evento en Google Calendar' };
       }
 
-      const eventId = await crearEventoGoogleCalendar({
+      const eventId = await crearEventoGoogleCalendarUtil({
         pacienteNombre: payload.paciente_nombre || 'Paciente Kiromov',
         pacienteTelefono: payload.paciente_telefono,
         fecha: payload.fecha,
@@ -37,16 +54,16 @@ export async function syncEventToGoogleCalendar(payload: {
         return { success: false, error: 'Falta google_event_id para cancelar evento' };
       }
 
-      const eliminado = await eliminarEventoGoogleCalendar(payload.google_event_id);
+      const eliminado = await eliminarEventoGoogleCalendarUtil(payload.google_event_id);
       return { success: eliminado };
     }
 
     if (payload.action === 'update_event') {
       if (payload.google_event_id) {
-        await eliminarEventoGoogleCalendar(payload.google_event_id);
+        await eliminarEventoGoogleCalendarUtil(payload.google_event_id);
       }
       if (payload.fecha && payload.hora) {
-        const nuevoEventId = await crearEventoGoogleCalendar({
+        const nuevoEventId = await crearEventoGoogleCalendarUtil({
           pacienteNombre: payload.paciente_nombre || 'Paciente Kiromov',
           pacienteTelefono: payload.paciente_telefono,
           fecha: payload.fecha,
