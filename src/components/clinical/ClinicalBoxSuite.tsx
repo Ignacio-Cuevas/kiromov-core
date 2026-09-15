@@ -20,6 +20,83 @@ interface ClinicalBoxSuiteProps {
   onSuccess?: () => void;
 }
 
+export const calcularPronosticoAltaClinica = (historialSOAP: any[]) => {
+  // CASO A: Solo 1 sesión registrada (Modo Calibración)
+  if (!historialSOAP || historialSOAP.length < 2) {
+    const dolorInicial = historialSOAP?.[0]?.nivel_dolor_ena ?? 7;
+    return {
+      fase: 'calibracion',
+      titulo: '⏳ Calibrando Respuesta Tisular',
+      mensaje: `Línea de base fijada (ENA ${dolorInicial}/10). La proyección de sesiones se calculará a partir de la 2ª sesión tras evaluar la respuesta tisular.`,
+      sesionesRealizadas: historialSOAP?.length || 1,
+      faltanSesiones: null,
+      porcentaje: 20,
+      badgeColor: 'bg-amber-50 text-amber-800 border-amber-200',
+      metaAlcanzada: false
+    };
+  }
+
+  // CASO B: 2 o más sesiones (Cálculo Predictivo Real)
+  // Ordenar cronológicamente (S1 más antigua -> Sn más reciente)
+  const notas = [...historialSOAP].sort(
+    (a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
+  );
+
+  const s1 = notas[0];
+  const sn = notas[notas.length - 1];
+
+  const dolorInicial = Number(s1.nivel_dolor_ena) || 7;
+  const dolorActual = Number(sn.nivel_dolor_ena) || 0;
+  const totalSesiones = notas.length;
+
+  // Gradiente de recuperación del dolor
+  const deltaDolor = dolorInicial - dolorActual;
+  const pctMejoria = dolorInicial > 0 ? Math.round((deltaDolor / dolorInicial) * 100) : 0;
+
+  // Criterios predictivos según respuesta tisular y sesiones realizadas:
+  let faltanAprox = 3;
+  let clasificacion = 'Favorable';
+  let badgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
+
+  if (dolorActual <= 1) {
+    // Dolor en meta de alta
+    faltanAprox = 0;
+    clasificacion = 'Meta alcanzada';
+    badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  } else if (pctMejoria >= 50 || dolorActual <= 3) {
+    // Buena respuesta analgésica y mecánica
+    faltanAprox = Math.max(1, 4 - totalSesiones);
+    clasificacion = `Respuesta rápida (${pctMejoria}% de alivio)`;
+    badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  } else if (pctMejoria >= 20) {
+    // Evolución estándar TMO
+    faltanAprox = Math.max(2, 6 - totalSesiones);
+    clasificacion = `Respuesta favorable (${pctMejoria}% de alivio)`;
+    badgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
+  } else {
+    // Respuesta lenta o dolor irritable persistente
+    faltanAprox = Math.max(3, 8 - totalSesiones);
+    clasificacion = 'Respuesta lenta / Alta irritabilidad';
+    badgeColor = 'bg-amber-50 text-amber-800 border-amber-200';
+  }
+
+  const porcentajeEstimado = faltanAprox === 0 
+    ? 100 
+    : Math.min(95, Math.round((totalSesiones / (totalSesiones + faltanAprox)) * 100));
+
+  return {
+    fase: 'predictiva',
+    titulo: faltanAprox === 0 ? '✅ Alta Funcional Alcanzada' : `Faltan ~${faltanAprox} sesión(es) para el alta`,
+    clasificacion,
+    mensaje: `Basado en ${totalSesiones} sesiones con dolor actual ENA ${dolorActual}/10 (Meta: ≤ 1/10).`,
+    sesionesRealizadas: totalSesiones,
+    faltanSesiones: faltanAprox,
+    porcentaje: porcentajeEstimado,
+    badgeColor,
+    metaAlcanzada: faltanAprox === 0
+  };
+};
+
 export default function ClinicalBoxSuite({
   pacienteId,
   citaId,
@@ -506,18 +583,61 @@ export default function ClinicalBoxSuite({
               )}
             </div>
 
-            {/* Estimación de Alta */}
-            <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                🎯 Estimación de Alta Funcional
-              </span>
-              <p className="text-xs font-bold text-slate-800">
-                {evaluacionInicialTMO?.estimacion_alta || historialSOAP[0]?.pronostico_sesiones || '4 a 6 sesiones estimadas'}
-              </p>
-              <p className="text-[11px] text-slate-500">
-                {planActivo ? `${Math.max(0, (planActivo.sesiones_totales || 0) - (planActivo.sesiones_usadas || 0))} sesiones disponibles en plan actual` : 'Sin plan activo'}
-              </p>
-            </div>
+            {/* Estimación de Alta Funcional (Algoritmo Predictivo Clínico) */}
+            {(() => {
+              const estimacion = calcularPronosticoAltaClinica(historialSOAP);
+
+              return (
+                <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      🎯 Estimación de Alta Funcional
+                    </span>
+                    <span className="font-mono font-bold text-slate-700 text-[11px]">
+                      {estimacion.porcentaje}%
+                    </span>
+                  </div>
+
+                  {/* Barra de Progreso Visual */}
+                  <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        estimacion.metaAlcanzada ? 'bg-emerald-500' : 'bg-blue-600'
+                      }`}
+                      style={{ width: `${estimacion.porcentaje}%` }}
+                    />
+                  </div>
+
+                  {/* Detalle Clínico Predictivo */}
+                  <div className="pt-1 space-y-1">
+                    <p className="font-bold text-slate-900 text-xs">
+                      {estimacion.titulo}
+                    </p>
+
+                    {estimacion.fase === 'calibracion' ? (
+                      <p className="text-[11px] text-slate-500 leading-relaxed italic">
+                        {estimacion.mensaje}
+                      </p>
+                    ) : (
+                      <>
+                        <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md border ${estimacion.badgeColor}`}>
+                          {estimacion.clasificacion}
+                        </span>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          {estimacion.mensaje}
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  {planActivo && (
+                    <div className="pt-1.5 border-t border-slate-200/60 text-[10px] text-slate-500 font-medium">
+                      {Math.max(0, (planActivo.sesiones_totales || 0) - (planActivo.sesiones_usadas || 0))} sesiones disponibles en plan actual
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </aside>
 
           {/* ------------------------------------------------------------------ */}
