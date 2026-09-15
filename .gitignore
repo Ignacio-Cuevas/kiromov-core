@@ -16,7 +16,6 @@
 
 # misc
 .DS_Store
-*.pem
 
 # debug
 npm-debug.log*
@@ -27,8 +26,16 @@ yarn-error.log*
 .env*.local
 .env.local
 .env
+.env*.development
+.env*.production
+
+# Credenciales y llaves privadas
+*credentials*.json
+*.credentials.json
+service-account*.json
 google-credentials.json
 *.json.secret
+*.pem
 
 # vercel
 .vercel

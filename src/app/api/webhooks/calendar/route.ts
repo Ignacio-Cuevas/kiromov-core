@@ -36,14 +36,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const authBuffer = Buffer.from(authHeader);
-    const secretBuffer = Buffer.from(secretKey);
-    
-    if (authBuffer.length !== secretBuffer.length || !crypto.timingSafeEqual(authBuffer, secretBuffer)) {
-      return NextResponse.json({ error: 'No autorizado: Token de webhook inválido' }, { status: 401 });
+    const hash = (str: string) => crypto.createHash('sha256').update(str).digest();
+    const authHash = hash(authHeader);
+    const secretHash = hash(secretKey);
+
+    if (!crypto.timingSafeEqual(authHash, secretHash)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
   } catch (error) {
-    return NextResponse.json({ error: 'No autorizado: Formato de token inválido' }, { status: 401 });
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
   if (!supabase) {
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     const horaNormalizada = hora.length === 5 ? hora + ':00' : hora;
 
-    console.log('[WEBHOOK CALENDAR] Cita recibida:', { nombre_completo, fecha, hora, google_event_id });
+    console.log('[WEBHOOK CALENDAR] Cita procesada exitosamente');
 
     // Normalización de Datos
     let cleanName = nombre_completo

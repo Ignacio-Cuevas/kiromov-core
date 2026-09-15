@@ -175,8 +175,6 @@ export function PatientModal({
         estado: 'activo'
       };
 
-      console.log('Enviando payload a Supabase:', payload);
-      
       const isEditing = Boolean(patientToEdit?.id);
       let resultData;
 
@@ -210,7 +208,6 @@ export function PatientModal({
           setIsSubmitting(false);
           return;
         }
-        console.log('Paciente creado exitosamente:', data);
         toast.success('¡Paciente registrado exitosamente!');
         resultData = data;
       }
