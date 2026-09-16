@@ -95,6 +95,30 @@ function AgendaContent() {
   const [deletingCita, setDeletingCita] = useState<CitaExtendida | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSincronizarCalendario = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/calendar/sync-all', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Error al sincronizar con Google Calendar');
+      }
+      if (data.totalSincronizadas > 0) {
+        toast.success(`¡Sincronización exitosa! Se sincronizaron ${data.totalSincronizadas} citas con Google Calendar.`);
+      } else {
+        toast.info('Todas las citas vigentes ya estaban sincronizadas con Google Calendar.');
+      }
+      loadAgenda();
+    } catch (err: any) {
+      console.error('Error sincronizando calendario:', err);
+      toast.error(err.message || 'Error al conectar con el servicio de calendario');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const loadAgenda = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
@@ -1077,10 +1101,21 @@ function AgendaContent() {
             <h2 className="text-[28px] leading-tight font-bold text-ink-navy">{formattedTitleDate}</h2>
           </div>
           
-          <div className="flex items-center gap-2 border border-hairline p-1 rounded-inputs bg-pebble">
-            <button onClick={() => setVista('dia')} className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${vista === 'dia' ? 'bg-paper shadow-calendly text-ink-navy border border-hairline' : 'text-slate-gray hover:text-ink-navy'}`}>Día</button>
-            <button onClick={() => setVista('semana')} className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${vista === 'semana' ? 'bg-paper shadow-calendly text-ink-navy border border-hairline' : 'text-slate-gray hover:text-ink-navy'}`}>Semana</button>
-            <button onClick={() => setVista('mes')} className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${vista === 'mes' ? 'bg-paper shadow-calendly text-ink-navy border border-hairline' : 'text-slate-gray hover:text-ink-navy'}`}>Mes</button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleSincronizarCalendario}
+              disabled={isSyncing}
+              className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              title="Sincronizar citas huérfanas hacia Google Calendar"
+            >
+              <span>🔄</span> {isSyncing ? 'Sincronizando...' : 'Sincronizar Google Calendar'}
+            </button>
+
+            <div className="flex items-center gap-2 border border-hairline p-1 rounded-inputs bg-pebble">
+              <button onClick={() => setVista('dia')} className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${vista === 'dia' ? 'bg-paper shadow-calendly text-ink-navy border border-hairline' : 'text-slate-gray hover:text-ink-navy'}`}>Día</button>
+              <button onClick={() => setVista('semana')} className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${vista === 'semana' ? 'bg-paper shadow-calendly text-ink-navy border border-hairline' : 'text-slate-gray hover:text-ink-navy'}`}>Semana</button>
+              <button onClick={() => setVista('mes')} className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${vista === 'mes' ? 'bg-paper shadow-calendly text-ink-navy border border-hairline' : 'text-slate-gray hover:text-ink-navy'}`}>Mes</button>
+            </div>
           </div>
         </div>
 
