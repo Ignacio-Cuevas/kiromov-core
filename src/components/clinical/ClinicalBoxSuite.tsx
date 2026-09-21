@@ -10,6 +10,7 @@ import { DischargeReportModal } from '@/components/clinical/DischargeReportModal
 import { ReimbursementCertificate } from '@/components/clinical/ReimbursementCertificate';
 import { FileText, Printer } from 'lucide-react';
 import { EditPatientDialog } from '@/components/patients/EditPatientDialog';
+import { ManagePlanModal } from '@/components/patients/ManagePlanModal';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
@@ -117,6 +118,7 @@ export default function ClinicalBoxSuite({
   const [abrirEditarPaciente, setAbrirEditarPaciente] = useState(false);
   const [abrirDischargeModal, setAbrirDischargeModal] = useState(false);
   const [abrirCertificadoModal, setAbrirCertificadoModal] = useState(false);
+  const [abrirManagePlanModal, setAbrirManagePlanModal] = useState(false);
   const [evaluacionesTMO, setEvaluacionesTMO] = useState<any[]>([]);
   const [evaluacionActivaIndex, setEvaluacionActivaIndex] = useState<number>(0);
   const [modoEvaluacion, setModoEvaluacion] = useState<'nueva' | 'editar'>('editar');
@@ -380,18 +382,31 @@ export default function ClinicalBoxSuite({
               </p>
             </div>
 
-            {/* Badges de Plan y Pago */}
-            <div className="hidden md:flex items-center gap-2">
-              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200">
-                {planActivo?.nombre_plan ? `${planActivo.nombre_plan} • ${planActivo.sesiones_usadas}/${planActivo.sesiones_totales} ses.` : 'Sin plan activo'}
-              </span>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+            {/* Badges de Plan y Pago + Botón Ajustar Plan */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setAbrirManagePlanModal(true)}
+                className="hidden md:inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 transition-colors cursor-pointer"
+                title="Hacer clic para editar plan del paciente"
+              >
+                <span>{planActivo?.nombre_plan ? `${planActivo.nombre_plan} • ${planActivo.sesiones_usadas}/${planActivo.sesiones_totales} ses.` : 'Sin plan activo'}</span>
+              </button>
+              <span className={`hidden md:inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold ${
                 planActivo?.estado_pago === 'pagado' 
                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                   : 'bg-rose-50 text-rose-700 border border-rose-200'
               }`}>
                 {planActivo?.estado_pago === 'pagado' ? '✓ Plan Pagado' : '🔴 Cobro Pendiente'}
               </span>
+              <button
+                type="button"
+                onClick={() => setAbrirManagePlanModal(true)}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 transition-all flex items-center gap-1 shadow-xs cursor-pointer"
+                title="Ajustar sesiones o estado del plan"
+              >
+                <span>⚙️ Ajustar Plan</span>
+              </button>
             </div>
           </div>
 
@@ -1026,6 +1041,19 @@ export default function ClinicalBoxSuite({
           patient={paciente}
           onPatientUpdated={(updated) => {
             cargarDatos();
+          }}
+        />
+      )}
+
+      {abrirManagePlanModal && paciente && (
+        <ManagePlanModal
+          isOpen={abrirManagePlanModal}
+          onClose={() => setAbrirManagePlanModal(false)}
+          paciente={paciente}
+          planActual={planActivo}
+          onSuccess={async () => {
+            await cargarDatos();
+            onSuccess?.();
           }}
         />
       )}
