@@ -725,9 +725,13 @@ function AgendaContent() {
                 {formatRut(p.rut) || 'Sin RUT'} • <span className="font-sans italic">{cita.motivo_consulta || 'Sesión Kinésica'}</span>
               </p>
               {(p.alertas_seguridad || p.antecedentes_morbidos) && (
-                <div className="bg-rose-50 border border-rose-200 text-rose-800 px-3 py-1.5 rounded-inputs text-xs flex flex-wrap items-center gap-1.5 mt-2 max-w-full">
-                  <span className="font-bold whitespace-nowrap">🚩 Alerta Seguridad TMO:</span>
-                  <span className="truncate">{p.alertas_seguridad || p.antecedentes_morbidos}</span>
+                <div className="bg-rose-50/80 border border-rose-200 text-rose-900 p-2.5 rounded-xl text-xs space-y-0.5 mt-2">
+                  <span className="font-bold flex items-center gap-1 text-[11px] text-rose-800 uppercase tracking-wider">
+                    🚩 Alerta Seguridad TMO
+                  </span>
+                  <p className="text-xs text-rose-950 leading-relaxed whitespace-normal break-words font-medium">
+                    {p.alertas_seguridad || p.antecedentes_morbidos}
+                  </p>
                 </div>
               )}
             </div>
@@ -742,67 +746,72 @@ function AgendaContent() {
           </div>
         </div>
 
-        {/* Grid 3 Columnas (Contexto de Box) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-white/85 p-3.5 rounded-xl border border-slate-200/60 shadow-xs text-xs backdrop-blur-xs">
-          
-          {/* Col 1: Tratamiento & Saldo */}
-          <div className="space-y-1.5">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-              <span>🩺 Tratamiento</span>
+        {/* Panel Integrado de Tratamiento, Saldo y Estado */}
+        <div className="bg-white/90 p-3.5 rounded-xl border border-slate-200/80 shadow-xs space-y-2.5 text-xs">
+
+          {/* Fila 1: Tratamiento y Saldo de Sesiones */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                Tratamiento
+              </span>
+              <p className="font-bold text-slate-900 text-xs mt-0.5" title={p.nombre_plan || 'Plan'}>
+                {tienePlan ? (p.nombre_plan || 'Plan Kinésico') : 'Sin plan activo'}
+              </p>
             </div>
-            {tienePlan ? (
-              <div>
-                <p className="text-xs font-semibold text-slate-800 truncate mb-1" title={p.nombre_plan || 'Plan'}>{p.nombre_plan || 'Plan Kinésico'}</p>
-                <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600 mb-1">
-                  <span>Sesión {p.sesiones_usadas} de {p.sesiones_totales}</span>
-                  <span className="text-slate-400">• {p.sesiones_restantes} rest.</span>
+
+            {tienePlan && (p.sesiones_totales || 0) > 0 ? (
+              <div className="text-right">
+                <span className="font-mono font-bold text-slate-800 text-xs">
+                  {p.sesiones_usadas}/{p.sesiones_totales} ses.
+                </span>
+                <span className="text-[11px] text-slate-500 ml-1">
+                  ({p.sesiones_restantes} rest.)
+                </span>
+                <div className="w-24 h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1 ml-auto">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                    style={{ width: `${pct}%` }}
+                  />
                 </div>
-                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%` }} />
-                </div>
-                {p.sesiones_restantes === 1 && (
-                  <div className="mt-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md animate-pulse">
-                      🎯 Hoy es su última sesión del plan
-                    </span>
-                  </div>
-                )}
               </div>
             ) : (
-              <p className="text-xs text-slate-500 italic mt-2">Sin plan activo</p>
+              <span className="text-slate-400 text-[11px] italic">Sin sesiones prepagadas</span>
             )}
           </div>
 
-          {/* Col 2: Estado Financiero */}
-          <div className="space-y-1.5 md:border-l md:border-slate-200 md:pl-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-              💰 Financiamiento
-            </span>
+          {/* Fila 2: Financiamiento y Estado Clínico */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
 
-            {/* CASO 3: Si el plan está pagado */}
-            {p?.plan_id && p?.estado_pago === 'pagado' && p?.estado_plan !== 'finalizado' && (
-              <div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            {/* Estado Financiero sin texto quebrado */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Financiamiento:
+              </span>
+
+              {/* Caso 1: Si el plan está pagado */}
+              {p?.plan_id && p?.estado_pago === 'pagado' && p?.estado_plan !== 'finalizado' && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                   ✓ Plan Pagado (Al día)
+                  {p.numero_boleta && <span className="text-[10px] text-slate-500 ml-1 font-mono">(Bol: {p.numero_boleta})</span>}
                 </span>
-                {p.numero_boleta && <p className="text-[11px] text-slate-500 mt-1">Boleta: {p.numero_boleta}</p>}
-              </div>
-            )}
+              )}
 
-            {/* CASO 2: Si tiene cobro pendiente y el plan NO está finalizado */}
-            {p?.plan_id && p?.estado_pago === 'pendiente' && p?.estado_plan !== 'finalizado' && (
-              <div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                  🔴 Debe ({montoPendiente})
-                </span>
-                <div className="mt-2 space-y-1.5">
+              {/* Caso 2: Si tiene cobro pendiente y el plan NO está finalizado */}
+              {p?.plan_id && p?.estado_pago === 'pendiente' && p?.estado_plan !== 'finalizado' && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                    🔴 Debe ({montoPendiente})
+                  </span>
                   <button
+                    type="button"
                     onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.monto_clp, paciente_id: p.id }); }}
-                    className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold shadow-sm transition-colors cursor-pointer"
+                    className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold shadow-xs transition-colors cursor-pointer whitespace-nowrap"
                   >
-                    💳 Registrar Cobro
+                    💳 Cobrar
                   </button>
                   <button
+                    type="button"
                     onClick={() => {
                       setCancelingPlan({
                         id: p.plan_id,
@@ -814,94 +823,76 @@ function AgendaContent() {
                         pacientes: p
                       });
                     }}
-                    className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg border border-rose-200 bg-rose-50/50 hover:bg-rose-100 text-rose-700 text-[10px] font-semibold transition-colors cursor-pointer"
-                    title="Ajustar sesiones realizadas o anular el plan"
+                    className="px-1.5 py-0.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-semibold transition-colors cursor-pointer whitespace-nowrap"
+                    title="Ajustar o cancelar plan"
                   >
-                    ✕ Ajustar / Cancelar Plan
+                    ⚙️
                   </button>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* CASO 4: Si completó su plan */}
-            {p?.estado_plan === 'finalizado' && (
-              <div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                  ⚠️ Sesión Finalizada
-                </span>
-                
-                {p.estado_pago === 'pendiente' ? (
-                  <div className="mt-2 space-y-1.5">
+              {/* Caso 3: Si completó su plan */}
+              {p?.estado_plan === 'finalizado' && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                    ⚠️ Plan Finalizado
+                  </span>
+                  {p.estado_pago === 'pendiente' ? (
                     <button
+                      type="button"
                       onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.monto_clp, paciente_id: p.id }); }}
-                      className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold shadow-sm transition-colors cursor-pointer"
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold shadow-xs transition-colors cursor-pointer whitespace-nowrap"
                     >
                       💳 Cobrar ({montoPendiente})
                     </button>
+                  ) : (
                     <button
-                      onClick={() => {
-                        setCancelingPlan({
-                          id: p.plan_id,
-                          nombre_plan: p.nombre_plan,
-                          sesiones_totales: p.sesiones_totales,
-                          sesiones_usadas: p.sesiones_usadas,
-                          monto_clp: p.monto_clp,
-                          paciente_id: p.id,
-                          pacientes: p
-                        });
-                      }}
-                      className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg border border-rose-200 bg-rose-50/50 hover:bg-rose-100 text-rose-700 text-[10px] font-semibold transition-colors cursor-pointer"
-                      title="Ajustar sesiones realizadas o anular el plan"
+                      type="button"
+                      onClick={() => { setAssignTreatmentModal({ isOpen: true, paciente: p }); }}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors whitespace-nowrap cursor-pointer"
                     >
-                      ✕ Ajustar / Cancelar Plan
+                      + Nuevo Plan
                     </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => { setAssignTreatmentModal({ isOpen: true, paciente: p }); }}
-                    className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-blue-600 text-blue-700 hover:bg-blue-50 text-[11px] font-bold shadow-sm transition-colors"
-                  >
-                    + Asignar Nuevo Plan
-                  </button>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
 
-            {/* CASO 1: Si no tiene plan */}
-            {(!p?.plan_id || p?.estado_plan === 'sin_plan') && (
-              <div>
+              {/* Caso 4: Si no tiene plan */}
+              {(!p?.plan_id || p?.estado_plan === 'sin_plan') && (
                 <button
+                  type="button"
                   onClick={() => { setAssignTreatmentModal({ isOpen: true, paciente: p }); }}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-blue-600 text-blue-700 hover:bg-blue-50 text-[11px] font-bold shadow-sm transition-colors"
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors whitespace-nowrap cursor-pointer"
                 >
                   + Asignar Tratamiento / Plan
                 </button>
-              </div>
-            )}
+              )}
+            </div>
+
+            {/* Dolor ENA y Estado Clínico */}
+            <div className="flex items-center gap-1.5 text-slate-600">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Dolor:</span>
+              <span className="font-bold text-slate-900 font-mono text-xs">
+                ENA {p?.ultimo_dolor_ena !== undefined && p?.ultimo_dolor_ena !== null && p.ultimo_dolor_ena >= 0 ? `${p.ultimo_dolor_ena}/10` : '- / 10'}
+              </span>
+              {requiereReevaluacion(p) && (
+                <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 whitespace-nowrap ml-1">
+                  ⚠️ Reevaluación
+                </span>
+              )}
+            </div>
+
           </div>
 
-          {/* Col 3: Semáforo Clínico TMO */}
-          <div className="space-y-1.5 md:border-l md:border-slate-200 md:pl-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-              📊 Estado Clínico
-            </span>
-            {p?.ultimo_dolor_ena !== undefined && p?.ultimo_dolor_ena !== null && p.ultimo_dolor_ena >= 0 ? (
-              <div className="space-y-1">
-                <p className="text-slate-700 text-xs">
-                  Último dolor: <span className="font-bold text-slate-900 font-mono">ENA {p.ultimo_dolor_ena}/10</span>
-                </p>
-                {requiereReevaluacion(p) && (
-                  <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                    ⚠️ Reevaluación TMO
-                  </span>
-                )}
-              </div>
-            ) : (
-              <p className="text-slate-500 text-xs italic">
-                Primera Atención / Evaluación
-              </p>
-            )}
-          </div>
+          {/* Alerta de última sesión si aplica */}
+          {p.sesiones_restantes === 1 && (
+            <div className="pt-1 border-t border-slate-100">
+              <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md block text-center animate-pulse">
+                🎯 Hoy es su última sesión del plan
+              </span>
+            </div>
+          )}
+
         </div>
 
         {/* Botonera Operativa Inferior */}
