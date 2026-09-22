@@ -18,24 +18,24 @@ export function BottomNav() {
   if (pathname === '/login') return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 md:hidden pb-[env(safe-area-inset-bottom,8px)] shadow-lg print:hidden">
-      <div className="grid grid-cols-4 h-14">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-hairline md:hidden pb-[env(safe-area-inset-bottom,8px)] shadow-calendly-lg print:hidden">
+      <div className="grid grid-cols-4 h-16 items-center">
         {navItems.map((item) => {
           const isActive = pathname === item.href || (item.href === '/pacientes' && pathname === '/');
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors ${
+              className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${
                 isActive 
-                  ? 'text-blue-600 font-bold' 
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'text-signal-blue font-bold' 
+                  : 'text-slate-gray hover:text-ink-navy'
               }`}
             >
-              <span className="text-base leading-none">{item.icon}</span>
+              <span className="text-lg leading-none">{item.icon}</span>
               <span>{item.label}</span>
               {isActive && (
-                <span className="w-1 h-1 bg-blue-600 rounded-full mt-0.5" />
+                <span className="w-1.5 h-1.5 bg-signal-blue rounded-full mt-0.5" />
               )}
             </Link>
           );

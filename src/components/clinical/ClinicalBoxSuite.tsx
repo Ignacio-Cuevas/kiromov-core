@@ -119,6 +119,7 @@ export default function ClinicalBoxSuite({
   const [abrirDischargeModal, setAbrirDischargeModal] = useState(false);
   const [abrirCertificadoModal, setAbrirCertificadoModal] = useState(false);
   const [abrirManagePlanModal, setAbrirManagePlanModal] = useState(false);
+  const [tabActiva, setTabActiva] = useState<'contexto' | 'soap' | 'historial'>('soap');
   const [evaluacionesTMO, setEvaluacionesTMO] = useState<any[]>([]);
   const [evaluacionActivaIndex, setEvaluacionActivaIndex] = useState<number>(0);
   const [modoEvaluacion, setModoEvaluacion] = useState<'nueva' | 'editar'>('editar');
@@ -368,13 +369,11 @@ export default function ClinicalBoxSuite({
     <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-hidden animate-in fade-in duration-150">
       <div className="w-full max-w-[96vw] h-[94vh] bg-slate-100 rounded-3xl shadow-2xl border border-slate-300 flex flex-col overflow-hidden">
         
-        {/* ==================================================================== */}
-        {/* CABECERA SUPERIOR FIJA */}
-        {/* ==================================================================== */}
-        <header className="h-16 flex-shrink-0 bg-white border-b border-slate-200 px-6 flex items-center justify-between z-10">
-          <div className="flex items-center gap-4">
+        {/* CABECERA SUPERIOR RESPONSIVA */}
+        <header className="min-h-16 flex-shrink-0 bg-white border-b border-slate-200 px-4 sm:px-6 py-2.5 sm:py-0 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 z-10">
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight leading-none">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-none">
                 {paciente?.nombre_completo || 'Cargando paciente...'}
               </h2>
               <p className="text-xs text-slate-500 font-mono mt-1">
@@ -383,7 +382,7 @@ export default function ClinicalBoxSuite({
             </div>
 
             {/* Badges de Plan y Pago + Botón Ajustar Plan */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={() => setAbrirManagePlanModal(true)}
@@ -402,7 +401,7 @@ export default function ClinicalBoxSuite({
               <button
                 type="button"
                 onClick={() => setAbrirManagePlanModal(true)}
-                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 transition-all flex items-center gap-1 shadow-xs cursor-pointer"
+                className="min-h-[44px] sm:min-h-0 px-2.5 py-1.5 sm:py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1 shadow-xs cursor-pointer"
                 title="Ajustar sesiones o estado del plan"
               >
                 <span>⚙️ Ajustar Plan</span>
@@ -414,42 +413,87 @@ export default function ClinicalBoxSuite({
             <button
               type="button"
               onClick={() => setAbrirCertificadoModal(true)}
-              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              className="min-h-[44px] sm:min-h-0 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               title="Emitir certificado médico para reembolso"
             >
               <FileText className="w-3.5 h-3.5" />
-              <span>Certificado Reembolso</span>
+              <span className="hidden sm:inline">Certificado Reembolso</span>
+              <span className="sm:hidden">Certificado</span>
             </button>
 
             <button
               type="button"
               onClick={() => setAbrirDischargeModal(true)}
-              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              className="min-h-[44px] sm:min-h-0 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               title="Generar informe oficial de alta médica y reintegro funcional"
             >
               <FileText className="w-3.5 h-3.5 text-emerald-600" />
-              <span>📄 Informe de Alta Médica</span>
+              <span className="hidden sm:inline">📄 Informe de Alta</span>
+              <span className="sm:hidden">📄 Alta</span>
             </button>
 
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+              className="min-h-[44px] sm:min-h-0 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              ✕ Volver a la Agenda
+              <span className="hidden sm:inline">✕ Volver a la Agenda</span>
+              <span className="sm:hidden">✕ Salir</span>
             </button>
           </div>
         </header>
 
+        {/* SELECTOR DE PESTAÑAS MÓVIL Y TABLET (< 1024px) */}
+        <div className="lg:hidden flex items-center bg-slate-200/80 border-b border-slate-200 p-1.5 gap-1.5 shrink-0 overflow-x-auto no-scrollbar">
+          <button
+            type="button"
+            onClick={() => setTabActiva('contexto')}
+            className={`flex-1 min-h-[44px] py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+              tabActiva === 'contexto'
+                ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>👤 Contexto</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTabActiva('soap')}
+            className={`flex-1 min-h-[44px] py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+              tabActiva === 'soap'
+                ? 'bg-white text-blue-600 shadow-sm border border-slate-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>📝 Atención Hoy (SOAP)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTabActiva('historial')}
+            className={`flex-1 min-h-[44px] py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+              tabActiva === 'historial'
+                ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>⏱️ Historial</span>
+            {historialSOAP.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 rounded-full font-bold ml-1">
+                {historialSOAP.length}
+              </span>
+            )}
+          </button>
+        </div>
+
         {/* ==================================================================== */}
-        {/* CUERPO DE 3 COLUMNAS CON SCROLL INDEPENDIENTE */}
+        {/* CUERPO: 3 COLUMNAS INDEPENDIENTES EN DESKTOP / PESTAÑAS EN MÓVIL    */}
         {/* ==================================================================== */}
-        <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-4 p-4">
+        <div className="flex-1 min-h-0 lg:grid lg:grid-cols-12 gap-4 p-3 sm:p-4 overflow-hidden">
           
           {/* ------------------------------------------------------------------ */}
-          {/* COLUMNA 1 (IZQUIERDA - 3 cols): CONTEXTO Y ANTECEDENTES */}
+          {/* COLUMNA 1: CONTEXTO Y ANTECEDENTES                                 */}
           {/* ------------------------------------------------------------------ */}
-          <aside className="md:col-span-3 h-full overflow-y-auto bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-5">
+          <aside className={`${tabActiva === 'contexto' ? 'flex' : 'hidden'} lg:flex lg:col-span-3 h-full overflow-y-auto bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex-col space-y-5`}>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Contexto del Paciente</h3>
 
             {/* Próxima Cita */}
@@ -656,9 +700,9 @@ export default function ClinicalBoxSuite({
           </aside>
 
           {/* ------------------------------------------------------------------ */}
-          {/* COLUMNA 2 (CENTRO - 6 cols): ESPACIO DE ATENCIÓN ACTIVA SOAP */}
+          {/* COLUMNA 2 (CENTRO - 6 cols): ESPACIO DE ATENCIÓN ACTIVA SOAP       */}
           {/* ------------------------------------------------------------------ */}
-          <main className="md:col-span-6 h-full overflow-y-auto bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+          <main className={`${tabActiva === 'soap' ? 'block' : 'hidden'} lg:block lg:col-span-6 h-full overflow-y-auto bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm`}>
             <form onSubmit={handleGuardarSOAP} className="space-y-6 pb-6">
               
               {/* Encabezado del Formulario */}
@@ -743,7 +787,7 @@ export default function ClinicalBoxSuite({
                 )}
               </div>
 
-              {/* Selector de Dolor ENA Hoy (0 al 10) */}
+              {/* Selector de Dolor ENA Hoy (0 al 10 - Táctil iOS 44px en móviles) */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
                   Nivel de Dolor Hoy (Escala ENA 0 - 10)
@@ -754,9 +798,9 @@ export default function ClinicalBoxSuite({
                       key={num}
                       type="button"
                       onClick={() => setNivelDolor(num)}
-                      className={`h-9 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                      className={`min-h-[44px] sm:min-h-[36px] h-11 sm:h-9 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center ${
                         nivelDolor === num
-                          ? 'bg-blue-600 text-white shadow-md scale-105 ring-2 ring-blue-400'
+                          ? 'bg-blue-600 text-white shadow-md scale-105 ring-2 ring-blue-400 font-black'
                           : num <= 3 
                           ? 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
                           : num <= 6 
@@ -783,7 +827,7 @@ export default function ClinicalBoxSuite({
                         key={seg}
                         type="button"
                         onClick={() => toggleSegmento(seg)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                        className={`min-h-[44px] sm:min-h-[36px] px-3.5 py-2 sm:py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center justify-center ${
                           sel 
                             ? 'bg-blue-600 text-white shadow-sm font-semibold' 
                             : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
@@ -809,7 +853,7 @@ export default function ClinicalBoxSuite({
                         key={tec}
                         type="button"
                         onClick={() => toggleTecnica(tec)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                        className={`min-h-[44px] sm:min-h-[36px] px-3.5 py-2 sm:py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center justify-center ${
                           sel 
                             ? 'bg-blue-600 text-white shadow-sm font-semibold' 
                             : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
@@ -896,7 +940,7 @@ export default function ClinicalBoxSuite({
           {/* ------------------------------------------------------------------ */}
           {/* COLUMNA 3 (DERECHA - 3 cols): HISTORIAL INTERACTIVO CON DESPLIEGUE */}
           {/* ------------------------------------------------------------------ */}
-          <aside className="md:col-span-3 h-full overflow-y-auto bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+          <aside className={`${tabActiva === 'historial' ? 'block' : 'hidden'} lg:block lg:col-span-3 h-full overflow-y-auto bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-4`}>
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Timeline Histórico</h3>
               <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">

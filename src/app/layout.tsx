@@ -16,10 +16,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="h-full">
-      <body className="bg-slate-50/50 text-slate-900 antialiased flex flex-col min-h-full">
+      <body className="bg-cloud text-ink-navy antialiased flex flex-col min-h-full font-gilroy">
         <Header />
-        {/* pb-20 en móvil asegura que la barra inferior no tape el contenido final */}
-        <div className="flex-1 pb-20 md:pb-6">
+        {/* pb-24 en móvil asegura que la barra inferior no tape el contenido final en ningún dispositivo */}
+        <div className="flex-1 pb-24 md:pb-8">
           {children}
         </div>
         <BottomNav />

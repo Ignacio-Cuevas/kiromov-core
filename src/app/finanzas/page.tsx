@@ -231,19 +231,19 @@ function FinanzasContent() {
 
   return (
     <div className="min-h-screen bg-cloud pb-20 font-gilroy text-ink-navy">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 space-y-8 print:hidden">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6 sm:space-y-8 print:hidden">
         
         {/* HEADER Y FILTRO */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-[28px] font-bold text-ink-navy tracking-tight">Finanzas & Caja</h1>
-            <p className="text-[14px] text-slate-gray mt-1">Gestión de ingresos, egresos y cuentas por cobrar.</p>
+            <h1 className="text-2xl sm:text-[28px] font-bold text-ink-navy tracking-tight">Finanzas & Caja</h1>
+            <p className="text-xs sm:text-[14px] text-slate-gray mt-1">Gestión de ingresos, egresos y cuentas por cobrar.</p>
           </div>
           <div className="flex items-center gap-2">
             <select
               value={periodo}
               onChange={(e) => setPeriodo(e.target.value as PeriodoFiltro)}
-              className="bg-paper border border-hairline text-ink-navy text-[14px] font-semibold rounded-inputs px-4 py-2.5 shadow-calendly focus:outline-none"
+              className="min-h-[44px] bg-paper border border-hairline text-ink-navy text-xs sm:text-[14px] font-semibold rounded-inputs px-3 sm:px-4 py-2 sm:py-2.5 shadow-calendly focus:outline-none cursor-pointer"
             >
               <option value="este_mes">Este Mes</option>
               <option value="mes_anterior">Mes Anterior</option>
@@ -254,46 +254,46 @@ function FinanzasContent() {
           </div>
         </div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-paper rounded-cards p-6 shadow-calendly border border-hairline transition-all hover:shadow-calendly-lg hover:-translate-y-0.5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-inputs bg-pebble flex items-center justify-center text-signal-blue"><TrendingUp className="w-5 h-5"/></div>
-              <h3 className="text-[12px] font-bold text-slate-gray uppercase">Ingresos Reales</h3>
+        {/* KPIs (2 columnas en móvil, 4 en desktop con tipografía responsive) */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="bg-paper rounded-cards p-4 sm:p-6 shadow-calendly border border-hairline transition-all hover:shadow-calendly-lg hover:-translate-y-0.5">
+            <div className="flex items-center gap-2.5 sm:gap-3 mb-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-inputs bg-pebble flex items-center justify-center text-signal-blue shrink-0"><TrendingUp className="w-4 h-4 sm:w-5 sm:h-5"/></div>
+              <h3 className="text-[11px] sm:text-[12px] font-bold text-slate-gray uppercase truncate">Ingresos Reales</h3>
             </div>
-            <p className="text-[32px] font-bold text-ink-navy leading-tight">{formatCLP(ingresosPeriodo)}</p>
+            <p className="text-lg sm:text-2xl lg:text-[32px] font-bold text-ink-navy leading-tight truncate">{formatCLP(ingresosPeriodo)}</p>
           </div>
-          <div className="bg-paper rounded-cards p-6 shadow-calendly border border-hairline transition-all hover:shadow-calendly-lg hover:-translate-y-0.5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-inputs bg-pebble flex items-center justify-center text-ink-navy"><TrendingDown className="w-5 h-5"/></div>
-              <h3 className="text-[12px] font-bold text-slate-gray uppercase">Egresos</h3>
+          <div className="bg-paper rounded-cards p-4 sm:p-6 shadow-calendly border border-hairline transition-all hover:shadow-calendly-lg hover:-translate-y-0.5">
+            <div className="flex items-center gap-2.5 sm:gap-3 mb-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-inputs bg-pebble flex items-center justify-center text-ink-navy shrink-0"><TrendingDown className="w-4 h-4 sm:w-5 sm:h-5"/></div>
+              <h3 className="text-[11px] sm:text-[12px] font-bold text-slate-gray uppercase truncate">Egresos</h3>
             </div>
-            <p className="text-[32px] font-bold text-ink-navy leading-tight">{formatCLP(egresosPeriodo)}</p>
+            <p className="text-lg sm:text-2xl lg:text-[32px] font-bold text-ink-navy leading-tight truncate">{formatCLP(egresosPeriodo)}</p>
           </div>
-          <div className="bg-paper rounded-cards p-6 shadow-calendly border border-hairline transition-all hover:shadow-calendly-lg hover:-translate-y-0.5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-inputs bg-cloud flex items-center justify-center text-deep-cobalt"><DollarSign className="w-5 h-5"/></div>
-              <h3 className="text-[12px] font-bold text-slate-gray uppercase">Flujo Neto</h3>
+          <div className="bg-paper rounded-cards p-4 sm:p-6 shadow-calendly border border-hairline transition-all hover:shadow-calendly-lg hover:-translate-y-0.5">
+            <div className="flex items-center gap-2.5 sm:gap-3 mb-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-inputs bg-cloud flex items-center justify-center text-deep-cobalt shrink-0"><DollarSign className="w-4 h-4 sm:w-5 sm:h-5"/></div>
+              <h3 className="text-[11px] sm:text-[12px] font-bold text-slate-gray uppercase truncate">Flujo Neto</h3>
             </div>
-            <p className="text-[32px] font-bold text-ink-navy leading-tight">{formatCLP(flujoNetoPeriodo)}</p>
+            <p className="text-lg sm:text-2xl lg:text-[32px] font-bold text-ink-navy leading-tight truncate">{formatCLP(flujoNetoPeriodo)}</p>
           </div>
-          <div className="bg-paper rounded-cards p-6 shadow-calendly border border-hairline transition-all hover:shadow-calendly-lg hover:-translate-y-0.5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-inputs bg-pebble flex items-center justify-center text-slate-gray"><AlertTriangle className="w-5 h-5"/></div>
-              <h3 className="text-[12px] font-bold text-slate-gray uppercase">Cuentas por Cobrar</h3>
+          <div className="bg-paper rounded-cards p-4 sm:p-6 shadow-calendly border border-hairline transition-all hover:shadow-calendly-lg hover:-translate-y-0.5">
+            <div className="flex items-center gap-2.5 sm:gap-3 mb-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-inputs bg-pebble flex items-center justify-center text-slate-gray shrink-0"><AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5"/></div>
+              <h3 className="text-[11px] sm:text-[12px] font-bold text-slate-gray uppercase truncate">Por Cobrar</h3>
             </div>
-            <p className="text-[32px] font-bold text-ink-navy leading-tight">{formatCLP(porCobrarPeriodo)}</p>
-            <p className="text-[12px] text-mist-gray mt-1">De {deudoresCount} pacientes</p>
+            <p className="text-lg sm:text-2xl lg:text-[32px] font-bold text-ink-navy leading-tight truncate">{formatCLP(porCobrarPeriodo)}</p>
+            <p className="text-[11px] sm:text-[12px] text-mist-gray mt-0.5 truncate">De {deudoresCount} pacientes</p>
           </div>
         </div>
 
         {/* TABS Y TABLAS */}
         <div className="bg-paper rounded-cards shadow-calendly border border-hairline overflow-hidden">
-          <div className="border-b border-hairline flex overflow-x-auto bg-cloud">
-            <button onClick={() => setActiveTab('asistencias')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'asistencias' ? 'border-signal-blue text-signal-blue bg-paper' : 'border-transparent text-slate-gray hover:text-ink-navy hover:bg-pebble'}`}>🗓️ Quién Asistió</button>
-            <button onClick={() => setActiveTab('pagados')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'pagados' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>💰 Quién Pagó</button>
-            <button onClick={() => setActiveTab('deben')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'deben' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>⚠️ Quién Debe {deudoresCount > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">{deudoresCount}</span>}</button>
-            <button onClick={() => setActiveTab('egresos')} className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === 'egresos' ? 'border-rose-500 text-rose-600' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>📉 Egresos</button>
+          <div className="border-b border-hairline flex overflow-x-auto no-scrollbar bg-cloud">
+            <button onClick={() => setActiveTab('asistencias')} className={`min-h-[48px] px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${activeTab === 'asistencias' ? 'border-signal-blue text-signal-blue bg-paper' : 'border-transparent text-slate-gray hover:text-ink-navy hover:bg-pebble'}`}>🗓️ Quién Asistió</button>
+            <button onClick={() => setActiveTab('pagados')} className={`min-h-[48px] px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${activeTab === 'pagados' ? 'border-emerald-600 text-emerald-700 bg-paper' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>💰 Quién Pagó</button>
+            <button onClick={() => setActiveTab('deben')} className={`min-h-[48px] px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${activeTab === 'deben' ? 'border-amber-500 text-amber-600 bg-paper' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>⚠️ Quién Debe {deudoresCount > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">{deudoresCount}</span>}</button>
+            <button onClick={() => setActiveTab('egresos')} className={`min-h-[48px] px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${activeTab === 'egresos' ? 'border-rose-500 text-rose-600 bg-paper' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>📉 Egresos</button>
           </div>
 
           <div className="p-0 min-h-[400px]">
@@ -409,14 +409,14 @@ function FinanzasContent() {
                                   <Button 
                                     onClick={() => setCancelingPlan(c)} 
                                     variant="outline" 
-                                    className="border-rose-200 text-rose-700 hover:bg-rose-50 rounded-xl text-xs font-bold shadow-2xs h-8 cursor-pointer"
+                                    className="min-h-[44px] sm:min-h-0 border-rose-200 text-rose-700 hover:bg-rose-50 rounded-xl text-xs font-bold shadow-2xs h-auto py-2 px-3 cursor-pointer"
                                     title="Ajustar monto a sesiones realizadas o anular el plan"
                                   >
-                                    <X className="w-3.5 h-3.5 mr-1 text-rose-600" /> Ajustar / Cancelar Plan
+                                    <X className="w-3.5 h-3.5 mr-1 text-rose-600" /> Ajustar / Cancelar
                                   </Button>
                                   <Button 
                                     onClick={() => setSettlingPlan(c)} 
-                                    className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm h-8 cursor-pointer"
+                                    className="min-h-[44px] sm:min-h-0 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm h-auto py-2 px-3 cursor-pointer"
                                   >
                                     <CreditCard className="w-3.5 h-3.5 mr-1.5" /> Cobrar Plan
                                   </Button>
@@ -434,7 +434,7 @@ function FinanzasContent() {
                 {activeTab === 'egresos' && (
                   <div>
                     <div className="p-4 border-b border-slate-100 flex justify-end bg-slate-50/50">
-                      <Button onClick={() => setShowEgresoModal(true)} className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm h-9">
+                      <Button onClick={() => setShowEgresoModal(true)} className="min-h-[44px] bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm px-4 py-2 flex items-center justify-center cursor-pointer">
                         <Plus className="w-4 h-4 mr-1.5" /> Nuevo Egreso
                       </Button>
                     </div>
