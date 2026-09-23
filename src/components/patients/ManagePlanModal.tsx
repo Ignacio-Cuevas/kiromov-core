@@ -267,7 +267,22 @@ export function ManagePlanModal({
           .from('compras_planes')
           .update(payload)
           .eq('id', planId);
-        if (error) throw error;
+        if (error) {
+          // Reintentar con conjunto base de columnas estándar
+          const fallbackPayload = {
+            nombre_plan: nombrePlan.trim() || 'Plan Kinésico',
+            total_sesiones: Number(sesionesTotales),
+            sesiones_totales: Number(sesionesTotales),
+            sesiones_usadas: Number(sesionesUsadas),
+            estado: estadoPlan,
+            estado_pago: estadoPago,
+          };
+          const retry = await supabase
+            .from('compras_planes')
+            .update(fallbackPayload)
+            .eq('id', planId);
+          if (retry.error) throw retry.error;
+        }
       } else {
         // Asignar plan desde cero
         const { error } = await supabase

@@ -6,7 +6,7 @@ import { SettlePaymentModal } from "@/components/sales/SettlePaymentModal";
 import { CancelPlanModal } from "@/components/sales/CancelPlanModal";
 import { PostSessionModal } from "@/components/sales/PostSessionModal";
 import { AssignTreatmentModal } from "@/components/sales/AssignTreatmentModal";
-import ClinicalBoxSuite from "@/components/clinical/ClinicalBoxSuite";
+import ClinicalRecordView from "@/components/clinical/ClinicalRecordView";
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
@@ -28,7 +28,10 @@ import { Input } from '@/components/ui/input';
 import {
   CalendarDays, ChevronLeft, ChevronRight, Clock, User, MessageCircle,
   Stethoscope, Edit2, Trash2, Plus, CheckCircle2, Loader2, Search,
+  Lock, Settings,
 } from 'lucide-react';
+import { BlockTimeModal, BloqueoAgenda } from '@/components/agenda/BlockTimeModal';
+import { ScheduleSettingsModal } from '@/components/agenda/ScheduleSettingsModal';
 
 function getFormattedLocalDate(d: Date): string {
   const year = d.getFullYear();
@@ -96,6 +99,40 @@ function AgendaContent() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Bloqueos de Horario y Configuración de Jornada
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [bloqueos, setBloqueos] = useState<BloqueoAgenda[]>([]);
+
+  const handleDesbloquearDirecto = async (bloqueo: BloqueoAgenda) => {
+    if (!window.confirm(`¿Deseas desbloquear "${bloqueo.titulo}"?`)) return;
+    try {
+      if (bloqueo.google_event_id) {
+        await fetch('/api/calendar/delete-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId: bloqueo.google_event_id })
+        }).catch(console.warn);
+      }
+      if (supabase) {
+        try {
+          await supabase.from('bloqueos_agenda').delete().eq('id', bloqueo.id);
+        } catch (e) {
+          console.warn('Error al borrar bloqueo en supabase:', e);
+        }
+      }
+      const localBlk = localStorage.getItem('kiromov_bloqueos_agenda');
+      if (localBlk) {
+        const filtrados = JSON.parse(localBlk).filter((b: BloqueoAgenda) => b.id !== bloqueo.id);
+        localStorage.setItem('kiromov_bloqueos_agenda', JSON.stringify(filtrados));
+      }
+      toast.success('Horario desbloqueado correctamente');
+      loadAgenda();
+    } catch (err: any) {
+      toast.error('Error al desbloquear horario');
+    }
+  };
 
   const handleSincronizarCalendario = async () => {
     setIsSyncing(true);
@@ -209,6 +246,34 @@ function AgendaContent() {
             }
           });
         }
+      }
+
+      // Cargar bloqueos de agenda
+      try {
+        let listaBloqueos: BloqueoAgenda[] = [];
+        const { data: bData, error: bError } = await supabase
+          .from('bloqueos_agenda')
+          .select('*')
+          .order('fecha_inicio', { ascending: true });
+
+        if (!bError && bData) {
+          listaBloqueos = bData;
+        }
+
+        const localBlk = localStorage.getItem('kiromov_bloqueos_agenda');
+        if (localBlk) {
+          const parsed = JSON.parse(localBlk);
+          parsed.forEach((pb: BloqueoAgenda) => {
+            if (!listaBloqueos.some(b => b.id === pb.id)) {
+              listaBloqueos.push(pb);
+            }
+          });
+        }
+        setBloqueos(listaBloqueos);
+      } catch (blkErr) {
+        console.warn('Aviso cargando bloqueos:', blkErr);
+        const localBlk = localStorage.getItem('kiromov_bloqueos_agenda');
+        if (localBlk) setBloqueos(JSON.parse(localBlk));
       }
 
       setCitas((citasData as CitaExtendida[]) || []);
@@ -433,6 +498,23 @@ function AgendaContent() {
     
     setSavingCita(true);
     try {
+      // 0. Verificación previa de conflicto con bloqueos de agenda
+      const conflictoBloqueo = bloqueos.find(b => {
+        if (b.fecha_inicio <= newCita.fecha && b.fecha_fin >= newCita.fecha) {
+          if (b.dia_completo) return true;
+          if (b.hora_inicio && b.hora_fin) {
+            return newCita.hora >= b.hora_inicio && newCita.hora < b.hora_fin;
+          }
+          return true;
+        }
+        return false;
+      });
+
+      if (conflictoBloqueo) {
+        toast.error(`⚠️ Este horario está bloqueado: ${conflictoBloqueo.titulo} (${conflictoBloqueo.dia_completo ? 'Día completo' : `${conflictoBloqueo.hora_inicio} - ${conflictoBloqueo.hora_fin}`})`);
+        return;
+      }
+
       // 1. Verificación previa al agendar
       const { data: citaOcupada } = await supabase
         .from('citas_atenciones')
@@ -930,9 +1012,52 @@ function AgendaContent() {
   };
 
   const renderDia = () => {
+    const diaActualStr = getFormattedLocalDate(fechaBase);
+    const bloqueosDia = bloqueos.filter(b => b.fecha_inicio <= diaActualStr && b.fecha_fin >= diaActualStr);
+
     return (
-      <div className="p-4 sm:p-6 space-y-0 min-h-[400px]">
-        {citas.length === 0 ? (
+      <div className="p-4 sm:p-6 space-y-4 min-h-[400px]">
+        {/* Franjas Bloqueadas con Rayado Diagonal */}
+        {bloqueosDia.length > 0 && (
+          <div className="space-y-3">
+            {bloqueosDia.map(b => (
+              <div
+                key={b.id}
+                className="rounded-2xl border-2 border-dashed border-amber-300 bg-[repeating-linear-gradient(45deg,#fffdf7,#fffdf7_12px,#fef3c7_12px,#fef3c7_24px)] p-4 sm:p-5 flex items-center justify-between shadow-xs transition-all"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-900 flex items-center justify-center font-bold text-lg border border-amber-300">
+                    🔒
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-amber-950 text-sm sm:text-base">
+                        {b.titulo}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold uppercase border border-amber-200">
+                        {b.tipo}
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-800/90 font-mono font-medium mt-0.5">
+                      {b.dia_completo
+                        ? `Bloqueo de día completo (${b.fecha_inicio} al ${b.fecha_fin})`
+                        : `Horario Bloqueado: ${b.hora_inicio || '09:00'} - ${b.hora_fin || '10:00'} hrs`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDesbloquearDirecto(b)}
+                  className="px-3.5 py-1.5 bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-slate-200 hover:border-rose-300 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
+                >
+                  Desbloquear
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {citas.length === 0 && bloqueosDia.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-mist-gray">
             <CalendarDays className="w-12 h-12 mb-3 text-hairline" />
             <p className="text-[16px] font-semibold text-slate-gray">No hay citas para este día</p>
@@ -961,14 +1086,41 @@ function AgendaContent() {
                     const isToday = getFormattedLocalDate(dia) === getFormattedLocalDate(new Date());
                     const diaStr = getFormattedLocalDate(dia);
                     const citasDia = citas.filter(c => c.fecha === diaStr);
+                    const bloqueosDia = bloqueos.filter(b => b.fecha_inicio <= diaStr && b.fecha_fin >= diaStr);
+
                     return (
                         <div key={idx} className={`flex-1 min-w-[220px] ${isToday ? 'bg-signal-blue/5' : ''}`}>
                             <div className={`p-4 text-center border-b border-hairline sticky top-0 shadow-sm z-10 ${isToday ? 'text-signal-blue bg-paper border-t-2 border-t-signal-blue' : 'text-slate-gray bg-paper'}`}>
                                 <p className="text-[12px] font-bold uppercase tracking-widest">{dia.toLocaleDateString('es-CL', { weekday: 'short' })}</p>
                                 <p className={`text-[24px] font-black inline-flex items-center justify-center w-10 h-10 rounded-full mt-1 ${isToday ? 'bg-signal-blue text-white' : ''}`}>{dia.getDate()}</p>
                             </div>
-                            <div className="p-4">
-                                {citasDia.length === 0 ? (
+                            <div className="p-4 space-y-2">
+                                {/* Bloqueos en Semana con Rayado */}
+                                {bloqueosDia.map(b => (
+                                  <div
+                                    key={b.id}
+                                    className="p-2.5 rounded-xl border border-dashed border-amber-300 bg-[repeating-linear-gradient(45deg,#fffdf7,#fffdf7_10px,#fef3c7_10px,#fef3c7_20px)] text-xs mb-2 shadow-xs group relative"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-amber-950 text-[11px] truncate flex items-center gap-1">
+                                        🔒 {b.titulo}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); handleDesbloquearDirecto(b); }}
+                                        className="text-[10px] font-bold text-rose-700 hover:text-rose-900 cursor-pointer ml-1"
+                                        title="Desbloquear"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                    <p className="text-[10px] text-amber-800 font-mono mt-0.5">
+                                      {b.dia_completo ? 'Día bloqueado' : `${b.hora_inicio || '09:00'} - ${b.hora_fin || '10:00'} hrs`}
+                                    </p>
+                                  </div>
+                                ))}
+
+                                {citasDia.length === 0 && bloqueosDia.length === 0 ? (
                                     <button 
                                       onClick={() => {
                                         setNewCita(prev => ({ ...prev, fecha: diaStr }));
@@ -1020,8 +1172,9 @@ function AgendaContent() {
                     const diaStr = getFormattedLocalDate(dia);
                     const isToday = diaStr === getFormattedLocalDate(new Date());
                     const citasDia = citas.filter(c => c.fecha === diaStr);
+                    const bloqueosDia = bloqueos.filter(b => b.fecha_inicio <= diaStr && b.fecha_fin >= diaStr);
                     const citasToShow = citasDia.slice(0, 3);
-                    const hasMore = citasDia.length > 3;
+                    const hasMore = (citasDia.length + bloqueosDia.length) > 3;
 
                     return (
                         <div 
@@ -1036,6 +1189,17 @@ function AgendaContent() {
                                 <span className={`inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[12px] sm:text-[14px] font-bold ${isToday ? 'bg-signal-blue text-white' : 'text-slate-gray'}`}>{dia.getDate()}</span>
                             </div>
                             <div className="space-y-1 sm:space-y-1.5">
+                                {/* Bloqueos en celda de mes */}
+                                {bloqueosDia.map(b => (
+                                  <div
+                                    key={b.id}
+                                    className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-[repeating-linear-gradient(45deg,#fef3c7,#fef3c7_6px,#fde68a_6px,#fde68a_12px)] text-amber-950 border border-amber-300 truncate shadow-2xs"
+                                    title={`🔒 ${b.titulo} (${b.dia_completo ? 'Día completo' : `${b.hora_inicio || '09:00'}-${b.hora_fin || '10:00'}`})`}
+                                  >
+                                    🔒 {b.titulo}
+                                  </div>
+                                ))}
+
                                 {citasToShow.map(c => {
                                     const s = c.estado?.toLowerCase() || 'pendiente';
                                     const tokens = getCitaColorTokens(s);
@@ -1059,7 +1223,7 @@ function AgendaContent() {
                                     );
                                 })}
                                 {hasMore && (
-                                    <div className="text-[10px] sm:text-[11px] text-center font-bold text-mist-gray mt-1 sm:mt-2 hover:text-slate-gray transition-colors">+{citasDia.length - 3} citas más</div>
+                                    <div className="text-[10px] sm:text-[11px] text-center font-bold text-mist-gray mt-1 sm:mt-2 hover:text-slate-gray transition-colors">+{citasDia.length + bloqueosDia.length - 3} más</div>
                                 )}
                             </div>
                         </div>
@@ -1122,13 +1286,29 @@ function AgendaContent() {
 
         {/* Contenedor Principal Agenda */}
         <div className="bg-paper rounded-cards shadow-calendly border border-hairline overflow-hidden">
-          <div className="p-6 bg-cloud border-b border-hairline flex justify-between items-center">
+          <div className="p-6 bg-cloud border-b border-hairline flex flex-wrap justify-between items-center gap-3">
             <h3 className="text-[24px] font-semibold text-ink-navy flex items-center gap-2">
               <CalendarDays className="w-6 h-6 text-slate-gray" /> Citas Programadas
             </h3>
-            <Button onClick={() => setShowNewCitaModal(true)} className="bg-signal-blue hover:bg-deep-cobalt text-white rounded-buttons text-[16px] font-semibold px-4 py-2 shadow-calendly-btn">
-              <Plus className="w-5 h-5 mr-1.5" /> Agendar Cita
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowSettingsModal(true)}
+                className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold rounded-buttons px-3 sm:px-4 py-2 flex items-center gap-1.5 shadow-xs"
+              >
+                <Settings className="w-4 h-4 text-slate-500" /> Horarios de Box
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowBlockModal(true)}
+                className="border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs sm:text-sm font-semibold rounded-buttons px-3 sm:px-4 py-2 flex items-center gap-1.5 shadow-xs"
+              >
+                <Lock className="w-4 h-4 text-amber-700" /> Bloquear Horario
+              </Button>
+              <Button onClick={() => setShowNewCitaModal(true)} className="bg-signal-blue hover:bg-deep-cobalt text-white rounded-buttons text-[16px] font-semibold px-4 py-2 shadow-calendly-btn">
+                <Plus className="w-5 h-5 mr-1.5" /> Agendar Cita
+              </Button>
+            </div>
           </div>
 
           {loading ? (
@@ -1226,7 +1406,7 @@ function AgendaContent() {
       )}
 </main>
       {isDrawerOpen && (
-        <ClinicalBoxSuite 
+        <ClinicalRecordView 
           onClose={() => setIsDrawerOpen(false)} 
           pacienteId={selectedPatientForDrawer?.id || ''} 
           citaId={selectedCitaForSuite?.id || ''}
@@ -1247,7 +1427,15 @@ function AgendaContent() {
             <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Fecha</label><Input type="date" value={newCita.fecha} onChange={e => setNewCita({...newCita, fecha: e.target.value})} className="bg-slate-50/50" /></div>
             <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Hora</label><select value={newCita.hora} onChange={e => setNewCita({...newCita, hora: e.target.value})} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10">{timeBlocks.map(t => {
               const isOccupied = citas.some(c => c.fecha === newCita.fecha && c.hora?.startsWith(t) && c.estado !== 'cancelada');
-              return <option key={t} value={t} disabled={isOccupied}>{t} {isOccupied ? '(Ocupado)' : ''}</option>;
+              const isBlocked = bloqueos.some(b => {
+                if (b.fecha_inicio <= newCita.fecha && b.fecha_fin >= newCita.fecha) {
+                  if (b.dia_completo) return true;
+                  return t >= (b.hora_inicio || '00:00') && t < (b.hora_fin || '23:59');
+                }
+                return false;
+              });
+              const disabled = isOccupied || isBlocked;
+              return <option key={t} value={t} disabled={disabled}>{t} {isOccupied ? '(Ocupado)' : isBlocked ? '🔒 (Bloqueado)' : ''}</option>;
             })}</select></div>
           </div>
           <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Motivo de Consulta</label><Input value={newCita.motivo} onChange={e => setNewCita({...newCita, motivo: e.target.value})} className="bg-slate-50/50" /></div>
@@ -1261,7 +1449,18 @@ function AgendaContent() {
         <DialogBody className="space-y-4 pt-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Fecha</label><Input type="date" value={editForm.fecha} onChange={e => setEditForm({...editForm, fecha: e.target.value})} className="bg-slate-50/50" /></div>
-            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Hora</label><select value={editForm.hora} onChange={e => setEditForm({...editForm, hora: e.target.value})} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10">{timeBlocks.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Hora</label><select value={editForm.hora} onChange={e => setEditForm({...editForm, hora: e.target.value})} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10">{timeBlocks.map(t => {
+              const isOccupied = citas.some(c => c.id !== editingCita?.id && c.fecha === editForm.fecha && c.hora?.startsWith(t) && c.estado !== 'cancelada');
+              const isBlocked = bloqueos.some(b => {
+                if (b.fecha_inicio <= editForm.fecha && b.fecha_fin >= editForm.fecha) {
+                  if (b.dia_completo) return true;
+                  return t >= (b.hora_inicio || '00:00') && t < (b.hora_fin || '23:59');
+                }
+                return false;
+              });
+              const disabled = isOccupied || isBlocked;
+              return <option key={t} value={t} disabled={disabled}>{t} {isOccupied ? '(Ocupado)' : isBlocked ? '🔒 (Bloqueado)' : ''}</option>;
+            })}</select></div>
           </div>
           <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Motivo</label><Input value={editForm.motivo} onChange={e => setEditForm({...editForm, motivo: e.target.value})} className="bg-slate-50/50" /></div>
         </DialogBody>
@@ -1273,6 +1472,20 @@ function AgendaContent() {
         <DialogHeader><DialogTitle className="text-red-600">Cancelar Cita</DialogTitle><DialogDescription>¿Estás seguro de que deseas cancelar esta cita? Esta acción no se puede deshacer.</DialogDescription></DialogHeader>
         <DialogFooter className="mt-6"><Button variant="outline" onClick={() => setDeletingCita(null)}>Atrás</Button><Button onClick={handleDeleteCita} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 text-white">{isDeleting ? 'Eliminando...' : 'Sí, cancelar cita'}</Button></DialogFooter>
       </Dialog>
+
+      <BlockTimeModal
+        isOpen={showBlockModal}
+        onClose={() => setShowBlockModal(false)}
+        onSuccess={() => loadAgenda()}
+        initialDate={getFormattedLocalDate(fechaBase)}
+        bloqueosExistentes={bloqueos}
+      />
+
+      <ScheduleSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        onSuccess={() => loadAgenda()}
+      />
     </div>
   );
 }

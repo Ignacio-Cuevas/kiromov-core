@@ -468,15 +468,17 @@ function FinanzasContent() {
                                 <td className="px-4 py-3 text-right">
                                   <div className="flex items-center justify-end gap-1.5">
                                     <button
+                                      type="button"
                                       onClick={() => handleAbrirEditarEgreso(e)}
-                                      className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                      className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                                       title="Editar gasto"
                                     >
                                       ✏️
                                     </button>
                                     <button
+                                      type="button"
                                       onClick={() => handleEliminarEgreso(e.id)}
-                                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                                       title="Eliminar gasto"
                                     >
                                       🗑️

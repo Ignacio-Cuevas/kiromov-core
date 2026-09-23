@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { createClient } from '@/utils/supabase/client';
 import { formatRut, validateRut } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Edit2, Save, Loader2, User, Phone, Mail, Stethoscope, AlertTriangle } from 'lucide-react';
+import { Edit2, Save, Loader2, User, Phone, Mail, Stethoscope, AlertTriangle, Trash2 } from 'lucide-react';
 
 interface EditPatientDialogProps {
   isOpen?: boolean;
@@ -24,6 +24,7 @@ interface EditPatientDialogProps {
   onOpenChange?: (open: boolean) => void;
   patient: any;
   onPatientUpdated: (updatedPatient: any) => void;
+  onPatientDeleted?: (deletedId: string) => void;
 }
 
 export function EditPatientDialog({
@@ -33,6 +34,7 @@ export function EditPatientDialog({
   onOpenChange,
   patient,
   onPatientUpdated,
+  onPatientDeleted,
 }: EditPatientDialogProps) {
   const isDialogOpen = isOpen ?? open ?? false;
 
@@ -55,6 +57,75 @@ export function EditPatientDialog({
   const [banderasRojas, setBanderasRojas] = useState('');
   const [estado, setEstado] = useState('activo');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleEliminarPacienteRaiz = async (pacienteId: string) => {
+    const nombrePaciente = patient?.nombre_completo || patient?.full_name || 'este paciente';
+    if (!window.confirm(`¿Estás seguro de eliminar definitivamente a ${nombrePaciente}? Esta acción borrará todas sus citas, compras, notas SOAP y evaluaciones desde la raíz de forma irreversible.`)) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      if (!supabase) throw new Error('No hay conexión con la base de datos');
+
+      // 1. Eliminar citas de Google Calendar si existen
+      try {
+        const { data: citasFuturas } = await supabase
+          .from('citas_atenciones')
+          .select('google_event_id')
+          .eq('paciente_id', pacienteId)
+          .not('google_event_id', 'is', null);
+
+        if (citasFuturas && citasFuturas.length > 0) {
+          for (const c of citasFuturas) {
+            if (c.google_event_id) {
+              await fetch('/api/calendar/delete-event', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ eventId: c.google_event_id })
+              }).catch(console.warn);
+            }
+          }
+        }
+      } catch (errCal) {
+        console.warn('Aviso en eliminación de eventos de Google Calendar:', errCal);
+      }
+
+      // 2. Limpieza en cascada defensiva de todas las tablas dependientes
+      await Promise.allSettled([
+        supabase.from('evoluciones_soap').delete().eq('paciente_id', pacienteId),
+        supabase.from('evaluaciones_iniciales_tmo').delete().eq('paciente_id', pacienteId),
+        supabase.from('evaluaciones_tmo').delete().eq('paciente_id', pacienteId),
+        supabase.from('citas_atenciones').delete().eq('paciente_id', pacienteId),
+        supabase.from('compras_planes').delete().eq('paciente_id', pacienteId),
+        supabase.from('documentos_pacientes').delete().eq('paciente_id', pacienteId),
+        supabase.from('certificados_reembolso').delete().eq('paciente_id', pacienteId),
+        supabase.from('informes_alta').delete().eq('paciente_id', pacienteId),
+      ]);
+
+      // 3. Eliminar paciente desde la raíz en public.pacientes
+      const { error } = await supabase
+        .from('pacientes')
+        .delete()
+        .eq('id', pacienteId);
+
+      if (error) throw error;
+
+      toast.success('¡Ficha del paciente y todo su historial eliminados desde la raíz!');
+      if (onPatientDeleted) {
+        onPatientDeleted(pacienteId);
+      } else {
+        onPatientUpdated(null);
+      }
+      handleClose();
+    } catch (err: any) {
+      console.error('Error al eliminar paciente:', err);
+      toast.error(`Error al eliminar: ${err.message || 'Error desconocido'}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     if (patient) {
@@ -304,6 +375,39 @@ export function EditPatientDialog({
                   className="bg-white border-rose-200 focus:border-rose-400 rounded-xl text-xs text-rose-900 resize-none"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Zona de Peligro: Eliminación de Ficha Desde la Raíz */}
+          <div className="rounded-2xl border border-rose-200 bg-rose-50/60 p-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Trash2 className="h-4 w-4 text-rose-600" />
+                Zona de Peligro: Eliminación de Ficha
+              </span>
+            </div>
+            <p className="text-xs text-rose-700/90 leading-relaxed">
+              Elimina definitivamente al paciente junto con todo su historial clínico (citas, compras de planes, notas SOAP y evaluaciones TMO) desde la raíz de forma irreversible.
+            </p>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => handleEliminarPacienteRaiz(patient.id)}
+                disabled={deleting || saving}
+                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Eliminando desde la raíz...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>🗑️ Eliminar Ficha del Paciente</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </DialogBody>

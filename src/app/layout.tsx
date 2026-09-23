@@ -1,4 +1,5 @@
-import { Header } from "@/components/layout/Header";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { TopBar } from "@/components/layout/TopBar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import "./globals.css";
 import type { Metadata } from "next";
@@ -16,13 +17,22 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="h-full">
-      <body className="bg-cloud text-ink-navy antialiased flex flex-col min-h-full font-gilroy">
-        <Header />
-        {/* pb-24 en móvil asegura que la barra inferior no tape el contenido final en ningún dispositivo */}
-        <div className="flex-1 pb-24 md:pb-8">
-          {children}
+      <body className="bg-slate-50/60 text-slate-900 antialiased flex flex-col min-h-full font-gilroy">
+        <div className="flex min-h-screen bg-slate-50/60 text-slate-900 antialiased">
+          {/* Sidebar fijo en escritorio */}
+          <Sidebar />
+
+          {/* Área de contenido */}
+          <div className="flex-1 flex flex-col min-w-0">
+            <TopBar />
+            <main className="flex-1 p-4 md:p-6 pb-24 md:pb-8 overflow-y-auto overflow-x-hidden">
+              {children}
+            </main>
+          </div>
+
+          {/* Barra inferior en móviles */}
+          <BottomNav />
         </div>
-        <BottomNav />
         <Toaster position="top-right" richColors closeButton />
       </body>
     </html>

@@ -16,6 +16,7 @@ import { RenewPlanDialog } from "@/components/patients/RenewPlanDialog";
 import { EditPatientDialog } from "@/components/patients/EditPatientDialog";
 import { ManagePlanModal } from "@/components/patients/ManagePlanModal";
 import { DischargeReportModal } from "@/components/clinical/DischargeReportModal";
+import ClinicalRecordView from "@/components/clinical/ClinicalRecordView";
 import { toast } from 'sonner';
 import { 
   Table, 
@@ -78,6 +79,11 @@ interface PacienteResumen {
   motivo_consulta?: string | null;
   diagnostico_principal?: string | null;
   diagnostico_medico?: string | null;
+  fecha_nacimiento?: string | null;
+  antecedentes_morbidos?: string | null;
+  antecedentes_medicos?: string | null;
+  banderas_rojas?: string | null;
+  alertas_seguridad?: string | null;
 }
 
 const CHIPS_TMO = [
@@ -122,6 +128,8 @@ export default function PacientesPage() {
   const [pacienteParaAlta, setPacienteParaAlta] = useState<PacienteResumen | null>(null);
   const [isDischargeModalOpen, setIsDischargeModalOpen] = useState(false);
 
+  const [selectedPacienteFichaId, setSelectedPacienteFichaId] = useState<string | null>(null);
+
   const handleAbrirEditar = (p: PacienteResumen) => {
     setPacienteParaEditar(p);
     setIsEditModalOpen(true);
@@ -130,6 +138,24 @@ export default function PacientesPage() {
   const handleAbrirAjustarPlan = (p: PacienteResumen) => {
     setPacienteParaAjustarPlan(p);
     setIsManagePlanModalOpen(true);
+  };
+
+  const handleAbrirAjustePlan = (p: PacienteResumen) => {
+    handleAbrirAjustarPlan(p);
+  };
+
+  const handleAgendarPaciente = (p: PacienteResumen) => {
+    setPacienteParaAgendar({
+      id: p.id,
+      nombre_completo: p.nombre_completo,
+      rut: p.rut,
+      telefono: p.telefono,
+    });
+    setIsAgendarModalOpen(true);
+  };
+
+  const abrirFichaPaciente = (pacienteId: string) => {
+    setSelectedPacienteFichaId(pacienteId);
   };
 
   // 1. Carga de datos directa enriquecida con compras_planes y diagnóstico clínico TMO
@@ -147,7 +173,7 @@ export default function PacientesPage() {
           .order('nombre_completo', { ascending: true }),
         supabase
           .from('pacientes')
-          .select('id, motivo_consulta, diagnostico_principal, diagnostico_medico, rut'),
+          .select('*'),
         supabase
           .from('compras_planes')
           .select('*')
@@ -218,11 +244,20 @@ export default function PacientesPage() {
           }
 
           return {
+            ...raw,
             ...p,
-            rut: p.rut || raw.rut || '—',
+            rut: p.rut && p.rut !== '—' ? p.rut : (raw.rut || '—'),
+            telefono: p.telefono || raw.telefono || null,
+            email: p.email || raw.email || null,
+            prevision: p.prevision || raw.prevision || raw.prevision_salud || 'Particular',
+            fecha_nacimiento: p.fecha_nacimiento || raw.fecha_nacimiento || null,
             motivo_consulta: p.motivo_consulta || raw.motivo_consulta || null,
             diagnostico_principal: p.diagnostico_principal || raw.diagnostico_principal || null,
             diagnostico_medico: p.diagnostico_medico || raw.diagnostico_medico || null,
+            antecedentes_morbidos: raw.antecedentes_morbidos || raw.antecedentes_medicos || p.antecedentes_morbidos || null,
+            antecedentes_medicos: raw.antecedentes_medicos || raw.antecedentes_morbidos || p.antecedentes_medicos || null,
+            banderas_rojas: raw.banderas_rojas || raw.alertas_seguridad || p.banderas_rojas || null,
+            alertas_seguridad: raw.alertas_seguridad || raw.banderas_rojas || p.alertas_seguridad || null,
             plan_id: planId,
             nombre_plan: nombrePlan,
             sesiones_totales: sesionesTotales,
@@ -365,10 +400,10 @@ export default function PacientesPage() {
   }, [pacientesFiltrados]);
 
   return (
-    <div className="min-h-screen bg-cloud pb-16 font-gilroy text-ink-navy">
+    <div className="min-h-screen bg-cloud pb-16 font-gilroy text-ink-navy overflow-x-hidden">
       
       {/* Contenedor Principal */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8 print:hidden">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8 print:hidden overflow-x-hidden">
         
         {/* Título y Acciones Globales */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -447,25 +482,25 @@ export default function PacientesPage() {
               </span>
             </div>
 
-            {/* 2. Selector de Modo de Vista ([ 📋 Tabla ] vs [ 🗂️ Tablero ]) */}
+            {/* 2. Selector de Modo de Vista ([ 🗃️ Tarjetas ] vs [ 🗂️ Tablero ]) */}
             <div className="flex items-center p-1 bg-pebble rounded-inputs border border-hairline self-start sm:self-auto">
               <button
                 onClick={() => setModoVista('tabla')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold transition-all cursor-pointer ${
                   modoVista === 'tabla'
-                    ? 'bg-paper text-ink-navy shadow-calendly'
+                    ? 'bg-paper text-ink-navy shadow-calendly font-bold'
                     : 'text-slate-gray hover:text-ink-navy'
                 }`}
               >
                 <Table className="w-3.5 h-3.5" />
-                <span>Tabla</span>
+                <span>Tarjetas</span>
               </button>
 
               <button
                 onClick={() => setModoVista('kanban')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold transition-all cursor-pointer ${
                   modoVista === 'kanban'
-                    ? 'bg-paper text-signal-blue shadow-calendly'
+                    ? 'bg-paper text-signal-blue shadow-calendly font-bold'
                     : 'text-slate-gray hover:text-ink-navy'
                 }`}
               >
@@ -820,408 +855,154 @@ export default function PacientesPage() {
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            {/* 1. LISTA DE TARJETAS CLÍNICAS MÓVILES (< 768px, Móviles y Tablets) */}
-            <div className="block md:hidden space-y-3">
-              {loading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="h-40 bg-white rounded-2xl border border-slate-200 animate-pulse" />
-                  ))}
-                </div>
-              ) : pacientesFiltrados.length === 0 ? (
-                <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs">
-                  No se encontraron pacientes con los criterios de búsqueda.
-                </div>
-              ) : (
-                pacientesFiltrados.map((p) => {
-                  const { tienePlan, sesionesUsadas, sesionesTotales, sesionesRestantes, porcentajeUso } = getResumenPlan(p);
-                  const segmentoKey = detectarSegmentoTMO(p);
-                  const segmentoInfo = getSegmentoTMOLabel(segmentoKey);
-                  const alerta = evaluarRiesgoDesercion({ ...p, sesiones_consumidas: sesionesUsadas } as any);
+          /* GRID DE TARJETAS CLÍNICAS RESPONSIVE (PatientCardGrid) */
+          <div>
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-12">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="h-52 bg-white rounded-2xl border border-slate-200 animate-pulse" />
+                ))}
+              </div>
+            ) : pacientesFiltrados.length === 0 ? (
+              <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs">
+                No se encontraron pacientes con los criterios de búsqueda.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-12">
+                {pacientesFiltrados.map((p) => {
+                  const riesgo = evaluarRiesgoDesercion({ ...p, sesiones_consumidas: p.sesiones_usadas } as any);
+                  const esRiesgo = riesgo.nivel !== null;
+                  const tienePlan = p.sesiones_totales > 0;
 
                   return (
                     <div
-                      key={`card-${p.id}`}
-                      className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-3 hover:shadow-md transition-shadow"
+                      key={p.id}
+                      className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between space-y-3"
                     >
-                      {/* Cabecera Móvil: Nombre en negrita, Previsión y Chip Anatómico */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <Link
-                              href={`/agenda?pacienteId=${p.id}&ficha=true`}
-                              className="font-bold text-sm text-slate-900 hover:text-blue-600 transition-colors line-clamp-1"
-                            >
+                      {/* 1. Cabecera de la Tarjeta: Nombre, Previsión y Alerta de Riesgo */}
+                      <div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-slate-900 text-sm leading-snug truncate" title={p.nombre_completo}>
                               {p.nombre_completo}
-                            </Link>
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700">
-                              {p.prevision || 'Particular'}
-                            </span>
+                            </h3>
+                            <p className="text-xs text-slate-500 font-mono mt-0.5 truncate">
+                              {p.rut || 'Sin RUT'} {p.telefono ? `• ${p.telefono}` : ''}
+                            </p>
                           </div>
 
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold border ${segmentoInfo.colorClass}`}>
-                              {segmentoInfo.shortLabel}
+                          {/* Badge de Previsión */}
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200 flex-shrink-0">
+                            {p.prevision || 'Particular'}
+                          </span>
+                        </div>
+
+                        {/* Alerta de Deserción si aplica */}
+                        {esRiesgo && (
+                          <div className="mt-2">
+                            <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-md border ${riesgo.badgeClass}`}>
+                              {riesgo.etiqueta}
                             </span>
-                            {p.rut && (
-                              <span className="font-mono text-[11px] text-slate-400">
-                                {p.rut}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 2. Bloque de Tratamiento y Saldo de Sesiones */}
+                      <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-100 text-xs space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Tratamiento
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleAbrirAjustePlan(p)}
+                            className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold cursor-pointer flex items-center gap-0.5"
+                            title="Editar sesiones del plan"
+                          >
+                            ⚙️ Ajustar
+                          </button>
+                        </div>
+
+                        {tienePlan ? (
+                          <div>
+                            <div className="flex items-center justify-between font-semibold text-slate-800">
+                              <span className="truncate max-w-[170px]" title={p.nombre_plan || 'Plan Kinésico'}>
+                                {p.nombre_plan || 'Plan Kinésico'}
                               </span>
-                            )}
-                            {p.telefono && (
-                              <a
-                                href={`https://wa.me/56${p.telefono.replace(/\D/g, '').slice(-9)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[11px] text-emerald-600 font-medium inline-flex items-center gap-0.5"
-                              >
-                                💬 {p.telefono}
-                              </a>
-                            )}
+                              <span className="font-mono font-bold text-slate-900">
+                                {p.sesiones_usadas}/{p.sesiones_totales} ses.
+                              </span>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  p.estado_plan === 'finalizado'
+                                    ? 'bg-slate-400'
+                                    : p.estado_plan === 'por_renovar'
+                                    ? 'bg-amber-500'
+                                    : 'bg-emerald-500'
+                                }`}
+                                style={{
+                                  width: `${Math.min(100, (p.sesiones_usadas / p.sesiones_totales) * 100)}%`
+                                }}
+                              />
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-1">
+                              {p.sesiones_restantes} sesiones restantes disponibles
+                            </p>
                           </div>
-                        </div>
-
-                        {/* Pastilla de Estado */}
-                        <div className="shrink-0">
-                          {p.estado_plan === 'vigente' && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              Vigente
-                            </span>
-                          )}
-                          {p.estado_plan === 'por_renovar' && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                              Por Renovar
-                            </span>
-                          )}
-                          {p.estado_plan === 'finalizado' && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
-                              Finalizado
-                            </span>
-                          )}
-                          {p.estado_plan === 'sin_plan' && (
-                            <span className="text-[10px] text-slate-400">Sin plan</span>
-                          )}
-                        </div>
+                        ) : (
+                          <p className="text-slate-400 text-xs italic py-1">Sin plan activo asignado</p>
+                        )}
                       </div>
 
-                      {/* Barra de Progreso de Sesiones Visible con X/Y ses. */}
-                      <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-100 space-y-1.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-slate-800">
-                            {tienePlan ? `${sesionesUsadas}/${sesionesTotales} ses.` : 'Sin sesiones activas'}
-                          </span>
-                          <span className="text-slate-500 font-medium text-[11px]">
-                            {tienePlan ? `${sesionesRestantes} restantes` : '0 restantes'}
-                          </span>
-                        </div>
-                        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-300 ${
-                              p.estado_plan === 'finalizado'
-                                ? 'bg-slate-400'
-                                : p.estado_plan === 'por_renovar'
-                                ? 'bg-amber-500'
-                                : 'bg-emerald-500'
-                            }`}
-                            style={{ width: `${porcentajeUso}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Alerta de Deserción y Botón Directo de WhatsApp */}
-                      {alerta.nivel && (
-                        <div className="flex items-center justify-between gap-2 p-2 bg-rose-50/80 rounded-xl border border-rose-200">
-                          <span className="text-[11px] font-bold text-rose-800 truncate">
-                            {alerta.etiqueta}
-                          </span>
-                          {p.telefono ? (
+                      {/* 3. Botonera Inferior de Acciones */}
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                        <div className="flex items-center gap-1.5">
+                          {esRiesgo && p.telefono && (
                             <a
-                              href={`https://wa.me/56${p.telefono.replace(/\D/g, '').slice(-9)}?text=${encodeURIComponent(alerta.mensajeWhatsApp)}`}
+                              href={`https://wa.me/56${(p.telefono || '').replace(/\D/g, '').slice(-9)}?text=${encodeURIComponent(riesgo.mensajeWhatsApp)}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="min-h-[44px] px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all inline-flex items-center justify-center gap-1.5 shrink-0"
+                              className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl border border-emerald-200 flex items-center gap-1 transition-colors"
+                              title="Contactar por WhatsApp"
                             >
-                              <MessageCircle className="w-3.5 h-3.5" />
-                              <span>WhatsApp</span>
+                              💬 Reactivar
                             </a>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 italic">Sin tel.</span>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => handleAbrirEditar(p)}
+                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                            title="Editar datos / RUT"
+                          >
+                            ✏️
+                          </button>
                         </div>
-                      )}
 
-                      {/* Botones de Acción Accesibles (Mínimo 44px altura táctil iOS): [ Agendar ], [ ⚙️ Plan ], [ Ficha → ] */}
-                      <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPacienteParaAgendar({
-                              id: p.id,
-                              nombre_completo: p.nombre_completo,
-                              rut: p.rut,
-                              telefono: p.telefono,
-                            });
-                            setIsAgendarModalOpen(true);
-                          }}
-                          className="min-h-[44px] py-2 px-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all text-center flex items-center justify-center cursor-pointer active:scale-95 shadow-xs"
-                        >
-                          Agendar
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleAbrirAjustarPlan(p)}
-                          className="min-h-[44px] py-2 px-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-xs"
-                        >
-                          <span>⚙️ Plan</span>
-                        </button>
-
-                        <Link
-                          href={`/agenda?pacienteId=${p.id}&ficha=true`}
-                          className="min-h-[44px] py-2 px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl transition-all text-center flex items-center justify-center gap-1 active:scale-95 shadow-xs"
-                        >
-                          <span>Ficha</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleAgendarPaciente(p)}
+                            className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl shadow-xs transition-all cursor-pointer"
+                          >
+                            Agendar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => abrirFichaPaciente(p.id)}
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+                          >
+                            Ficha →
+                          </button>
+                        </div>
                       </div>
+
                     </div>
                   );
-                })
-              )}
-            </div>
-
-            {/* 2. TABLA DE PACIENTES TRADICIONAL (>= 768px, Escritorio y Tablets Horizontales) */}
-            <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="px-5 py-3.5">Paciente</th>
-                      <th className="px-5 py-3.5">RUT / Contacto</th>
-                      <th className="px-5 py-3.5">Previsión</th>
-                      <th className="px-5 py-3.5">Saldo Sesiones</th>
-                      <th className="px-5 py-3.5">Estado Plan</th>
-                      <th className="px-5 py-3.5 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-                    {loading ? (
-                      <tr>
-                        <td colSpan={6} className="px-5 py-12 text-center text-slate-400">
-                          <div className="space-y-3 px-2">
-                            {[1,2,3,4,5].map(i => (
-                              <div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse w-full"></div>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    ) : pacientesFiltrados.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-5 py-12 text-center text-slate-400">
-                          No se encontraron pacientes con los criterios de búsqueda.
-                        </td>
-                      </tr>
-                    ) : (
-                      pacientesFiltrados.map((p) => {
-                        const { tienePlan, sesionesUsadas, sesionesTotales, sesionesRestantes, porcentajeUso } = getResumenPlan(p);
-                        const segmentoKey = detectarSegmentoTMO(p);
-                        const segmentoInfo = getSegmentoTMOLabel(segmentoKey);
-                        const alerta = evaluarRiesgoDesercion({ ...p, sesiones_consumidas: sesionesUsadas } as any);
-
-                        return (
-                          <tr key={p.id} className="hover:bg-slate-50/90 transition-colors duration-150 group">
-                            
-                            {/* Paciente con Avatar y Chip Anatómico */}
-                            <td className="px-5 py-3.5">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs flex-shrink-0 border border-slate-200/80">
-                                  {p.nombre_completo ? p.nombre_completo.charAt(0).toUpperCase() : 'P'}
-                                </div>
-                                <div>
-                                  <div className="flex items-center gap-1.5">
-                                    <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                                      {p.nombre_completo}
-                                    </p>
-                                    <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold border ${segmentoInfo.colorClass}`}>
-                                      {segmentoInfo.shortLabel}
-                                    </span>
-                                  </div>
-                                  {p.email && <p className="text-[11px] text-slate-400">{p.email}</p>}
-                                </div>
-                              </div>
-                            </td>
-
-                            {/* RUT y WhatsApp */}
-                            <td className="px-5 py-3.5 whitespace-nowrap">
-                              <p className="font-mono text-xs text-slate-700">{p.rut || '—'}</p>
-                              {p.telefono && (
-                                <a
-                                  href={`https://wa.me/56${p.telefono.replace(/\D/g, '').slice(-9)}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-[11px] text-emerald-600 hover:text-emerald-700 font-medium inline-flex items-center gap-1 mt-0.5"
-                                >
-                                  <span>💬 {p.telefono}</span>
-                                </a>
-                              )}
-                            </td>
-
-                            {/* Previsión */}
-                            <td className="px-5 py-3.5">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">
-                                {p.prevision || 'Particular'}
-                              </span>
-                            </td>
-
-                            {/* Saldo de Sesiones con Ajuste Táctil */}
-                            <td className="px-5 py-3.5">
-                              <div className="flex items-center justify-between gap-2 max-w-[210px]">
-                                {tienePlan ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleAbrirAjustarPlan(p)}
-                                    className="text-left space-y-1 group/saldo cursor-pointer hover:opacity-85 transition-opacity flex-1"
-                                    title="Hacer clic para ajustar plan del paciente"
-                                  >
-                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900">
-                                      <span className="group-hover/saldo:text-blue-600 transition-colors">
-                                        {sesionesUsadas}/{sesionesTotales} ses.
-                                      </span>
-                                      <span className="text-slate-400 font-normal">
-                                        ({sesionesRestantes} rest.)
-                                      </span>
-                                    </div>
-                                    <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                      <div 
-                                        className={`h-full rounded-full transition-all duration-500 ease-out ${
-                                          p.estado_plan === 'finalizado' ? 'bg-slate-400' :
-                                          p.estado_plan === 'por_renovar' ? 'bg-amber-500' : 'bg-emerald-500'
-                                        }`} 
-                                        style={{ width: `${porcentajeUso}%` }} 
-                                      />
-                                    </div>
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleAbrirAjustarPlan(p)}
-                                    className="text-slate-400 text-xs italic hover:text-blue-600 transition-colors cursor-pointer flex-1 text-left"
-                                    title="Crear o asignar plan"
-                                  >
-                                    Sin plan activo
-                                  </button>
-                                )}
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleAbrirAjustarPlan(p)}
-                                  className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-blue-600 transition-all text-xs font-bold shrink-0 shadow-xs cursor-pointer"
-                                  title="Ajustar plan manualmente"
-                                >
-                                  ⚙️
-                                </button>
-                              </div>
-                            </td>
-
-                            {/* Estado del Plan / Alertas Clínicas */}
-                            <td className="px-5 py-3.5 whitespace-nowrap">
-                              {p.estado_plan === 'vigente' && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 mb-1">
-                                  ● Plan Vigente
-                                </span>
-                              )}
-                              {p.estado_plan === 'por_renovar' && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 mb-1">
-                                  ⚠️ Por Renovar (1 rest.)
-                                </span>
-                              )}
-                              {p.estado_plan === 'finalizado' && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 mb-1">
-                                  Finalizado
-                                </span>
-                              )}
-                              {p.estado_plan === 'sin_plan' && (
-                                <span className="text-slate-400 text-xs mb-1 block">—</span>
-                              )}
-                              
-                              {alerta.nivel && (
-                                <div className="mt-1">
-                                  <a 
-                                    href={`https://wa.me/56${(p.telefono || '').replace(/\D/g, '').slice(-9)}?text=${encodeURIComponent(alerta.mensajeWhatsApp)}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border hover:opacity-80 transition-opacity ${alerta.badgeClass}`}
-                                  >
-                                    {alerta.etiqueta} 💬
-                                  </a>
-                                </div>
-                              )}
-
-                              {requiereReevaluacion(p as any) && (
-                                <div className="mt-1">
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
-                                    ⚠️ Reevaluar TMO (ENA {p.ultimo_dolor_ena}/10)
-                                  </span>
-                                </div>
-                              )}
-                            </td>
-
-                            {/* Acciones */}
-                            <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end gap-2">
-                                {alerta.nivel && p.telefono && (
-                                  <a
-                                    href={`https://wa.me/56${p.telefono.replace(/\D/g, '').slice(-9)}?text=${encodeURIComponent(alerta.mensajeWhatsApp)}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all inline-flex items-center gap-1 cursor-pointer"
-                                    title="Enviar mensaje de reactivación por WhatsApp"
-                                  >
-                                    <MessageCircle className="w-3.5 h-3.5" />
-                                    <span className="hidden xl:inline">Reactivar</span>
-                                  </a>
-                                )}
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleAbrirEditar(p)}
-                                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
-                                  title="Editar datos del paciente"
-                                >
-                                  ✏️
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setPacienteParaAgendar({
-                                      id: p.id,
-                                      nombre_completo: p.nombre_completo,
-                                      rut: p.rut,
-                                      telefono: p.telefono
-                                    });
-                                    setIsAgendarModalOpen(true);
-                                  }}
-                                  className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl shadow-xs transition-all cursor-pointer"
-                                >
-                                  Agendar
-                                </button>
-                                <Link
-                                  href={`/agenda?pacienteId=${p.id}&ficha=true`}
-                                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-xl transition-all active:scale-[0.98]"
-                                >
-                                  Ficha →
-                                </Link>
-                              </div>
-                            </td>
-
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                })}
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -1309,6 +1090,11 @@ export default function PacientesPage() {
             onPatientUpdated={(updated) => {
               cargarPacientes();
             }}
+            onPatientDeleted={() => {
+              setIsEditModalOpen(false);
+              setPacienteParaEditar(null);
+              cargarPacientes();
+            }}
           />
         )}
 
@@ -1331,6 +1117,18 @@ export default function PacientesPage() {
             }}
             onSuccess={async () => {
               await cargarPacientes();
+            }}
+          />
+        )}
+
+        {/* Expediente Clínico Medilink desde Directorio de Pacientes */}
+        {selectedPacienteFichaId && (
+          <ClinicalRecordView
+            pacienteId={selectedPacienteFichaId}
+            onClose={() => setSelectedPacienteFichaId(null)}
+            onSuccess={() => {
+              setSelectedPacienteFichaId(null);
+              cargarPacientes();
             }}
           />
         )}

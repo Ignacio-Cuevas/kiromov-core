@@ -78,24 +78,33 @@ export function EditExpenseModal({
     try {
       if (!supabase) throw new Error("No hay conexión con la base de datos");
 
-      const updatePayload = {
+      const updatePayload: Record<string, any> = {
         concepto: concepto.trim(),
         categoria,
         monto_clp: montoNum,
         medio_pago: medioPago,
-        metodo_pago: medioPago,
         fecha: fecha || getChileanDate(),
         observacion: observacion.trim() || null,
       };
 
-      const { error } = await supabase
+      let { error } = await supabase
         .from("egresos_caja")
-        .update(updatePayload)
+        .update({
+          ...updatePayload,
+          metodo_pago: medioPago,
+        })
         .eq("id", egreso.id);
 
       if (error) {
-        console.error("Error al actualizar egreso:", error);
-        throw new Error(error.message);
+        // Reintentar sin metodo_pago en caso de discrepancia de esquema
+        const retry = await supabase
+          .from("egresos_caja")
+          .update(updatePayload)
+          .eq("id", egreso.id);
+        if (retry.error) {
+          console.error("Error al actualizar egreso:", retry.error);
+          throw new Error(retry.error.message);
+        }
       }
 
       toast.success("Gasto / Egreso actualizado exitosamente", {
