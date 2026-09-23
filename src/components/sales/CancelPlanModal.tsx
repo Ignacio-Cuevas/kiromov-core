@@ -63,61 +63,82 @@ export function CancelPlanModal({
 
       if (modalMode === 'adjust') {
         // Opción 1: Ajustar a sesiones realizadas
-        const { error } = await supabase
-          .from('compras_planes')
-          .update({
-            nombre_plan: `Sesión Individual (${sesionesUsadas} realizada(s))`,
-            sesiones_totales: Number(sesionesUsadas) || 1,
-            total_sesiones: Number(sesionesUsadas) || 1,
-            monto_clp: montoAjustado,
-            valor_total: montoAjustado,
-            estado: 'finalizado', // Cierra el plan
-            notas: `Cancelación anticipada: paciente realizó ${sesionesUsadas} sesión(es). Se ajustó el cobro a ${formatCLP(montoAjustado)}. Motivo: ${motivo.trim() || 'No especificado'}.`,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', planId);
+        const nuevoMonto = parseInt(String(montoAjustado).replace(/\D/g, ''), 10) || 0;
 
-        if (error) throw error;
+        const payload: any = {
+          nombre_plan: `Sesión Individual (${sesionesUsadas} realizada(s))`,
+          sesiones_totales: Number(sesionesUsadas) || 1,
+          total_sesiones: Number(sesionesUsadas) || 1,
+          monto_clp: nuevoMonto,
+          monto_total: nuevoMonto,
+          valor_total: nuevoMonto,
+          precio_base: nuevoMonto,
+          estado: 'completado',
+          notas: motivo?.trim() || 'Ajuste de cobro por cancelación anticipada',
+          updated_at: new Date().toISOString()
+        };
+
+        let { error } = await supabase.from('compras_planes').update(payload).eq('id', planId);
+        if (error) {
+          // Si Supabase falla por columnas no presentes en el schema cache (como valor_total)
+          delete payload.valor_total;
+          delete payload.monto_total;
+          delete payload.precio_base;
+          const retry = await supabase.from('compras_planes').update(payload).eq('id', planId);
+          if (retry.error) throw retry.error;
+        }
 
         toast.success('Plan ajustado correctamente', {
-          description: `Nuevo cobro fijado en ${formatCLP(montoAjustado)} por las ${sesionesUsadas} sesión(es) realizadas.`
+          description: `Nuevo cobro fijado en ${formatCLP(nuevoMonto)} por las ${sesionesUsadas} sesión(es) realizadas.`
         });
       } else {
         // Opción 2: Anular plan completo
         if (sesionesUsadas === 0) {
           // Si no usó sesiones, podemos anular o marcar cancelado con monto 0
-          const { error } = await supabase
-            .from('compras_planes')
-            .update({
-              monto_clp: 0,
-              valor_total: 0,
-              estado: 'cancelado',
-              estado_pago: 'pagado', // Salda para que no aparezca como deuda
-              notas: `Plan anulado por completo sin sesiones realizadas. Motivo: ${motivo.trim() || 'Error de asignación o desistimiento antes de iniciar'}.`,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', planId);
-
-        if (error) throw error;
-
-        toast.success('Plan anulado por completo', {
-          description: 'Se eliminó la deuda del paciente y el plan quedó cancelado.'
-        });
-      } else {
-        // Si usó sesiones pero el profesional decide anularlo sin cobro
-        const { error } = await supabase
-          .from('compras_planes')
-          .update({
+          const payloadCancel: any = {
             monto_clp: 0,
+            monto_total: 0,
             valor_total: 0,
+            precio_base: 0,
+            estado: 'cancelado',
+            estado_pago: 'pagado', // Salda para que no aparezca como deuda
+            notas: `Plan anulado por completo sin sesiones realizadas. Motivo: ${motivo?.trim() || 'Error de asignación o desistimiento antes de iniciar'}.`,
+            updated_at: new Date().toISOString()
+          };
+
+          let { error } = await supabase.from('compras_planes').update(payloadCancel).eq('id', planId);
+          if (error) {
+            delete payloadCancel.valor_total;
+            delete payloadCancel.monto_total;
+            delete payloadCancel.precio_base;
+            const retry = await supabase.from('compras_planes').update(payloadCancel).eq('id', planId);
+            if (retry.error) throw retry.error;
+          }
+
+          toast.success('Plan anulado por completo', {
+            description: 'Se eliminó la deuda del paciente y el plan quedó cancelado.'
+          });
+        } else {
+          // Si usó sesiones pero el profesional decide anularlo sin cobro
+          const payloadCancelCondonado: any = {
+            monto_clp: 0,
+            monto_total: 0,
+            valor_total: 0,
+            precio_base: 0,
             estado: 'cancelado',
             estado_pago: 'pagado',
-            notas: `Plan cancelado sin cobro adicional por criterio profesional (${sesionesUsadas} sesión(es) condonadas). Motivo: ${motivo.trim() || 'Condonación'}.`,
+            notas: `Plan cancelado sin cobro adicional por criterio profesional (${sesionesUsadas} sesión(es) condonadas). Motivo: ${motivo?.trim() || 'Condonación'}.`,
             updated_at: new Date().toISOString()
-          })
-          .eq('id', planId);
+          };
 
-          if (error) throw error;
+          let { error } = await supabase.from('compras_planes').update(payloadCancelCondonado).eq('id', planId);
+          if (error) {
+            delete payloadCancelCondonado.valor_total;
+            delete payloadCancelCondonado.monto_total;
+            delete payloadCancelCondonado.precio_base;
+            const retry = await supabase.from('compras_planes').update(payloadCancelCondonado).eq('id', planId);
+            if (retry.error) throw retry.error;
+          }
 
           toast.success('Plan cancelado y deuda condonada', {
             description: 'El plan quedó cancelado sin saldo pendiente.'

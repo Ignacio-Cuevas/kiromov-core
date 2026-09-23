@@ -50,7 +50,11 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
     setSelectedPlanId(planId);
     const planEncontrado = planesDisponibles.find(p => p.id === planId);
     if (planEncontrado) {
-      setMontoCustom(planEncontrado.precio.toString());
+      if (planEncontrado.id === 'personalizado') {
+        setMontoCustom(''); // Limpiar para obligar a ingresar el monto acordado
+      } else {
+        setMontoCustom(planEncontrado.precio ? planEncontrado.precio.toString() : '');
+      }
       setSesionesCustom(planEncontrado.sesiones || 1);
     }
   };
@@ -90,20 +94,29 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
     const planElegido = planesDisponibles.find((x) => x.id === selectedPlanId);
     if (!planElegido) return;
 
+    const montoClp = parseInt(String(montoCustom).replace(/\D/g, ''), 10) || 0;
+    if (montoClp <= 0) {
+      toast.error('Por favor ingresa un monto final acordado válido (mayor a $0).');
+      return;
+    }
+
     setSaving(true);
     try {
-      const montoClp = parseInt(montoCustom.replace(/\D/g, ''), 10) || 0;
-
-      const payload = {
+      const payload: Record<string, any> = {
         paciente_id: paciente.id,
         plan_id: planElegido.id || null,
         plan_id_ref: planElegido.id || null,
         catalogo_plan_id: planElegido.id || null,
-        nombre_plan: planElegido.nombre || 'Plan Kinésico',
-        plan_nombre: planElegido.nombre || 'Plan Kinésico',
+        nombre_plan: planElegido.id === 'personalizado' ? 'Plan Personalizado / Especial' : (planElegido.nombre || 'Plan Kinésico'),
+        plan_nombre: planElegido.id === 'personalizado' ? 'Plan Personalizado / Especial' : (planElegido.nombre || 'Plan Kinésico'),
         sesiones_totales: Number(sesionesCustom) || 1,
+        total_sesiones: Number(sesionesCustom) || 1,
         sesiones_usadas: 0,
         monto_clp: montoClp,
+        monto_total: montoClp,
+        valor_total: montoClp,
+        precio_base: montoClp,
+        total_final_clp: montoClp,
         metodo_pago: null,
         estado_pago: 'pendiente',
         fecha_compra: getChileanDate(),
@@ -112,10 +125,17 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
         created_at: new Date().toISOString()
       };
 
-      const { error } = await supabase.from('compras_planes').insert([payload]);
+      let { error } = await supabase.from('compras_planes').insert([payload]);
       if (error) {
-        toast.error('Error al asignar plan: ' + error.message);
-        return;
+        delete payload.valor_total;
+        delete payload.monto_total;
+        delete payload.precio_base;
+        delete payload.total_final_clp;
+        const retry = await supabase.from('compras_planes').insert([payload]);
+        if (retry.error) {
+          toast.error('Error al asignar plan: ' + retry.error.message);
+          return;
+        }
       }
 
       toast.success('Tratamiento asignado exitosamente (Pendiente de pago)');
@@ -162,19 +182,36 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
                 <label className="text-xs font-bold text-slate-700">N° de Sesiones</label>
                 <Input 
                   type="number" 
+                  min="1"
                   value={sesionesCustom} 
                   onChange={(e) => setSesionesCustom(parseInt(e.target.value) || 1)} 
                   className="font-bold bg-white" 
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Monto Final Acordado (CLP)</label>
-                <Input 
-                  type="number" 
-                  value={montoCustom} 
-                  onChange={(e) => setMontoCustom(e.target.value)} 
-                  className="font-bold text-blue-700 bg-white" 
-                />
+                <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span>Monto Final Acordado (CLP)</span>
+                  {selectedPlanId === 'personalizado' && (
+                    <span className="text-[10px] text-amber-600 font-semibold uppercase bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                      Obligatorio
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">$</span>
+                  <Input 
+                    type="number" 
+                    min="1"
+                    required
+                    placeholder="Ej: 80000"
+                    value={montoCustom} 
+                    onChange={(e) => setMontoCustom(e.target.value)} 
+                    className={`pl-7 font-bold text-blue-700 bg-white ${selectedPlanId === 'personalizado' && (!montoCustom || parseInt(montoCustom) <= 0) ? 'border-amber-400 ring-2 ring-amber-200/50' : ''}`} 
+                  />
+                </div>
+                {selectedPlanId === 'personalizado' && (!montoCustom || parseInt(montoCustom) <= 0) && (
+                  <p className="text-[11px] text-amber-600 font-medium">Ingresa el valor pactado con el paciente (no puede ser $0).</p>
+                )}
               </div>
             </div>
           </div>
