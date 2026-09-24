@@ -66,6 +66,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, action: 'cancelled' });
     }
 
+    // Paso 0 (Corte de Bucle Anti-Fantasmas):
+    // Verificar duplicados por google_event_id AL PRINCIPIO antes de buscar o crear pacientes
+    const { data: citaExistente } = await supabase
+      .from('citas_atenciones')
+      .select('id')
+      .eq('google_event_id', google_event_id)
+      .maybeSingle();
+
+    if (citaExistente) {
+      return NextResponse.json({ message: 'Evento ya registrado previamente' }, { status: 200 });
+    }
+
     if (!nombre_completo || !fecha || !hora) {
       return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 });
     }
@@ -74,8 +86,11 @@ export async function POST(request: NextRequest) {
 
     console.log('[WEBHOOK CALENDAR] Cita procesada exitosamente');
 
-    // Normalización de Datos
+    // Normalización de Datos y Limpieza Estricta de Prefijos
     let cleanName = nombre_completo
+      .replace(/^Cita:\s*/i, '')
+      .replace(/^Sesión:\s*/i, '')
+      .replace(/^Kinesiología:\s*/i, '')
       .replace(/^Cita Kiromov\s*[-–—:]\s*/i, '')
       .replace(/^Kiromov\s*[-–—:]\s*/i, '')
       .replace(/^Cita con\s*/i, '')
@@ -143,18 +158,7 @@ export async function POST(request: NextRequest) {
       pacienteId = nuevo.id;
     }
 
-    // Paso B (Evitar Duplicados e Insertar Cita)
-    const { data: citaExistente } = await supabase
-      .from('citas_atenciones')
-      .select('id')
-      .eq('google_event_id', google_event_id)
-      .maybeSingle();
-
-    if (citaExistente) {
-      return NextResponse.json({ message: 'Cita ya registrada previamente' }, { status: 200 });
-    }
-
-    // Insertar en la agenda:
+    // Paso B (Insertar Cita en Agenda)
     const { error: errCita } = await supabase
       .from('citas_atenciones')
       .insert([{

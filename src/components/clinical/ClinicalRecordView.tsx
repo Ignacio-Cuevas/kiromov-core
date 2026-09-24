@@ -322,7 +322,7 @@ export function ClinicalRecordView({
       const { error } = await supabase.from('evoluciones_soap').insert([payload]);
       if (error) throw error;
 
-      toast.success('¡Evolución clínica guardada exitosamente!');
+      toast.success('Evolución clínica guardada en la ficha');
       
       setSSubjetivo('');
       setOObjetivo('');

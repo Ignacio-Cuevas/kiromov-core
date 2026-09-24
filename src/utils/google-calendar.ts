@@ -62,11 +62,13 @@ export async function crearEventoGoogleCalendar(params: {
     const endM = String(totalMinutes % 60).padStart(2, '0');
     const endDateTime = `${params.fecha}T${endH}:${endM}:00-03:00`;
 
+    const nombreLimpio = params.pacienteNombre.replace(/^Cita:\s*/i, '').trim();
+
     const res = await calendar.events.insert({
       calendarId: CALENDAR_ID,
       requestBody: {
-        summary: `Cita: ${params.pacienteNombre}`,
-        description: `Paciente: ${params.pacienteNombre}\nTeléfono: ${params.pacienteTelefono || 'Sin registro'}\nMotivo: ${params.motivo || 'Atención Kinésica TMO'}\nRegistrado desde Kiromov Core`,
+        summary: `Cita: ${nombreLimpio}`,
+        description: `Paciente: ${nombreLimpio}\nTeléfono: ${params.pacienteTelefono || 'Sin registro'}\nMotivo: ${params.motivo || 'Atención Kinésica TMO'}\nRegistrado desde Kiromov Core`,
         start: { dateTime: startDateTime, timeZone: 'America/Santiago' },
         end: { dateTime: endDateTime, timeZone: 'America/Santiago' },
       },

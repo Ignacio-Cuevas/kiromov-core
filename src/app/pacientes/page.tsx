@@ -1127,7 +1127,6 @@ export default function PacientesPage() {
             pacienteId={selectedPacienteFichaId}
             onClose={() => setSelectedPacienteFichaId(null)}
             onSuccess={() => {
-              setSelectedPacienteFichaId(null);
               cargarPacientes();
             }}
           />

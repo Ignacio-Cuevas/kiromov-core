@@ -252,7 +252,7 @@ export function TopBar() {
         <ClinicalRecordView
           pacienteId={selectedPacienteId}
           onClose={() => setSelectedPacienteId(null)}
-          onSuccess={() => setSelectedPacienteId(null)}
+          onSuccess={() => {}}
         />
       )}
     </>
