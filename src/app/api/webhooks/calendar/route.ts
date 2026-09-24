@@ -28,8 +28,9 @@ import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
   // 1. Validación de Seguridad Criptográfica
-  const authHeader = request.headers.get('x-api-key') || request.headers.get('authorization') || '';
-  const secretKey = process.env.CALENDAR_WEBHOOK_SECRET || '';
+  const rawAuth = request.headers.get('x-api-key') || request.headers.get('authorization') || '';
+  const authHeader = rawAuth.replace(/^Bearer\s+/i, '').trim();
+  const secretKey = (process.env.CALENDAR_WEBHOOK_SECRET || '').trim();
 
   if (!secretKey) {
     return NextResponse.json({ error: 'Configuración de servidor incompleta' }, { status: 500 });

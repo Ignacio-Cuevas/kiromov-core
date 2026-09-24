@@ -30,8 +30,6 @@ export default function LoginPage() {
       return;
     }
 
-    console.log('Intentando login con:', email);
-
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
@@ -39,7 +37,7 @@ export default function LoginPage() {
       });
 
       if (error) {
-        console.error('Error Supabase Login:', error);
+        console.error('Error Supabase Login:', error.message);
         const msg = error.message === 'Invalid login credentials'
           ? 'Credenciales incorrectas. Verifica tu email y contraseña.'
           : error.message;
@@ -49,7 +47,6 @@ export default function LoginPage() {
         return;
       }
 
-      console.log('Login exitoso en cliente:', data?.user?.email);
       toast.success('¡Sesión iniciada!');
       
       // Redirección dura a /pacientes para forzar lectura de cookies en el servidor

@@ -10,6 +10,11 @@ export async function POST() {
     return NextResponse.json({ error: 'Cliente de base de datos no disponible' }, { status: 500 });
   }
 
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: 'No autorizado: se requiere sesión activa' }, { status: 401 });
+  }
+
   const hoyStr = new Date().toISOString().split('T')[0];
 
   // Buscar citas futuras sin sincronizar con Google Calendar

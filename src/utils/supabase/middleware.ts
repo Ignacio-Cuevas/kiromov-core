@@ -34,7 +34,7 @@ export async function updateSession(request: NextRequest) {
         cookiesToSet.forEach(({ name, value, options }) =>
           supabaseResponse.cookies.set(name, value, {
             ...options,
-            secure: isDev ? false : options?.secure, // Permite cookies en http://localhost
+            secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
           })
         );
@@ -60,8 +60,15 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(new URL('/pacientes', request.url));
   }
 
-  // Si no está autenticado y la ruta es privada -> enviar a /login
+  // Si no está autenticado y la ruta es privada:
   if (!user && !isPublicPath) {
+    // Si es un endpoint de API interno, responder con 401 JSON en lugar de redirección HTML
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'No autorizado: se requiere sesión activa' },
+        { status: 401 }
+      );
+    }
     return NextResponse.redirect(new URL('/login', request.url));
   }
 

@@ -36,6 +36,11 @@ service-account*.json
 google-credentials.json
 *.json.secret
 *.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
 
 # vercel
 .vercel
