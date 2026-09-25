@@ -46,23 +46,23 @@ export interface ConfiguracionAgenda {
 }
 
 export const DEFAULT_HORARIOS_POR_DIA: HorariosPorDia = {
-  1: { activo: true, hora_inicio: '09:00', hora_fin: '20:00' }, // Lunes
-  2: { activo: true, hora_inicio: '09:00', hora_fin: '20:00' }, // Martes
-  3: { activo: true, hora_inicio: '09:00', hora_fin: '20:00' }, // Miércoles
-  4: { activo: true, hora_inicio: '09:00', hora_fin: '20:00' }, // Jueves
-  5: { activo: true, hora_inicio: '09:00', hora_fin: '20:00' }, // Viernes
-  6: { activo: true, hora_inicio: '09:00', hora_fin: '14:00' }, // Sábado
-  0: { activo: false, hora_inicio: '09:00', hora_fin: '14:00' }, // Domingo
+  1: { activo: true, hora_inicio: '15:00', hora_fin: '19:00' }, // Lunes
+  2: { activo: false, hora_inicio: '15:00', hora_fin: '19:00' }, // Martes
+  3: { activo: true, hora_inicio: '15:00', hora_fin: '19:00' }, // Miércoles
+  4: { activo: true, hora_inicio: '10:00', hora_fin: '14:00' }, // Jueves
+  5: { activo: true, hora_inicio: '15:00', hora_fin: '19:00' }, // Viernes
+  6: { activo: true, hora_inicio: '10:00', hora_fin: '14:00' }, // Sábado
+  0: { activo: false, hora_inicio: '10:00', hora_fin: '14:00' }, // Domingo
 };
 
 export const DEFAULT_CONFIG: ConfiguracionAgenda = {
-  dias_activos: [1, 2, 3, 4, 5, 6], // Lunes a Sábado
-  hora_apertura: '09:00',
-  hora_cierre: '20:00',
+  dias_activos: [1, 3, 4, 5, 6], // Lunes, Miércoles, Jueves, Viernes, Sábado
+  hora_apertura: '10:00',
+  hora_cierre: '19:00',
   duracion_sesion_min: 45,
-  colacion_activa: true,
-  colacion_inicio: '13:00',
-  colacion_fin: '14:00',
+  colacion_activa: false,
+  colacion_inicio: '14:00',
+  colacion_fin: '15:00',
   horarios_por_dia: DEFAULT_HORARIOS_POR_DIA,
 };
 

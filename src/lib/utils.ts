@@ -141,3 +141,14 @@ export function getChileanTime(): string {
     hour12: false
   }).format(new Date());
 }
+
+/**
+ * Retorna el día de la semana (0 = Domingo, 1 = Lunes, ..., 6 = Sábado)
+ * para una fecha 'YYYY-MM-DD' evaluada al mediodía local para evitar desfaces UTC/DST.
+ */
+export function getDiaSemanaChile(dateString: string): number {
+  if (!dateString) return 1;
+  const [y, m, d] = dateString.split('-').map(Number);
+  const date = new Date(y, m - 1, d, 12, 0, 0);
+  return date.getDay();
+}

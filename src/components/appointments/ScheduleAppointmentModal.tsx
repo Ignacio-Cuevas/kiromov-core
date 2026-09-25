@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
-import { formatRut, getChileanDate } from '@/lib/utils';
+import { formatRut, getChileanDate, getDiaSemanaChile } from '@/lib/utils';
 import {
   scheduleAppointmentSchema,
   ScheduleAppointmentFormValues,
@@ -100,6 +100,7 @@ export function ScheduleAppointmentModal({
   const [citasOcupadas, setCitasOcupadas] = useState<any[]>([]);
   const [configAgenda, setConfigAgenda] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [modoHoraManual, setModoHoraManual] = useState(false);
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -242,22 +243,25 @@ export function ScheduleAppointmentModal({
     }
   }, [preselectedPatient, setValue]);
 
-  // Detección de día de semana y filtro de bloques día por día
+  // Detección de día de semana inmune a desfaces de zona horaria (UTC vs America/Santiago)
   const diaSemana = useMemo(() => {
-    if (!watchFecha) return 1;
-    const [y, m, d] = watchFecha.split('-').map(Number);
-    const dateObj = new Date(y, m - 1, d);
-    return dateObj.getDay(); // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+    return getDiaSemanaChile(watchFecha);
   }, [watchFecha]);
 
+  // Configuración de jornada del día según horarios oficiales de Kiromov Centro Clínico
   const horarioDia = useMemo(() => {
+    const defaultKiromov: Record<number, { activo: boolean; hora_inicio: string; hora_fin: string }> = {
+      1: { activo: true, hora_inicio: '15:00', hora_fin: '19:00' }, // Lunes
+      2: { activo: false, hora_inicio: '15:00', hora_fin: '19:00' }, // Martes
+      3: { activo: true, hora_inicio: '15:00', hora_fin: '19:00' }, // Miércoles
+      4: { activo: true, hora_inicio: '10:00', hora_fin: '14:00' }, // Jueves
+      5: { activo: true, hora_inicio: '15:00', hora_fin: '19:00' }, // Viernes
+      6: { activo: true, hora_inicio: '10:00', hora_fin: '14:00' }, // Sábado
+      0: { activo: false, hora_inicio: '10:00', hora_fin: '14:00' }, // Domingo
+    };
+
     if (!configAgenda) {
-      const esDomingo = diaSemana === 0;
-      return {
-        activo: !esDomingo,
-        hora_inicio: '09:00',
-        hora_fin: esDomingo ? '14:00' : '20:00',
-      };
+      return defaultKiromov[diaSemana] || { activo: true, hora_inicio: '15:00', hora_fin: '19:00' };
     }
 
     if (
@@ -267,50 +271,61 @@ export function ScheduleAppointmentModal({
       const h = configAgenda.horarios_por_dia[diaSemana] || configAgenda.horarios_por_dia[String(diaSemana)];
       return {
         activo: Boolean(h.activo),
-        hora_inicio: h.hora_inicio || '09:00',
-        hora_fin: h.hora_fin || '20:00',
+        hora_inicio: h.hora_inicio || defaultKiromov[diaSemana]?.hora_inicio || '15:00',
+        hora_fin: h.hora_fin || defaultKiromov[diaSemana]?.hora_fin || '19:00',
       };
     }
 
-    const diasActivos = Array.isArray(configAgenda.dias_activos) ? configAgenda.dias_activos : [1, 2, 3, 4, 5, 6];
+    const diasActivos = Array.isArray(configAgenda.dias_activos)
+      ? configAgenda.dias_activos
+      : [1, 3, 4, 5, 6];
+
     return {
       activo: diasActivos.includes(diaSemana),
-      hora_inicio: configAgenda.hora_apertura || '09:00',
-      hora_fin: configAgenda.hora_cierre || '20:00',
+      hora_inicio: configAgenda.hora_apertura || defaultKiromov[diaSemana]?.hora_inicio || '15:00',
+      hora_fin: configAgenda.hora_cierre || defaultKiromov[diaSemana]?.hora_fin || '19:00',
     };
   }, [configAgenda, diaSemana]);
 
-  // Generación exclusiva de bloques horarios activos del día
-  const timeBlocksDisponibles = useMemo(() => {
-    if (!horarioDia.activo) return [];
-
-    const [startH, startM] = (horarioDia.hora_inicio || '09:00').split(':').map(Number);
-    const [endH, endM] = (horarioDia.hora_fin || '20:00').split(':').map(Number);
-
-    const startMin = (startH || 0) * 60 + (startM || 0);
-    const endMin = (endH || 0) * 60 + (endM || 0);
-
-    const duracionMin = 30; // Granularidad de inicio cada 30 min
+  // Generación continua de bloques horarios clínicos (08:00 a 21:00 hrs en intervalos de 15 min)
+  const todosLosBloques = useMemo(() => {
     const blocks: string[] = [];
+    const startMin = 8 * 60;  // 08:00 hrs
+    const endMin = 21 * 60;   // 21:00 hrs
+    const stepMin = 15;       // Intervalos de 15 minutos
 
-    for (let m = startMin; m < endMin; m += duracionMin) {
+    for (let m = startMin; m <= endMin; m += stepMin) {
       const hh = String(Math.floor(m / 60)).padStart(2, '0');
       const mm = String(m % 60).padStart(2, '0');
       blocks.push(`${hh}:${mm}`);
     }
 
-    return blocks;
-  }, [horarioDia]);
-
-  // Ajustar hora seleccionada si cae fuera del rango del día seleccionado
-  useEffect(() => {
-    if (timeBlocksDisponibles.length > 0) {
-      const horaClean = (watchHora || '').slice(0, 5);
-      if (!timeBlocksDisponibles.includes(horaClean)) {
-        setValue('hora', timeBlocksDisponibles[0]);
+    // Si la hora actual tiene minutos especiales, incluirla para no perderla
+    if (watchHora) {
+      const cleanH = watchHora.slice(0, 5);
+      if (/^\d{2}:\d{2}$/.test(cleanH) && !blocks.includes(cleanH)) {
+        blocks.push(cleanH);
+        blocks.sort();
       }
     }
-  }, [timeBlocksDisponibles, watchHora, setValue]);
+
+    return blocks;
+  }, [watchHora]);
+
+  // Detección puramente informativa de fuera de horario habitual
+  const esFueraDeHorario = useMemo(() => {
+    if (!horarioDia.activo) return true;
+    if (!watchHora) return false;
+    const horaClean = watchHora.slice(0, 5);
+    return horaClean < horarioDia.hora_inicio || horaClean >= horarioDia.hora_fin;
+  }, [horarioDia, watchHora]);
+
+  // Si no hay hora seleccionada, sugerir el inicio de jornada habitual
+  useEffect(() => {
+    if (!watchHora && horarioDia.activo) {
+      setValue('hora', horarioDia.hora_inicio);
+    }
+  }, [horarioDia, watchHora, setValue]);
 
   // Cerrar dropdown al hacer click afuera
   useEffect(() => {
@@ -365,11 +380,6 @@ export function ScheduleAppointmentModal({
 
   // Envío del formulario unificado
   const onSubmit = async (values: ScheduleAppointmentFormValues) => {
-    if (!horarioDia.activo) {
-      toast.error('No se puede agendar: día no laboral según tu configuración de box.');
-      return;
-    }
-
     setSubmitting(true);
     try {
       const res = await createScheduleAppointmentAction(values);
@@ -689,35 +699,54 @@ export function ScheduleAppointmentModal({
                 )}
               </div>
 
-              {/* Hora con filtro dinámico día por día */}
+              {/* Hora con control total y selector 08:00 a 21:00 */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-bold text-slate-700">Hora de Inicio</label>
-                  {horarioDia.activo && (
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      Jornada: {horarioDia.hora_inicio} - {horarioDia.hora_fin}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {horarioDia.activo ? (
+                      <span className="text-[10px] text-slate-500 font-mono font-medium">
+                        Habitual: {horarioDia.hora_inicio} - {horarioDia.hora_fin}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md font-semibold border border-amber-200">
+                        Fuera de horario habitual
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setModoHoraManual(!modoHoraManual)}
+                      className="text-[10px] text-blue-600 hover:text-blue-700 hover:underline font-semibold ml-1 cursor-pointer"
+                      title="Alternar entre lista desplegable e ingreso manual de hora"
+                    >
+                      {modoHoraManual ? '• Lista' : '• Manual'}
+                    </button>
+                  </div>
                 </div>
 
-                {horarioDia.activo ? (
+                {modoHoraManual ? (
+                  <Input
+                    type="time"
+                    step="900"
+                    {...register('hora')}
+                    className="w-full bg-slate-50/70 border-slate-200 text-xs font-mono font-semibold h-10 text-slate-800"
+                  />
+                ) : (
                   <select
                     {...register('hora')}
                     className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-mono font-semibold h-10 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   >
-                    {timeBlocksDisponibles.map((t) => {
+                    {todosLosBloques.map((t) => {
                       const isOccupied = citasOcupadas.some((c) => c.hora?.startsWith(t));
+                      const isHabitual =
+                        horarioDia.activo && t >= horarioDia.hora_inicio && t < horarioDia.hora_fin;
                       return (
                         <option key={t} value={t} disabled={isOccupied}>
-                          {t} {isOccupied ? '(Ocupado)' : ''}
+                          {t} {isOccupied ? '(Ocupado)' : !isHabitual ? '• (Fuera de jornada)' : ''}
                         </option>
                       );
                     })}
                   </select>
-                ) : (
-                  <div className="h-10 px-3 bg-slate-100 border border-slate-200 rounded-xl flex items-center text-xs text-slate-400 italic">
-                    Día no laboral / Box cerrado
-                  </div>
                 )}
 
                 {errors.hora && (
@@ -728,12 +757,24 @@ export function ScheduleAppointmentModal({
               </div>
             </div>
 
-            {/* Aviso si el día no es laboral */}
-            {!horarioDia.activo && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span className="font-semibold">
-                  Día no laboral según tu configuración de box. Cambia la fecha o activa el día en Horarios de Box.
+            {/* Aviso informativo de horario (Permite agendar sin ninguna restricción) */}
+            {esFueraDeHorario && (
+              <div className="p-3 bg-amber-50/90 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center justify-between gap-2 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <div>
+                    <span className="font-bold block">
+                      {!horarioDia.activo
+                        ? 'Día fuera de configuración habitual de box'
+                        : `Horario fuera de jornada habitual (${horarioDia.hora_inicio} - ${horarioDia.hora_fin})`}
+                    </span>
+                    <span className="text-[11px] text-amber-800">
+                      Puedes agendar de todas formas bajo tu criterio profesional.
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-1 rounded-md border border-amber-200 shrink-0">
+                  Control Total
                 </span>
               </div>
             )}
@@ -818,7 +859,7 @@ export function ScheduleAppointmentModal({
 
           <Button
             type="submit"
-            disabled={submitting || !horarioDia.activo}
+            disabled={submitting}
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-9 px-5 rounded-xl shadow-xs gap-2"
           >
             {submitting ? (
