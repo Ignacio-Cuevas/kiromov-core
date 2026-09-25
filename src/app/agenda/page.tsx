@@ -297,15 +297,27 @@ function AgendaContent() {
           boxData.forEach((row: any) => {
             const diaId = Number(row.dia_semana);
             dur = Number(row.duracion_bloque_min) || dur;
+            const mananaActiva =
+              row.manana_activa !== undefined && row.manana_activa !== null
+                ? Boolean(row.manana_activa)
+                : true;
+
+            const tardeActiva =
+              row.tarde_activa !== undefined && row.tarde_activa !== null
+                ? Boolean(row.tarde_activa)
+                : (row.tarde_fin || '') > (row.tarde_inicio || '');
+
             nuevaSemana[diaId] = {
               dia_semana: diaId,
               nombre: DIAS_ORDENADOS.find((d) => d.id === diaId)?.label || `Día ${diaId}`,
               activo: Boolean(row.activo),
+              manana_activa: mananaActiva,
               manana_inicio: (row.manana_inicio || '09:00').slice(0, 5),
               manana_fin: (row.manana_fin || '13:00').slice(0, 5),
               colacion_activa: Boolean(row.colacion_activa),
               colacion_inicio: (row.colacion_inicio || '13:00').slice(0, 5),
               colacion_fin: (row.colacion_fin || '14:00').slice(0, 5),
+              tarde_activa: tardeActiva,
               tarde_inicio: (row.tarde_inicio || '14:00').slice(0, 5),
               tarde_fin: (row.tarde_fin || '20:00').slice(0, 5),
               duracion_bloque_min: dur,

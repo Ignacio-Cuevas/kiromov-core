@@ -185,15 +185,36 @@ export function MedicalTimeGrid({
 
                   {/* Indicador de disponibilidad diaria */}
                   <div className="mt-1">
-                    {isDiaActivo ? (
-                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/80">
-                        {confDia.manana_inicio} - {confDia.tarde_fin > confDia.tarde_inicio ? confDia.tarde_fin : confDia.manana_fin}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-medium text-slate-400 bg-slate-200/80 px-2 py-0.5 rounded-full">
-                        No laboral
-                      </span>
-                    )}
+                    {(() => {
+                      const mananaOn = confDia.manana_activa ?? true;
+                      const tardeOn = confDia.tarde_activa ?? (confDia.tarde_fin > confDia.tarde_inicio);
+                      if (!isDiaActivo || (!mananaOn && !tardeOn)) {
+                        return (
+                          <span className="text-[10px] font-medium text-slate-400 bg-slate-200/80 px-2 py-0.5 rounded-full">
+                            Cerrado
+                          </span>
+                        );
+                      }
+                      if (mananaOn && tardeOn) {
+                        return (
+                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/80">
+                            {confDia.manana_inicio} - {confDia.tarde_fin > confDia.tarde_inicio ? confDia.tarde_fin : confDia.manana_fin}
+                          </span>
+                        );
+                      }
+                      if (mananaOn) {
+                        return (
+                          <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/80">
+                            AM: {confDia.manana_inicio}-{confDia.manana_fin}
+                          </span>
+                        );
+                      }
+                      return (
+                        <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/80">
+                          PM: {confDia.tarde_inicio}-{confDia.tarde_fin}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               );
@@ -276,6 +297,13 @@ export function MedicalTimeGrid({
                           height: `${HOUR_HEIGHT / 2}px`,
                         }}
                       >
+                        {/* Indicador sutil de jornada cerrada en franjas no laborales */}
+                        {!inWorkingHours && (
+                          <span className="text-[9px] font-medium text-slate-400/80 mr-auto pl-2 truncate select-none">
+                            {slotIdx % 4 === 0 ? 'Jornada cerrada / No disponible' : ''}
+                          </span>
+                        )}
+
                         {/* Botón flotante al pasar el mouse por celda vacía */}
                         <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-bold text-signal-blue bg-white/95 px-2 py-0.5 rounded-md shadow-xs border border-blue-200 pointer-events-none flex items-center gap-1">
                           <Plus className="w-3 h-3" /> {slotTime}

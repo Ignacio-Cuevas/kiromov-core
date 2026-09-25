@@ -62,15 +62,27 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
                 const nombre = DIAS_ORDENADOS.find((d) => d.id === diaId)?.label || `Día ${diaId}`;
                 duracionDetectada = Number(row.duracion_bloque_min) || duracionDetectada;
 
+                const mananaActiva =
+                  row.manana_activa !== undefined && row.manana_activa !== null
+                    ? Boolean(row.manana_activa)
+                    : true;
+
+                const tardeActiva =
+                  row.tarde_activa !== undefined && row.tarde_activa !== null
+                    ? Boolean(row.tarde_activa)
+                    : (row.tarde_fin || '') > (row.tarde_inicio || '');
+
                 nuevaSemana[diaId] = {
                   dia_semana: diaId,
                   nombre,
                   activo: Boolean(row.activo),
+                  manana_activa: mananaActiva,
                   manana_inicio: (row.manana_inicio || '09:00').slice(0, 5),
                   manana_fin: (row.manana_fin || '13:00').slice(0, 5),
                   colacion_activa: Boolean(row.colacion_activa),
                   colacion_inicio: (row.colacion_inicio || '13:00').slice(0, 5),
                   colacion_fin: (row.colacion_fin || '14:00').slice(0, 5),
+                  tarde_activa: tardeActiva,
                   tarde_inicio: (row.tarde_inicio || '14:00').slice(0, 5),
                   tarde_fin: (row.tarde_fin || '20:00').slice(0, 5),
                   duracion_bloque_min: duracionDetectada,
@@ -111,11 +123,13 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
                     nuevaSemana[d.id] = {
                       ...nuevaSemana[d.id],
                       activo: Boolean(item.activo),
+                      manana_activa: true,
                       manana_inicio: (item.hora_inicio || apertura).slice(0, 5),
                       manana_fin: '13:00',
                       colacion_activa: agendaData.colacion_activa ?? true,
                       colacion_inicio: (agendaData.colacion_inicio || '13:00').slice(0, 5),
                       colacion_fin: (agendaData.colacion_fin || '14:00').slice(0, 5),
+                      tarde_activa: true,
                       tarde_inicio: (agendaData.colacion_fin || '14:00').slice(0, 5),
                       tarde_fin: (item.hora_fin || cierre).slice(0, 5),
                       duracion_bloque_min: dur,
@@ -185,7 +199,7 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
 
   // Restablecer a plantilla habitual
   const handleResetDefaults = () => {
-    if (confirm('¿Restablecer la configuración a los horarios habituales de Kiromov (Lunes a Viernes 09:00-20:00, Sábados 10:00-14:00)?')) {
+    if (confirm('¿Restablecer la configuración a los horarios habituales de Kiromov (Lunes a Viernes 09:00-20:00, Sábados AM 10:00-14:00)?')) {
       setSemana(DEFAULT_SEMANA_HORARIOS);
       setDuracionGlobal(45);
       toast.info('Valores restablecidos a la plantilla base. Haz clic en Guardar para confirmar.');
@@ -206,24 +220,38 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
 
       // Validar coherencia de rangos por día
       for (const d of activeDays) {
-        if (d.manana_inicio >= d.manana_fin) {
+        if (!d.manana_activa && !d.tarde_activa) {
+          toast.error(`En ${d.nombre}, debes activar al menos un turno (Mañana o Tarde) o marcar el día como cerrado.`);
+          setSaving(false);
+          return;
+        }
+
+        if (d.manana_activa && d.manana_inicio >= d.manana_fin) {
           toast.error(`En ${d.nombre}, la hora de inicio de mañana (${d.manana_inicio}) debe ser menor que la de fin (${d.manana_fin}).`);
           setSaving(false);
           return;
         }
 
-        if (d.colacion_activa) {
-          if (d.colacion_inicio < d.manana_inicio || d.colacion_fin <= d.colacion_inicio) {
-            toast.error(`En ${d.nombre}, revisa el rango de colación (${d.colacion_inicio} - ${d.colacion_fin}).`);
+        if (d.tarde_activa && d.tarde_inicio >= d.tarde_fin) {
+          toast.error(`En ${d.nombre}, la hora de inicio de tarde (${d.tarde_inicio}) debe ser menor que la de cierre (${d.tarde_fin}).`);
+          setSaving(false);
+          return;
+        }
+
+        if (d.manana_activa && d.tarde_activa) {
+          if (d.tarde_inicio < d.manana_fin) {
+            toast.error(`En ${d.nombre}, el turno de la tarde no puede comenzar antes de que finalice la mañana.`);
             setSaving(false);
             return;
           }
-        }
 
-        if (d.tarde_fin > d.tarde_inicio && d.tarde_inicio < d.manana_fin) {
-          toast.error(`En ${d.nombre}, el turno de la tarde no puede comenzar antes de que finalice la mañana.`);
-          setSaving(false);
-          return;
+          if (d.colacion_activa) {
+            if (d.colacion_inicio < d.manana_inicio || d.colacion_fin <= d.colacion_inicio) {
+              toast.error(`En ${d.nombre}, revisa el rango de colación (${d.colacion_inicio} - ${d.colacion_fin}).`);
+              setSaving(false);
+              return;
+            }
+          }
         }
       }
 
@@ -233,11 +261,13 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
           const rowsToUpsert = Object.values(semana).map((d) => ({
             dia_semana: d.dia_semana,
             activo: d.activo,
+            manana_activa: d.manana_activa,
             manana_inicio: d.manana_inicio,
             manana_fin: d.manana_fin,
-            colacion_activa: d.colacion_activa,
+            colacion_activa: d.manana_activa && d.tarde_activa ? d.colacion_activa : false,
             colacion_inicio: d.colacion_inicio,
             colacion_fin: d.colacion_fin,
+            tarde_activa: d.tarde_activa,
             tarde_inicio: d.tarde_inicio,
             tarde_fin: d.tarde_fin,
             duracion_bloque_min: duracionGlobal,
@@ -258,15 +288,20 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
         // 2. Sincronizar en configuracion_agenda para compatibilidad de vistas
         try {
           const diasActivosIds = activeDays.map((d) => d.dia_semana);
-          const earliest = activeDays.map((d) => d.manana_inicio).sort()[0] || '09:00';
-          const latest = activeDays.map((d) => (d.tarde_fin > d.tarde_inicio ? d.tarde_fin : d.manana_fin)).sort().slice(-1)[0] || '20:00';
+          const earliest = activeDays
+            .map((d) => (d.manana_activa ? d.manana_inicio : d.tarde_inicio))
+            .sort()[0] || '09:00';
+          const latest = activeDays
+            .map((d) => (d.tarde_activa && d.tarde_fin > d.tarde_inicio ? d.tarde_fin : d.manana_fin))
+            .sort()
+            .slice(-1)[0] || '20:00';
 
           const horariosPorDiaComp: Record<number, { activo: boolean; hora_inicio: string; hora_fin: string }> = {};
           Object.values(semana).forEach((d) => {
             horariosPorDiaComp[d.dia_semana] = {
-              activo: d.activo,
-              hora_inicio: d.manana_inicio,
-              hora_fin: d.tarde_fin > d.tarde_inicio ? d.tarde_fin : d.manana_fin,
+              activo: d.activo && (d.manana_activa || d.tarde_activa),
+              hora_inicio: d.manana_activa ? d.manana_inicio : d.tarde_inicio,
+              hora_fin: d.tarde_activa && d.tarde_fin > d.tarde_inicio ? d.tarde_fin : d.manana_fin,
             };
           });
 
@@ -275,7 +310,7 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
             hora_apertura: earliest,
             hora_cierre: latest,
             duracion_sesion_min: duracionGlobal,
-            colacion_activa: activeDays.some((d) => d.colacion_activa),
+            colacion_activa: activeDays.some((d) => d.colacion_activa && d.manana_activa && d.tarde_activa),
             colacion_inicio: '13:00',
             colacion_fin: '14:00',
             horarios_por_dia: horariosPorDiaComp,
@@ -312,9 +347,9 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
             Object.values(semana).map((d) => [
               d.dia_semana,
               {
-                activo: d.activo,
-                hora_inicio: d.manana_inicio,
-                hora_fin: d.tarde_fin > d.tarde_inicio ? d.tarde_fin : d.manana_fin,
+                activo: d.activo && (d.manana_activa || d.tarde_activa),
+                hora_inicio: d.manana_activa ? d.manana_inicio : d.tarde_inicio,
+                hora_fin: d.tarde_activa && d.tarde_fin > d.tarde_inicio ? d.tarde_fin : d.manana_fin,
               },
             ])
           ),
@@ -322,7 +357,7 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
       );
 
       toast.success('¡Horarios de Box guardados exitosamente!', {
-        description: 'La grilla horaria semanal y el motor de citas ahora reflejan tu nueva jornada.',
+        description: 'La grilla horaria semanal ahora refleja tus turnos AM y PM independientes.',
       });
 
       if (onSavedSuccess) onSavedSuccess();
@@ -361,7 +396,7 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
             Configuración de Horarios de Box
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Define tu semana tipo y turnos de atención. La grilla semanal sombreará automáticamente los bloques no disponibles.
+            Activa o bloquea turnos de Mañana (AM) y Tarde (PM) de forma independiente por día.
           </p>
         </div>
 
@@ -370,7 +405,7 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
             type="button"
             variant="outline"
             onClick={handleResetDefaults}
-            className="text-xs border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl"
+            className="text-xs border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl cursor-pointer"
             title="Restablecer a plantilla recomendada"
           >
             <RotateCcw className="w-3.5 h-3.5 mr-1" />
@@ -404,7 +439,7 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
             <h3 className="text-sm font-bold text-ink-navy">Duración de Bloque Predeterminada</h3>
           </div>
           <p className="text-xs text-slate-500">
-            Tiempo estándar reservado para cada sesión en la grilla y en el agendamiento rápido.
+            Tiempo estándar asignado para cada bloque de sesión en la grilla y en el agendamiento rápido.
           </p>
         </div>
 
@@ -435,9 +470,12 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
       </div>
 
       {/* Lista de Días de la Semana */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         {DIAS_ORDENADOS.map(({ id: diaId, label: diaNombre }) => {
           const dia = semana[diaId] || DEFAULT_SEMANA_HORARIOS[diaId];
+          const mananaActiva = dia.manana_activa ?? true;
+          const tardeActiva = dia.tarde_activa ?? (dia.tarde_fin > dia.tarde_inicio);
+          const ambosTurnosActivos = mananaActiva && tardeActiva;
 
           return (
             <div
@@ -450,8 +488,8 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
             >
               {/* Fila del Día */}
               <div className="p-4 sm:p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                {/* Columna Izquierda: Nombre de Día y Switch */}
-                <div className="flex items-center gap-3.5 min-w-[200px]">
+                {/* Columna Izquierda: Nombre de Día y Switch General */}
+                <div className="flex items-center gap-3.5 min-w-[210px]">
                   <button
                     type="button"
                     onClick={() => handleToggleActivo(diaId)}
@@ -471,7 +509,7 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
                       {diaNombre}
                       {dia.activo ? (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          Habilitado
+                          {ambosTurnosActivos ? 'Día Completo' : mananaActiva ? 'Sólo AM' : tardeActiva ? 'Sólo PM' : 'Sin Turnos'}
                         </span>
                       ) : (
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
@@ -480,73 +518,61 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
                       )}
                     </h4>
                     <p className="text-[11px] text-slate-500">
-                      {dia.activo
-                        ? `${dia.manana_inicio} a ${dia.tarde_fin > dia.tarde_inicio ? dia.tarde_fin : dia.manana_fin} hrs`
-                        : 'No se reciben pacientes este día'}
+                      {(() => {
+                        if (!dia.activo) return 'No se reciben pacientes este día';
+                        if (ambosTurnosActivos) {
+                          return `AM (${dia.manana_inicio}-${dia.manana_fin}) • PM (${dia.tarde_inicio}-${dia.tarde_fin})`;
+                        }
+                        if (mananaActiva) {
+                          return `Sólo Mañana: ${dia.manana_inicio} a ${dia.manana_fin} hrs`;
+                        }
+                        if (tardeActiva) {
+                          return `Sólo Tarde: ${dia.tarde_inicio} a ${dia.tarde_fin} hrs`;
+                        }
+                        return 'Sin turnos habilitados';
+                      })()}
                     </p>
                   </div>
                 </div>
 
-                {/* Columna Derecha: Configuración de Turnos */}
+                {/* Columna Derecha: Configuración de Turnos Independientes */}
                 {dia.activo ? (
                   <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-                    {/* Turno Mañana */}
-                    <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/80 space-y-1.5">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                        <SunMedium className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Turno Mañana</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <label className="text-[10px] font-semibold text-slate-400 block mb-0.5">Inicio</label>
-                          <input
-                            type="time"
-                            value={dia.manana_inicio}
-                            onChange={(e) => handleUpdateDia(diaId, { manana_inicio: e.target.value })}
-                            className="w-full text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-800"
-                          />
+                    
+                    {/* Turno Mañana (AM) */}
+                    <div
+                      className={`p-3.5 rounded-xl border transition-all ${
+                        mananaActiva
+                          ? 'bg-slate-50/80 border-slate-200/80 shadow-2xs'
+                          : 'bg-slate-100/50 border-dashed border-slate-300 opacity-70'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-2">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                          <SunMedium className={`w-3.5 h-3.5 ${mananaActiva ? 'text-amber-500' : 'text-slate-400'}`} />
+                          <span>Turno Mañana (AM)</span>
                         </div>
-                        <span className="text-slate-300 mt-3">-</span>
-                        <div className="flex-1">
-                          <label className="text-[10px] font-semibold text-slate-400 block mb-0.5">Fin</label>
-                          <input
-                            type="time"
-                            value={dia.manana_fin}
-                            onChange={(e) => handleUpdateDia(diaId, { manana_fin: e.target.value })}
-                            className="w-full text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-800"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Pausa de Colación */}
-                    <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/80 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer">
+                        <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
                           <input
                             type="checkbox"
-                            checked={dia.colacion_activa}
-                            onChange={(e) => handleUpdateDia(diaId, { colacion_activa: e.target.checked })}
-                            className="rounded border-slate-300 text-signal-blue focus:ring-signal-blue"
+                            checked={mananaActiva}
+                            onChange={(e) => handleUpdateDia(diaId, { manana_activa: e.target.checked })}
+                            className="rounded border-slate-300 text-signal-blue focus:ring-signal-blue cursor-pointer"
                           />
-                          <Utensils className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Pausa Colación</span>
-                        </label>
-                        {dia.colacion_activa && (
-                          <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                            Bloqueado
+                          <span className={`font-bold ${mananaActiva ? 'text-emerald-700' : 'text-slate-400'}`}>
+                            {mananaActiva ? 'Habilitado' : 'Bloqueado'}
                           </span>
-                        )}
+                        </label>
                       </div>
 
-                      {dia.colacion_activa ? (
+                      {mananaActiva ? (
                         <div className="flex items-center gap-2">
                           <div className="flex-1">
                             <label className="text-[10px] font-semibold text-slate-400 block mb-0.5">Inicio</label>
                             <input
                               type="time"
-                              value={dia.colacion_inicio}
-                              onChange={(e) => handleUpdateDia(diaId, { colacion_inicio: e.target.value })}
+                              value={dia.manana_inicio}
+                              onChange={(e) => handleUpdateDia(diaId, { manana_inicio: e.target.value })}
                               className="w-full text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-800"
                             />
                           </div>
@@ -555,51 +581,136 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
                             <label className="text-[10px] font-semibold text-slate-400 block mb-0.5">Fin</label>
                             <input
                               type="time"
-                              value={dia.colacion_fin}
-                              onChange={(e) => handleUpdateDia(diaId, { colacion_fin: e.target.value })}
+                              value={dia.manana_fin}
+                              onChange={(e) => handleUpdateDia(diaId, { manana_fin: e.target.value })}
                               className="w-full text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-800"
                             />
                           </div>
                         </div>
                       ) : (
-                        <p className="text-[11px] text-slate-400 italic pt-2">
-                          Jornada continua sin pausa de colación
-                        </p>
+                        <div className="py-2 text-center text-[10px] text-slate-400 font-medium italic">
+                          🔒 Mañana bloqueada (sombreada en agenda)
+                        </div>
                       )}
                     </div>
 
-                    {/* Turno Tarde */}
-                    <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/80 space-y-1.5">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                        <MoonStar className="w-3.5 h-3.5 text-indigo-500" />
-                        <span>Turno Tarde</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <label className="text-[10px] font-semibold text-slate-400 block mb-0.5">Inicio</label>
-                          <input
-                            type="time"
-                            value={dia.tarde_inicio}
-                            onChange={(e) => handleUpdateDia(diaId, { tarde_inicio: e.target.value })}
-                            className="w-full text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-800"
-                          />
+                    {/* Pausa de Colación (Sólo activa y visible cuando AM y PM están activos) */}
+                    {ambosTurnosActivos ? (
+                      <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-1.5 text-xs font-bold text-slate-800 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={dia.colacion_activa}
+                              onChange={(e) => handleUpdateDia(diaId, { colacion_activa: e.target.checked })}
+                              className="rounded border-slate-300 text-signal-blue focus:ring-signal-blue cursor-pointer"
+                            />
+                            <Utensils className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Pausa Colación</span>
+                          </label>
+                          {dia.colacion_activa && (
+                            <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                              Bloqueado
+                            </span>
+                          )}
                         </div>
-                        <span className="text-slate-300 mt-3">-</span>
-                        <div className="flex-1">
-                          <label className="text-[10px] font-semibold text-slate-400 block mb-0.5">Cierre</label>
-                          <input
-                            type="time"
-                            value={dia.tarde_fin}
-                            onChange={(e) => handleUpdateDia(diaId, { tarde_fin: e.target.value })}
-                            className="w-full text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-800"
-                          />
-                        </div>
+
+                        {dia.colacion_activa ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <label className="text-[10px] font-semibold text-slate-400 block mb-0.5">Inicio</label>
+                              <input
+                                type="time"
+                                value={dia.colacion_inicio}
+                                onChange={(e) => handleUpdateDia(diaId, { colacion_inicio: e.target.value })}
+                                className="w-full text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-800"
+                              />
+                            </div>
+                            <span className="text-slate-300 mt-3">-</span>
+                            <div className="flex-1">
+                              <label className="text-[10px] font-semibold text-slate-400 block mb-0.5">Fin</label>
+                              <input
+                                type="time"
+                                value={dia.colacion_fin}
+                                onChange={(e) => handleUpdateDia(diaId, { colacion_fin: e.target.value })}
+                                className="w-full text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-800"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-slate-400 italic pt-1 text-center">
+                            Jornada continua sin pausa de almuerzo
+                          </p>
+                        )}
                       </div>
+                    ) : (
+                      <div className="bg-slate-50/50 p-3 rounded-xl border border-dashed border-slate-200 flex flex-col justify-center items-center text-center">
+                        <Utensils className="w-4 h-4 text-slate-400 mb-1" />
+                        <span className="text-[10px] text-slate-400 italic leading-snug">
+                          Colación no requerida (sólo aplica con turnos AM y PM simultáneos).
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Turno Tarde (PM) */}
+                    <div
+                      className={`p-3.5 rounded-xl border transition-all ${
+                        tardeActiva
+                          ? 'bg-slate-50/80 border-slate-200/80 shadow-2xs'
+                          : 'bg-slate-100/50 border-dashed border-slate-300 opacity-70'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-2">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                          <MoonStar className={`w-3.5 h-3.5 ${tardeActiva ? 'text-indigo-500' : 'text-slate-400'}`} />
+                          <span>Turno Tarde (PM)</span>
+                        </div>
+                        <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={tardeActiva}
+                            onChange={(e) => handleUpdateDia(diaId, { tarde_activa: e.target.checked })}
+                            className="rounded border-slate-300 text-signal-blue focus:ring-signal-blue cursor-pointer"
+                          />
+                          <span className={`font-bold ${tardeActiva ? 'text-emerald-700' : 'text-slate-400'}`}>
+                            {tardeActiva ? 'Habilitado' : 'Bloqueado'}
+                          </span>
+                        </label>
+                      </div>
+
+                      {tardeActiva ? (
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <label className="text-[10px] font-semibold text-slate-400 block mb-0.5">Inicio</label>
+                            <input
+                              type="time"
+                              value={dia.tarde_inicio}
+                              onChange={(e) => handleUpdateDia(diaId, { tarde_inicio: e.target.value })}
+                              className="w-full text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-800"
+                            />
+                          </div>
+                          <span className="text-slate-300 mt-3">-</span>
+                          <div className="flex-1">
+                            <label className="text-[10px] font-semibold text-slate-400 block mb-0.5">Cierre</label>
+                            <input
+                              type="time"
+                              value={dia.tarde_fin}
+                              onChange={(e) => handleUpdateDia(diaId, { tarde_fin: e.target.value })}
+                              className="w-full text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-800"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="py-2 text-center text-[10px] text-slate-400 font-medium italic">
+                          🔒 Tarde bloqueada (sombreada en agenda)
+                        </div>
+                      )}
                     </div>
+
                   </div>
                 ) : (
                   <div className="flex-1 py-3 text-xs text-slate-400 italic bg-slate-100/50 rounded-xl px-4 border border-dashed border-slate-200">
-                    🔒 Día no laboral. Los bloques horarios aparecerán sombreados en la grilla horaria semanal.
+                    🔒 Día no laboral. Todos los bloques de este día aparecerán sombreados en la grilla horaria semanal.
                   </div>
                 )}
               </div>
