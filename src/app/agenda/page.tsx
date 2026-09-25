@@ -592,8 +592,22 @@ function AgendaContent() {
   };
 
   const renderCardCita = (cita: CitaExtendida, compact = false) => {
-    const p = cita.pacientes;
-    if (!p) return null;
+    const p = cita.pacientes || {
+      id: cita.paciente_id || '',
+      nombre_completo: cita.motivo_consulta || 'Paciente Externo (Sin Ficha)',
+      rut: '',
+      telefono: '',
+      email: '',
+      prevision: 'Sin registrar',
+      motivo_consulta: cita.motivo_consulta || '',
+      alertas_seguridad: '',
+      antecedentes_morbidos: '',
+      estado_plan: 'sin_plan',
+      sesiones_usadas: 0,
+      sesiones_totales: 0,
+      estado_pago: 'al_dia',
+      monto_clp: 0,
+    };
     
     const s = cita.estado?.toLowerCase() || 'pendiente';
     const tokens = getCitaColorTokens(s);
@@ -650,7 +664,15 @@ function AgendaContent() {
                       💬 WhatsApp
                     </a>
                     <button
-                      onClick={() => { setSelectedPatientForDrawer(p); setSelectedCitaForSuite(cita); setIsDrawerOpen(true); }}
+                      onClick={() => {
+                        if (p.id) {
+                          setSelectedPatientForDrawer(p);
+                          setSelectedCitaForSuite(cita);
+                          setIsDrawerOpen(true);
+                        } else {
+                          toast.info('Cita sin ficha clínica vinculada.');
+                        }
+                      }}
                       className="text-[11px] text-signal-blue font-semibold hover:underline"
                     >
                       Ficha →
@@ -899,12 +921,32 @@ function AgendaContent() {
                 <button onClick={() => handleRegistrarAsistencia(cita)} className="min-h-[44px] px-3.5 py-2 rounded-buttons bg-signal-blue hover:bg-deep-cobalt text-white text-[12px] font-semibold flex items-center justify-center gap-1 shadow-calendly-btn transition-colors cursor-pointer">
                   ✓ Registrar Asistencia
                 </button>
-                <button onClick={() => handleRegistrarInasistencia(cita.id, p.id)} className="min-h-[44px] px-3.5 py-2 rounded-buttons border border-hairline bg-pebble hover:bg-mist-gray/30 text-slate-gray text-[12px] font-semibold transition-colors cursor-pointer flex items-center justify-center">
+                <button
+                  onClick={() => {
+                    if (p.id) {
+                      handleRegistrarInasistencia(cita.id, p.id);
+                    } else {
+                      handleCambiarEstadoCita(cita, 'no_asistio');
+                    }
+                  }}
+                  className="min-h-[44px] px-3.5 py-2 rounded-buttons border border-hairline bg-pebble hover:bg-mist-gray/30 text-slate-gray text-[12px] font-semibold transition-colors cursor-pointer flex items-center justify-center"
+                >
                   🚫 No Asistió
                 </button>
               </>
             )}
-            <button onClick={() => { setSelectedPatientForDrawer(p); setSelectedCitaForSuite(cita); setIsDrawerOpen(true); }} className="min-h-[44px] px-3.5 py-2 rounded-buttons bg-ink-navy hover:bg-slate-gray text-white text-[12px] font-semibold flex items-center justify-center gap-1 shadow-calendly-btn transition-colors cursor-pointer">
+            <button
+              onClick={() => {
+                if (p.id) {
+                  setSelectedPatientForDrawer(p);
+                  setSelectedCitaForSuite(cita);
+                  setIsDrawerOpen(true);
+                } else {
+                  toast.info('Cita sin ficha clínica vinculada en base de datos.');
+                }
+              }}
+              className="min-h-[44px] px-3.5 py-2 rounded-buttons bg-ink-navy hover:bg-slate-gray text-white text-[12px] font-semibold flex items-center justify-center gap-1 shadow-calendly-btn transition-colors cursor-pointer"
+            >
               Ficha & SOAP →
             </button>
           </div>
@@ -1106,7 +1148,7 @@ function AgendaContent() {
                                     const s = c.estado?.toLowerCase() || 'pendiente';
                                     const tokens = getCitaColorTokens(s);
                                     
-                                    const primerNombre = c.pacientes?.nombre_completo?.split(' ')[0] || '';
+                                    const primerNombre = c.pacientes?.nombre_completo?.split(' ')[0] || (c.motivo_consulta ? c.motivo_consulta.replace(/^Atención Kinésica - /i, '').split(' ')[0] : 'Externo');
                                     const { tienePlan, sesionesUsadas, sesionesTotales } = getResumenPlan(c.pacientes || {});
                                     const planStr = tienePlan ? `${c.pacientes?.nombre_plan} (${sesionesUsadas}/${sesionesTotales} ses)` : 'Sin plan';
 
@@ -1117,8 +1159,8 @@ function AgendaContent() {
                                             
                                             {/* Hover Tooltip */}
                                             <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-48 bg-ink-navy text-paper p-3 rounded-inputs shadow-calendly-lg z-[60] text-[12px] whitespace-normal pointer-events-none">
-                                                <p className="font-bold text-[14px]">{c.pacientes?.nombre_completo}</p>
-                                                <p className="text-mist-gray text-[11px] mt-1">{c.pacientes?.prevision || 'Particular'} • {c.pacientes?.telefono}</p>
+                                                <p className="font-bold text-[14px]">{c.pacientes?.nombre_completo || c.motivo_consulta || 'Paciente Sin Ficha'}</p>
+                                                <p className="text-mist-gray text-[11px] mt-1">{c.pacientes?.prevision || 'Particular'} • {c.pacientes?.telefono || 'Sin tel.'}</p>
                                                 <p className="text-signal-blue text-[11px] mt-1.5 font-semibold">{planStr}</p>
                                             </div>
                                         </div>

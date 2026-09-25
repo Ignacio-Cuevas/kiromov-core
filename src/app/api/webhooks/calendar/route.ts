@@ -129,7 +129,6 @@ export async function POST(request: NextRequest) {
 
     // Paso A (Buscar o Vincular Paciente - Blindaje Anti-Duplicados con limit(1))
     let pacienteId: string | null = null;
-    let nuevoPacienteCreadoId: string | null = null;
 
     if (cleanEmail) {
       const { data: existenteEmail } = await supabase
@@ -158,27 +157,16 @@ export async function POST(request: NextRequest) {
       if (existenteNom && existenteNom.length > 0) pacienteId = existenteNom[0].id;
     }
 
-    // Si no existe bajo ningún criterio, crear la ficha del paciente nuevo:
-    if (!pacienteId) {
-      const { data: nuevo, error: errNuevo } = await supabase
-        .from('pacientes')
-        .insert([{
-          nombre_completo: cleanName,
-          email: cleanEmail,
-          telefono: cleanTel,
-          motivo_consulta: motivo_consulta?.trim() || 'Reserva desde web kiromov.cl',
-          estado: 'activo'
-        }])
-        .select('id')
-        .single();
+    // REGLA ESTRICTA ANTI-FANTASMAS:
+    // NUNCA autogenerar pacientes vacíos en sincronizaciones/webhooks.
+    // Si no existe coincidencia, pacienteId queda como null y los datos de contacto se preservan en motivo y notas de la cita.
+    const motivoFinal = motivo_consulta?.trim()
+      ? motivo_consulta.trim()
+      : (cleanName ? `Atención Kinésica - ${cleanName}` : 'Evaluación Kinésica Inicial (Web)');
 
-      if (errNuevo) {
-        console.error('[WEBHOOK CALENDAR] Error creando paciente:', errNuevo);
-        return NextResponse.json({ success: false, error: errNuevo.message }, { status: 200 });
-      }
-      pacienteId = nuevo.id;
-      nuevoPacienteCreadoId = nuevo.id;
-    }
+    const notasDetalle = !pacienteId && cleanName
+      ? `Paciente externo (sin ficha): ${cleanName}${cleanTel ? ` • Tel: ${cleanTel}` : ''}${cleanEmail ? ` • Email: ${cleanEmail}` : ''}`
+      : null;
 
     // Paso B (Insertar Cita en Agenda)
     const { error: errCita } = await supabase
@@ -188,22 +176,20 @@ export async function POST(request: NextRequest) {
         fecha: fecha,
         hora: horaNormalizada,
         profesional: 'Klgo. Ignacio Cuevas Silva',
-        motivo_consulta: motivo_consulta?.trim() || 'Evaluación Kinésica Inicial (Web)',
+        motivo_consulta: motivoFinal,
+        notas: notasDetalle,
         estado: 'pendiente',
         google_event_id: google_event_id
       }]);
 
     if (errCita) {
       console.warn('[WEBHOOK CALENDAR] Error insertando cita:', errCita);
-      if (nuevoPacienteCreadoId) {
-        await supabase.from('pacientes').delete().eq('id', nuevoPacienteCreadoId);
-      }
       // Retornar 200 con detalle para cortar el bucle de reintentos automáticos de Google
       return NextResponse.json({ success: false, error: errCita.message }, { status: 200 });
     }
 
     // Respuesta exitosa
-    return NextResponse.json({ success: true, paciente_id: pacienteId });
+    return NextResponse.json({ success: true, paciente_id: pacienteId, unlinked: !pacienteId });
   } catch (error: any) {
     console.error('Error procesando webhook de calendar:', error);
     // Retornar 200 para evitar bucle de reintentos infinitos
