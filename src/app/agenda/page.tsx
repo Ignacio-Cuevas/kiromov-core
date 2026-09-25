@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { BlockTimeModal, BloqueoAgenda } from '@/components/agenda/BlockTimeModal';
 import { ScheduleSettingsModal } from '@/components/agenda/ScheduleSettingsModal';
+import { ScheduleAppointmentModal } from '@/components/appointments/ScheduleAppointmentModal';
 
 function getFormattedLocalDate(d: Date): string {
   const year = d.getFullYear();
@@ -87,8 +88,6 @@ function AgendaContent() {
     motivo: 'Sesión Kinésica',
     profesional: 'Klgo. Ignacio Cuevas'
   });
-  const [pacienteSearch, setPacienteSearch] = useState('');
-  const [savingCita, setSavingCita] = useState(false);
 
   // Edición y Eliminación
   const [editingCita, setEditingCita] = useState<CitaExtendida | null>(null);
@@ -492,98 +491,6 @@ function AgendaContent() {
     }
   };
 
-  const handleCreateCita = async () => {
-    if (!supabase) return;
-    if (!newCita.pacienteId || !newCita.fecha || !newCita.hora) { toast.error('Completa los campos obligatorios'); return; }
-    
-    setSavingCita(true);
-    try {
-      // 0. Verificación previa de conflicto con bloqueos de agenda
-      const conflictoBloqueo = bloqueos.find(b => {
-        if (b.fecha_inicio <= newCita.fecha && b.fecha_fin >= newCita.fecha) {
-          if (b.dia_completo) return true;
-          if (b.hora_inicio && b.hora_fin) {
-            return newCita.hora >= b.hora_inicio && newCita.hora < b.hora_fin;
-          }
-          return true;
-        }
-        return false;
-      });
-
-      if (conflictoBloqueo) {
-        toast.error(`⚠️ Este horario está bloqueado: ${conflictoBloqueo.titulo} (${conflictoBloqueo.dia_completo ? 'Día completo' : `${conflictoBloqueo.hora_inicio} - ${conflictoBloqueo.hora_fin}`})`);
-        return;
-      }
-
-      // 1. Verificación previa al agendar
-      const { data: citaOcupada } = await supabase
-        .from('citas_atenciones')
-        .select('id, hora, pacientes(nombre_completo)')
-        .eq('fecha', newCita.fecha)
-        .eq('hora', newCita.hora)
-        .neq('estado', 'cancelada')
-        .maybeSingle();
-
-      if (citaOcupada) {
-        const nombre = Array.isArray(citaOcupada.pacientes) ? citaOcupada.pacientes[0]?.nombre_completo : (citaOcupada.pacientes as any)?.nombre_completo;
-        toast.error(`⚠️ El horario de las ${newCita.hora.slice(0, 5)} ya está reservado para ${nombre}. Elige otro bloque.`);
-        return;
-      }
-      const payload = {
-         paciente_id: newCita.pacienteId,
-         fecha: newCita.fecha, 
-         hora: newCita.hora,
-         profesional: newCita.profesional,
-         motivo_consulta: newCita.motivo || 'Sesión de Tratamiento Kinésico',
-         estado: 'pendiente'
-      };
-
-      const { data, error } = await supabase
-         .from('citas_atenciones')
-         .insert([payload])
-         .select('id, pacientes(nombre_completo)')
-         .single();
-
-      if (error) {
-         console.error('Error Supabase al agendar:', error);
-         toast.error(`No se pudo agendar: ${error.message}`);
-         return;
-      }
-
-      // Sincronizar hacia Google Calendar
-      try {
-        const paciente = pacientes.find(p => p.id === newCita.pacienteId) || pacientesOptions.find(p => p.id === newCita.pacienteId);
-        const pacienteObj = Array.isArray(data.pacientes) ? data.pacientes[0] : (data.pacientes as any);
-        const nombrePaciente = paciente?.nombre_completo || pacienteObj?.nombre_completo;
-        const telefonoPaciente = paciente?.telefono || pacienteObj?.telefono;
-
-        const { crearEventoGoogleCalendar } = await import('@/actions/calendar');
-        const googleEventId = await crearEventoGoogleCalendar({
-          pacienteNombre: nombrePaciente || 'Paciente Kiromov',
-          pacienteTelefono: telefonoPaciente || null,
-          fecha: newCita.fecha,
-          hora: newCita.hora,
-          motivo: newCita.motivo || 'Atención Kinésica TMO'
-        });
-        
-        if (googleEventId) {
-           await supabase.from('citas_atenciones').update({ google_event_id: googleEventId }).eq('id', data.id);
-        }
-      } catch (syncErr) {
-         console.warn('[Google Calendar Sync] Falló el envío en segundo plano desde agenda:', syncErr);
-      }
-
-      toast.success('¡Cita agendada exitosamente!');
-      setShowNewCitaModal(false);
-      loadAgenda();
-    } catch (err) {
-      console.error('Excepción al agendar:', err);
-      toast.error((err as Error).message || 'Error inesperado al agendar cita');
-    } finally {
-      setSavingCita(false); // Garantiza que el formulario nunca quede congelado
-    }
-  };
-
   const handleUpdateCita = async () => {
     if (!supabase || !editingCita) return;
     setSavingEdit(true);
@@ -683,11 +590,6 @@ function AgendaContent() {
 
     return `https://wa.me/56${telefonoLimpio}?text=${encodeURIComponent(texto)}`;
   };
-  const pacientesOptions = useMemo(() => {
-    if (!pacienteSearch.trim()) return pacientes.slice(0, 50);
-    const q = pacienteSearch.toLowerCase();
-    return pacientes.filter(p => p.nombre_completo?.toLowerCase().includes(q) || p.rut?.toLowerCase().includes(q)).slice(0, 50);
-  }, [pacientes, pacienteSearch]);
 
   const renderCardCita = (cita: CitaExtendida, compact = false) => {
     const p = cita.pacientes;
@@ -1413,35 +1315,25 @@ function AgendaContent() {
           onSuccess={() => loadAgenda()} 
         />
       )}
-      {/* Modal Nueva Cita */}
-      <Dialog open={showNewCitaModal} onOpenChange={setShowNewCitaModal}>
-        <DialogHeader><DialogTitle>Agendar Nueva Cita</DialogTitle><DialogDescription>Selecciona un paciente y un horario para agendar.</DialogDescription></DialogHeader>
-        <DialogBody className="space-y-4 pt-4">
-          <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Paciente</label>
-            <div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><Input placeholder="Buscar por nombre o RUT..." value={pacienteSearch} onChange={e => setPacienteSearch(e.target.value)} className="pl-9 bg-slate-50/50" /></div>
-            <select value={newCita.pacienteId} onChange={e => setNewCita({ ...newCita, pacienteId: e.target.value })} className="w-full mt-2 p-2.5 bg-white border border-slate-200/80 rounded-xl text-sm" size={4}>
-              {pacientesOptions.map(p => <option key={p.id} value={p.id}>{p.nombre_completo} - {formatRut(p.rut)}</option>)}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Fecha</label><Input type="date" value={newCita.fecha} onChange={e => setNewCita({...newCita, fecha: e.target.value})} className="bg-slate-50/50" /></div>
-            <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Hora</label><select value={newCita.hora} onChange={e => setNewCita({...newCita, hora: e.target.value})} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10">{timeBlocks.map(t => {
-              const isOccupied = citas.some(c => c.fecha === newCita.fecha && c.hora?.startsWith(t) && c.estado !== 'cancelada');
-              const isBlocked = bloqueos.some(b => {
-                if (b.fecha_inicio <= newCita.fecha && b.fecha_fin >= newCita.fecha) {
-                  if (b.dia_completo) return true;
-                  return t >= (b.hora_inicio || '00:00') && t < (b.hora_fin || '23:59');
-                }
-                return false;
-              });
-              const disabled = isOccupied || isBlocked;
-              return <option key={t} value={t} disabled={disabled}>{t} {isOccupied ? '(Ocupado)' : isBlocked ? '🔒 (Bloqueado)' : ''}</option>;
-            })}</select></div>
-          </div>
-          <div className="space-y-1.5"><label className="text-xs font-bold text-slate-700">Motivo de Consulta</label><Input value={newCita.motivo} onChange={e => setNewCita({...newCita, motivo: e.target.value})} className="bg-slate-50/50" /></div>
-        </DialogBody>
-        <DialogFooter><Button variant="outline" onClick={() => setShowNewCitaModal(false)}>Cancelar</Button><Button onClick={handleCreateCita} disabled={savingCita} className="bg-blue-600 hover:bg-blue-700 text-white">{savingCita ? 'Guardando...' : 'Agendar Cita'}</Button></DialogFooter>
-      </Dialog>
+      {/* Modal Unificado de Cita Rápida Medilink */}
+      {showNewCitaModal && (
+        <ScheduleAppointmentModal
+          isOpen={showNewCitaModal}
+          onClose={() => {
+            setShowNewCitaModal(false);
+            setNewCita(prev => ({ ...prev, pacienteId: '' }));
+          }}
+          onSuccess={() => {
+            setShowNewCitaModal(false);
+            setNewCita(prev => ({ ...prev, pacienteId: '' }));
+            loadAgenda();
+          }}
+          preselectedPatient={pacientes.find(p => p.id === newCita.pacienteId) || null}
+          initialDate={newCita.fecha}
+          initialTime={newCita.hora}
+          initialMotivo={newCita.motivo}
+        />
+      )}
 
       {/* Modal Editar Cita */}
       <Dialog open={!!editingCita} onOpenChange={(open) => !open && setEditingCita(null)}>
