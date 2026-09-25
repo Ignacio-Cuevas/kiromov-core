@@ -141,6 +141,26 @@ export function ScheduleAppointmentModal({
   const watchHora = watch('hora');
   const watchMotivo = watch('motivo_consulta');
 
+  // Sincronizar fecha y hora iniciales al abrir el modal desde cualquier celda de la grilla horaria
+  useEffect(() => {
+    if (isOpen) {
+      if (initialDate) setValue('fecha', initialDate);
+      if (initialTime) setValue('hora', initialTime.slice(0, 5));
+      if (initialMotivo) setValue('motivo_consulta', initialMotivo);
+      if (preselectedPatient) {
+        setSelectedPatient({
+          id: preselectedPatient.id,
+          nombre_completo: preselectedPatient.nombre_completo,
+          rut: preselectedPatient.rut ?? null,
+          telefono: preselectedPatient.telefono ?? null,
+          email: preselectedPatient.email ?? null,
+        });
+        setValue('pacienteId', preselectedPatient.id);
+        setValue('isNewPatient', false);
+      }
+    }
+  }, [isOpen, initialDate, initialTime, initialMotivo, preselectedPatient, setValue]);
+
   // Debounce para el buscador predictivo (300 ms)
   useEffect(() => {
     const handler = setTimeout(() => {
