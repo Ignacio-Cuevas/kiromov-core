@@ -371,10 +371,10 @@ function AgendaContent() {
 
   const kpis = useMemo(() => {
     const citadosHoy = citas.length;
-    const confirmadas = citas.filter(c => c.estado?.toLowerCase() === 'confirmada').length;
-    const enSala = citas.filter(c => c.estado?.toLowerCase() === 'en_sala').length;
-    const asistio = citas.filter(c => ['asistio', 'asistió', 'atendido'].includes(c.estado?.toLowerCase())).length;
-    const pendientes = citas.filter(c => c.estado?.toLowerCase() === 'pendiente').length;
+    const confirmadas = citas.filter(c => String(c?.estado || '').toLowerCase() === 'confirmada').length;
+    const enSala = citas.filter(c => String(c?.estado || '').toLowerCase() === 'en_sala').length;
+    const asistio = citas.filter(c => ['asistio', 'asistió', 'atendido'].includes(String(c?.estado || '').toLowerCase())).length;
+    const pendientes = citas.filter(c => String(c?.estado || '').toLowerCase() === 'pendiente').length;
     return { citadosHoy, confirmadas, enSala, asistio, pendientes };
   }, [citas]);
 
@@ -639,17 +639,18 @@ function AgendaContent() {
     return fechaStr;
   };
 
-  const formatearNombre = (nombreCompleto?: string) => {
+  const formatearNombre = (nombreCompleto?: string | null) => {
     if (!nombreCompleto) return 'Estimado/a';
-    const primerNombre = nombreCompleto.trim().split(' ')[0];
+    const primerNombre = String(nombreCompleto).trim().split(' ')[0];
+    if (!primerNombre) return 'Estimado/a';
     return primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase();
   };
 
   const generarMensajeConfirmacion = (cita: CitaExtendida) => {
-    const nombre = formatearNombre(cita.pacientes?.nombre_completo);
-    const fechaCL = formatearFechaChilena(cita.fecha);
-    const hora = cita.hora?.slice(0, 5) || '16:00';
-    const telefonoLimpio = cita.pacientes?.telefono ? cita.pacientes.telefono.replace(/\D/g, '').slice(-9) : '';
+    const nombre = formatearNombre(cita?.pacientes?.nombre_completo);
+    const fechaCL = formatearFechaChilena(cita?.fecha || '');
+    const hora = cita?.hora?.slice(0, 5) || '16:00';
+    const telefonoLimpio = cita?.pacientes?.telefono ? String(cita.pacientes.telefono).replace(/\D/g, '').slice(-9) : '';
 
     const texto = `Hola ${nombre}, te escribimos de Kiromov Centro Clínico para solicitar la confirmación de tu sesión de kinesiología programada para el ${fechaCL} a las ${hora} hrs (Bulnes 470, Of. 75, Chillán). Por favor respóndenos este mensaje para confirmar tu asistencia. ¡Muchas gracias!`;
 
@@ -674,7 +675,7 @@ function AgendaContent() {
       monto_clp: 0,
     };
     
-    const s = cita.estado?.toLowerCase() || 'pendiente';
+    const s = String(cita?.estado || 'pendiente').toLowerCase();
     const tokens = getCitaColorTokens(s);
     const cleanPhone = p.telefono ? p.telefono.replace(/\D/g, '').slice(-9) : '';
 
@@ -765,11 +766,11 @@ function AgendaContent() {
                 <h4 className="font-bold text-ink-navy text-sm sm:text-base">{cita.pacientes?.nombre_completo || p.nombre_completo}</h4>
                 {p.prevision && (
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
-                    p.prevision.toLowerCase().includes('convenio')
+                    String(p.prevision || '').toLowerCase().includes('convenio')
                       ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                      : p.prevision.toLowerCase().includes('isapre')
+                      : String(p.prevision || '').toLowerCase().includes('isapre')
                       ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                      : p.prevision.toLowerCase().includes('fonasa')
+                      : String(p.prevision || '').toLowerCase().includes('fonasa')
                       ? 'bg-purple-100 text-purple-800 border border-purple-200'
                       : 'bg-pebble text-slate-gray'
                   }`}>
@@ -1176,7 +1177,7 @@ function AgendaContent() {
                                 ))}
 
                                 {citasToShow.map(c => {
-                                    const s = c.estado?.toLowerCase() || 'pendiente';
+                                    const s = String(c?.estado || 'pendiente').toLowerCase();
                                     const tokens = getCitaColorTokens(s);
                                     
                                     const primerNombre = c.pacientes?.nombre_completo?.split(' ')[0] || (c.motivo_consulta ? c.motivo_consulta.replace(/^Atención Kinésica - /i, '').split(' ')[0] : 'Externo');

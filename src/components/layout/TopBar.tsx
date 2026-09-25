@@ -212,13 +212,13 @@ export function TopBar() {
                               </span>
                             </>
                           )}
-                          {p.estado_pago && (
+                           {p.estado_pago && (
                             <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                              p.estado_pago.toLowerCase() === 'pagado'
+                              String(p.estado_pago || '').toLowerCase() === 'pagado'
                                 ? 'bg-emerald-50 text-emerald-700'
                                 : 'bg-rose-50 text-rose-700'
                             }`}>
-                              {p.estado_pago.toLowerCase() === 'pagado' ? '✓ Al día' : '🔴 Cobro'}
+                              {String(p.estado_pago || '').toLowerCase() === 'pagado' ? '✓ Al día' : '🔴 Cobro'}
                             </span>
                           )}
                         </div>

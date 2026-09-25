@@ -60,7 +60,7 @@ function getTopPosition(timeStr: string): number {
 }
 
 function getDurationMinutes(cita: any, defaultDuration: number = 45): number {
-  const motivo = (cita.motivo_consulta || '').toLowerCase();
+  const motivo = String(cita?.motivo_consulta || '').toLowerCase();
   if (motivo.includes('60 min') || motivo.includes('evaluación inicial') || motivo.includes('evaluacion inicial')) {
     return 60;
   }
@@ -79,18 +79,19 @@ function formatearFechaChilena(fechaStr: string): string {
   return fechaStr;
 }
 
-function formatearNombre(nombreCompleto?: string): string {
+function formatearNombre(nombreCompleto?: string | null): string {
   if (!nombreCompleto) return 'Estimado/a';
-  const primerNombre = nombreCompleto.trim().split(' ')[0];
+  const primerNombre = String(nombreCompleto).trim().split(' ')[0];
+  if (!primerNombre) return 'Estimado/a';
   return primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase();
 }
 
 function generarMensajeConfirmacion(cita: any): string {
-  const p = cita.pacientes || {};
-  const nombre = formatearNombre(p.nombre_completo);
-  const fechaCL = formatearFechaChilena(cita.fecha);
-  const hora = cita.hora?.slice(0, 5) || '16:00';
-  const telefonoLimpio = p.telefono ? p.telefono.replace(/\D/g, '').slice(-9) : '';
+  const p = cita?.pacientes || {};
+  const nombre = formatearNombre(p?.nombre_completo);
+  const fechaCL = formatearFechaChilena(cita?.fecha || '');
+  const hora = cita?.hora?.slice(0, 5) || '16:00';
+  const telefonoLimpio = p?.telefono ? String(p.telefono).replace(/\D/g, '').slice(-9) : '';
 
   const texto = `Hola ${nombre}, te escribimos de Kiromov Centro Clínico para solicitar la confirmación de tu sesión de kinesiología programada para el ${fechaCL} a las ${hora} hrs (Bulnes 470, Of. 75, Chillán). Por favor respóndenos este mensaje para confirmar tu asistencia. ¡Muchas gracias!`;
 
@@ -99,7 +100,7 @@ function generarMensajeConfirmacion(cita: any): string {
 
 // Semáforo de Confirmación de Cita (Traffic Light)
 function getCitaTrafficLight(cita: any) {
-  const estado = (cita.estado || 'pendiente').toLowerCase();
+  const estado = String(cita?.estado || 'pendiente').toLowerCase();
 
   if (estado === 'cancelada') {
     return {
@@ -152,8 +153,8 @@ function getCitaTrafficLight(cita: any) {
 }
 
 // Badge de Prestación Clínica (sin opacar el semáforo principal)
-function getModalityBadge(motivoConsulta: string = '') {
-  const motivo = motivoConsulta.toLowerCase();
+function getModalityBadge(motivoConsulta?: string | null) {
+  const motivo = String(motivoConsulta || '').toLowerCase();
   if (motivo.includes('evaluación inicial') || motivo.includes('evaluacion inicial')) {
     return {
       label: 'Eval. Inicial',
@@ -429,19 +430,19 @@ export function MedicalTimeGrid({
                     const heightPos = Math.max(46, (duracionMin / 60) * HOUR_HEIGHT - 3);
 
                     const theme = getCitaTrafficLight(cita);
-                    const modality = getModalityBadge(cita.motivo_consulta);
+                    const modality = getModalityBadge(cita?.motivo_consulta);
 
-                    const p = cita.pacientes || {};
+                    const p = cita?.pacientes || {};
                     const pacienteNombre =
-                      p.nombre_completo ||
-                      cita.motivo_consulta?.replace(/^Atención Kinésica - /i, '') ||
+                      p?.nombre_completo ||
+                      cita?.motivo_consulta?.replace(/^Atención Kinésica - /i, '') ||
                       'Paciente sin registrar';
-                    const pacientePrevision = p.prevision || 'Particular';
+                    const pacientePrevision = p?.prevision || 'Particular';
                     const { tienePlan, sesionesUsadas, sesionesTotales } = getResumenPlan(p);
                     const resumenPlanTexto = tienePlan ? `${sesionesUsadas}/${sesionesTotales} ses.` : 'Sin plan';
 
-                    const estado = (cita.estado || 'pendiente').toLowerCase();
-                    const cleanPhone = p.telefono ? p.telefono.replace(/\D/g, '').slice(-9) : '';
+                    const estado = String(cita?.estado || 'pendiente').toLowerCase();
+                    const cleanPhone = p?.telefono ? String(p.telefono).replace(/\D/g, '').slice(-9) : '';
                     const whatsappUrl = cleanPhone ? generarMensajeConfirmacion(cita) : '';
 
                     return (
