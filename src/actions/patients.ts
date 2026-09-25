@@ -429,3 +429,97 @@ export async function deletePatient(id: string): Promise<{ success: boolean; err
   revalidatePath('/pacientes');
   return { success: true };
 }
+
+/**
+ * Acción de seguridad para depurar pacientes duplicados vacíos
+ * (ej: creados por bucles de webhook o intentos repetidos)
+ * Mantiene intacto el paciente principal (el que tenga citas/planes o el más antiguo)
+ * y elimina de forma segura los registros clonados sin citas ni planes.
+ */
+export async function purgeDuplicatePatientsAction(
+  targetName?: string
+): Promise<{ success: boolean; deletedCount: number; message: string }> {
+  const supabase = await createClient();
+  if (!supabase) return { success: false, deletedCount: 0, message: 'Base de datos no disponible' };
+
+  try {
+    const query = supabase
+      .from('pacientes')
+      .select('id, nombre_completo, created_at')
+      .order('created_at', { ascending: true });
+
+    if (targetName) {
+      query.ilike('nombre_completo', `%${targetName.trim()}%`);
+    }
+
+    const { data: list, error } = await query;
+    if (error || !list) {
+      return { success: false, deletedCount: 0, message: error?.message || 'Error consultando pacientes' };
+    }
+
+    // Agrupar por nombre normalizado
+    const grupos: Record<string, typeof list> = {};
+    for (const p of list) {
+      const norm = (p.nombre_completo || '').trim().toLowerCase();
+      if (!norm) continue;
+      if (!grupos[norm]) grupos[norm] = [];
+      grupos[norm].push(p);
+    }
+
+    let totalBorrados = 0;
+
+    for (const norm in grupos) {
+      const miembros = grupos[norm];
+      if (miembros.length <= 1) continue;
+
+      // El primer miembro (más antiguo) se preserva como principal
+      const [principal, ...posiblesDuplicados] = miembros;
+
+      for (const dup of posiblesDuplicados) {
+        // Verificar que no tenga citas ni planes
+        const { data: citas } = await supabase
+          .from('citas_atenciones')
+          .select('id')
+          .eq('paciente_id', dup.id)
+          .limit(1);
+
+        const { data: planes } = await supabase
+          .from('compras_planes')
+          .select('id')
+          .eq('paciente_id', dup.id)
+          .limit(1);
+
+        const tieneCitas = citas && citas.length > 0;
+        const tienePlanes = planes && planes.length > 0;
+
+        // Solo borrar si es un registro fantasma vacío
+        if (!tieneCitas && !tienePlanes) {
+          const { error: delErr } = await supabase
+            .from('pacientes')
+            .delete()
+            .eq('id', dup.id);
+
+          if (!delErr) {
+            totalBorrados++;
+          }
+        }
+      }
+    }
+
+    revalidatePath('/pacientes');
+    revalidatePath('/agenda');
+
+    return {
+      success: true,
+      deletedCount: totalBorrados,
+      message: `Se depuraron exitosamente ${totalBorrados} registros duplicados vacíos.`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      deletedCount: 0,
+      message: err.message || 'Error inesperado durante la depuración',
+    };
+  }
+}
+

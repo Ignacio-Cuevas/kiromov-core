@@ -77,7 +77,8 @@ export function ScheduleAppointmentModal({
   initialTime,
   initialMotivo,
 }: ScheduleAppointmentModalProps) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+  const isSubmittingRef = useRef(false);
 
   // Estados de interfaz y búsqueda
   const [searchTerm, setSearchTerm] = useState('');
@@ -378,8 +379,10 @@ export function ScheduleAppointmentModal({
     setValue('rut', formatted, { shouldValidate: true });
   };
 
-  // Envío del formulario unificado
+  // Envío del formulario unificado (Estrictamente manual bajo clic explícito)
   const onSubmit = async (values: ScheduleAppointmentFormValues) => {
+    if (isSubmittingRef.current || submitting) return;
+    isSubmittingRef.current = true;
     setSubmitting(true);
     try {
       const res = await createScheduleAppointmentAction(values);
@@ -401,6 +404,7 @@ export function ScheduleAppointmentModal({
       console.error('Error al agendar:', err);
       toast.error(err?.message || 'Error inesperado al agendar cita.');
     } finally {
+      isSubmittingRef.current = false;
       setSubmitting(false);
     }
   };

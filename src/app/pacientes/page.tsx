@@ -18,6 +18,7 @@ import { ManagePlanModal } from "@/components/patients/ManagePlanModal";
 import { DischargeReportModal } from "@/components/clinical/DischargeReportModal";
 import ClinicalRecordView from "@/components/clinical/ClinicalRecordView";
 import { toast } from 'sonner';
+import { purgeDuplicatePatientsAction } from "@/actions/patients";
 import { 
   Table, 
   LayoutGrid, 
@@ -129,6 +130,26 @@ export default function PacientesPage() {
   const [isDischargeModalOpen, setIsDischargeModalOpen] = useState(false);
 
   const [selectedPacienteFichaId, setSelectedPacienteFichaId] = useState<string | null>(null);
+  const [isPurgingDuplicates, setIsPurgingDuplicates] = useState(false);
+
+  const handlePurgeDuplicates = async () => {
+    if (!confirm('¿Deseas buscar y eliminar registros de pacientes duplicados vacíos (sin citas ni compras asociadas)?')) return;
+    setIsPurgingDuplicates(true);
+    const toastId = toast.loading('Depurando registros duplicados vacíos...');
+    try {
+      const res = await purgeDuplicatePatientsAction();
+      if (res.success) {
+        toast.success(res.message, { id: toastId });
+        cargarPacientes();
+      } else {
+        toast.error(res.message, { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error('Error al depurar duplicados', { id: toastId });
+    } finally {
+      setIsPurgingDuplicates(false);
+    }
+  };
 
   const handleAbrirEditar = (p: PacienteResumen) => {
     setPacienteParaEditar(p);
@@ -413,6 +434,14 @@ export default function PacientesPage() {
           </div>
 
           <div className="flex items-center gap-2.5">
+            <button 
+              onClick={handlePurgeDuplicates}
+              disabled={isPurgingDuplicates}
+              className="px-3.5 py-2 rounded-buttons border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[13px] font-semibold transition-colors shadow-calendly-btn flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Elimina registros duplicados vacíos creados por error sin citas ni compras asociadas"
+            >
+              🧹 Depurar Duplicados
+            </button>
             <button 
               onClick={() => cargarPacientes()}
               className="px-4 py-2 rounded-buttons border border-hairline bg-paper text-slate-gray hover:bg-pebble text-[14px] font-semibold transition-colors shadow-calendly-btn"

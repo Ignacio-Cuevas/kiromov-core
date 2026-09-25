@@ -169,50 +169,83 @@ export async function createScheduleAppointmentAction(
     let pacienteTelefono: string | null = null;
     let newlyCreatedPatientId: string | null = null;
 
-    // 3. Crear paciente si es "Quick Create" (Alta rápida)
+    // 3. Crear o vincular paciente (Alta rápida blindada contra duplicaciones)
     if (data.isNewPatient) {
       const cleanName = (data.nombre_completo || '').trim();
       const cleanRut = data.sin_rut ? null : formatRut(data.rut || '');
 
-      let rawPhone = (data.telefono || '').replace(/[^\d+]/g, '');
-      if (!rawPhone.startsWith('+')) {
-        const digits = rawPhone.replace(/\D/g, '');
-        if (digits.length === 9) {
-          rawPhone = `+56${digits}`;
-        } else if (digits.length === 11 && digits.startsWith('56')) {
-          rawPhone = `+${digits}`;
-        } else {
-          rawPhone = `+56${digits}`;
+      // BLINDAJE ANTI-DUPLICADOS: Verificar si el paciente ya existe antes de insertar
+      let pacienteExistente: { id: string; nombre_completo: string; telefono: string | null } | null = null;
+
+      if (cleanRut) {
+        const { data: porRut } = await supabase
+          .from('pacientes')
+          .select('id, nombre_completo, telefono')
+          .eq('rut', cleanRut)
+          .limit(1);
+        if (porRut && porRut.length > 0) {
+          pacienteExistente = porRut[0];
         }
       }
 
-      const nextCode = `KIR-${Math.floor(10000 + Math.random() * 90000)}`;
-
-      const { data: nuevoPaciente, error: errInsertPaciente } = await supabase
-        .from('pacientes')
-        .insert([{
-          codigo_paciente: nextCode,
-          nombre_completo: cleanName,
-          rut: cleanRut,
-          telefono: rawPhone,
-          email: data.email?.trim().toLowerCase() || null,
-          motivo_consulta: data.motivo_consulta || 'Evaluación Inicial TMO (60 min)',
-          estado: 'activo',
-        }])
-        .select('id, nombre_completo, telefono')
-        .single();
-
-      if (errInsertPaciente || !nuevoPaciente) {
-        return {
-          success: false,
-          error: `Error al crear nuevo paciente: ${errInsertPaciente?.message || 'Error desconocido'}`,
-        };
+      if (!pacienteExistente && cleanName) {
+        const { data: porNombre } = await supabase
+          .from('pacientes')
+          .select('id, nombre_completo, telefono')
+          .ilike('nombre_completo', cleanName)
+          .limit(1);
+        if (porNombre && porNombre.length > 0) {
+          pacienteExistente = porNombre[0];
+        }
       }
 
-      targetPacienteId = nuevoPaciente.id;
-      newlyCreatedPatientId = nuevoPaciente.id;
-      pacienteNombre = nuevoPaciente.nombre_completo;
-      pacienteTelefono = nuevoPaciente.telefono;
+      if (pacienteExistente) {
+        // Reutilizar el paciente existente en vez de crear un duplicado
+        targetPacienteId = pacienteExistente.id;
+        pacienteNombre = pacienteExistente.nombre_completo;
+        pacienteTelefono = pacienteExistente.telefono;
+      } else {
+        // Insertar nuevo paciente ÚNICA Y EXCLUSIVAMENTE si no existe registro previo
+        let rawPhone = (data.telefono || '').replace(/[^\d+]/g, '');
+        if (!rawPhone.startsWith('+')) {
+          const digits = rawPhone.replace(/\D/g, '');
+          if (digits.length === 9) {
+            rawPhone = `+56${digits}`;
+          } else if (digits.length === 11 && digits.startsWith('56')) {
+            rawPhone = `+${digits}`;
+          } else {
+            rawPhone = `+56${digits}`;
+          }
+        }
+
+        const nextCode = `KIR-${Math.floor(10000 + Math.random() * 90000)}`;
+
+        const { data: nuevoPaciente, error: errInsertPaciente } = await supabase
+          .from('pacientes')
+          .insert([{
+            codigo_paciente: nextCode,
+            nombre_completo: cleanName,
+            rut: cleanRut,
+            telefono: rawPhone,
+            email: data.email?.trim().toLowerCase() || null,
+            motivo_consulta: data.motivo_consulta || 'Evaluación Inicial TMO (60 min)',
+            estado: 'activo',
+          }])
+          .select('id, nombre_completo, telefono')
+          .single();
+
+        if (errInsertPaciente || !nuevoPaciente) {
+          return {
+            success: false,
+            error: `Error al crear nuevo paciente: ${errInsertPaciente?.message || 'Error desconocido'}`,
+          };
+        }
+
+        targetPacienteId = nuevoPaciente.id;
+        newlyCreatedPatientId = nuevoPaciente.id;
+        pacienteNombre = nuevoPaciente.nombre_completo;
+        pacienteTelefono = nuevoPaciente.telefono;
+      }
     } else {
       targetPacienteId = data.pacienteId || '';
 

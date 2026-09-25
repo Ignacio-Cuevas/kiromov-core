@@ -67,14 +67,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Paso 0 (Corte de Bucle Anti-Fantasmas):
-    // Verificar duplicados por google_event_id AL PRINCIPIO antes de buscar o crear pacientes
-    const { data: citaExistente } = await supabase
+    // 0.1 Verificar duplicados por google_event_id con limit(1)
+    const { data: citasPorGoogle } = await supabase
       .from('citas_atenciones')
       .select('id')
       .eq('google_event_id', google_event_id)
-      .maybeSingle();
+      .limit(1);
 
-    if (citaExistente) {
+    if (citasPorGoogle && citasPorGoogle.length > 0) {
       return NextResponse.json({ message: 'Evento ya registrado previamente' }, { status: 200 });
     }
 
@@ -84,7 +84,24 @@ export async function POST(request: NextRequest) {
 
     const horaNormalizada = hora.length === 5 ? hora + ':00' : hora;
 
-    console.log('[WEBHOOK CALENDAR] Cita procesada exitosamente');
+    // 0.2 Verificar si la cita ya existe en la misma fecha y hora (evita doble inserción por webhook)
+    const { data: citasEnHorario } = await supabase
+      .from('citas_atenciones')
+      .select('id, google_event_id')
+      .eq('fecha', fecha)
+      .eq('hora', horaNormalizada)
+      .neq('estado', 'cancelada')
+      .limit(1);
+
+    if (citasEnHorario && citasEnHorario.length > 0) {
+      if (!citasEnHorario[0].google_event_id) {
+        await supabase
+          .from('citas_atenciones')
+          .update({ google_event_id })
+          .eq('id', citasEnHorario[0].id);
+      }
+      return NextResponse.json({ message: 'Cita ya agendada en este bloque, vinculada exitosamente' }, { status: 200 });
+    }
 
     // Normalización de Datos y Limpieza Estricta de Prefijos
     let cleanName = nombre_completo
@@ -110,16 +127,17 @@ export async function POST(request: NextRequest) {
       cleanEmail = email.split(',')[0].trim().toLowerCase();
     }
 
-    // Paso A (Buscar o Crear Paciente - Anti-Duplicados)
+    // Paso A (Buscar o Vincular Paciente - Blindaje Anti-Duplicados con limit(1))
     let pacienteId: string | null = null;
+    let nuevoPacienteCreadoId: string | null = null;
 
     if (cleanEmail) {
-      const { data: existente } = await supabase
+      const { data: existenteEmail } = await supabase
         .from('pacientes')
         .select('id')
         .eq('email', cleanEmail)
-        .maybeSingle();
-      if (existente) pacienteId = existente.id;
+        .limit(1);
+      if (existenteEmail && existenteEmail.length > 0) pacienteId = existenteEmail[0].id;
     }
 
     if (!pacienteId && cleanTel) {
@@ -127,20 +145,20 @@ export async function POST(request: NextRequest) {
         .from('pacientes')
         .select('id')
         .ilike('telefono', `%${cleanTel.slice(-9)}%`)
-        .maybeSingle();
-      if (existenteTel) pacienteId = existenteTel.id;
+        .limit(1);
+      if (existenteTel && existenteTel.length > 0) pacienteId = existenteTel[0].id;
     }
 
     if (!pacienteId && cleanName) {
       const { data: existenteNom } = await supabase
         .from('pacientes')
         .select('id')
-        .ilike('nombre_completo', `%${cleanName}%`)
-        .maybeSingle();
-      if (existenteNom) pacienteId = existenteNom.id;
+        .ilike('nombre_completo', cleanName)
+        .limit(1);
+      if (existenteNom && existenteNom.length > 0) pacienteId = existenteNom[0].id;
     }
 
-    // Si no existe, crear la ficha del paciente nuevo:
+    // Si no existe bajo ningún criterio, crear la ficha del paciente nuevo:
     if (!pacienteId) {
       const { data: nuevo, error: errNuevo } = await supabase
         .from('pacientes')
@@ -154,8 +172,12 @@ export async function POST(request: NextRequest) {
         .select('id')
         .single();
 
-      if (errNuevo) throw errNuevo;
+      if (errNuevo) {
+        console.error('[WEBHOOK CALENDAR] Error creando paciente:', errNuevo);
+        return NextResponse.json({ success: false, error: errNuevo.message }, { status: 200 });
+      }
       pacienteId = nuevo.id;
+      nuevoPacienteCreadoId = nuevo.id;
     }
 
     // Paso B (Insertar Cita en Agenda)
@@ -171,12 +193,20 @@ export async function POST(request: NextRequest) {
         google_event_id: google_event_id
       }]);
 
-    if (errCita) throw errCita;
+    if (errCita) {
+      console.warn('[WEBHOOK CALENDAR] Error insertando cita:', errCita);
+      if (nuevoPacienteCreadoId) {
+        await supabase.from('pacientes').delete().eq('id', nuevoPacienteCreadoId);
+      }
+      // Retornar 200 con detalle para cortar el bucle de reintentos automáticos de Google
+      return NextResponse.json({ success: false, error: errCita.message }, { status: 200 });
+    }
 
-    // Respuesta
+    // Respuesta exitosa
     return NextResponse.json({ success: true, paciente_id: pacienteId });
   } catch (error: any) {
     console.error('Error procesando webhook de calendar:', error);
-    return NextResponse.json({ error: error.message || 'Error interno del servidor' }, { status: 500 });
+    // Retornar 200 para evitar bucle de reintentos infinitos
+    return NextResponse.json({ success: false, error: error.message || 'Error interno' }, { status: 200 });
   }
 }
