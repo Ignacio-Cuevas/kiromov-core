@@ -427,7 +427,15 @@ export function ScheduleAppointmentModal({
         </div>
       </DialogHeader>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col min-h-0">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
+            e.preventDefault();
+          }
+        }}
+        className="flex-1 flex flex-col min-h-0"
+      >
         <DialogBody className="space-y-4 px-6 py-5 overflow-y-auto max-h-[75vh]">
           {/* ==================================================================== */}
           {/* SECCIÓN 1: IDENTIFICACIÓN DEL PACIENTE (COMBOBOX O QUICK CREATE)      */}
@@ -493,6 +501,12 @@ export function ScheduleAppointmentModal({
                     placeholder="Buscar por nombre, RUT (ej: 18.234.567-8) o WhatsApp..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }
+                    }}
                     onFocus={() => {
                       if (searchResults.length > 0 || searchTerm.trim()) {
                         setIsDropdownOpen(true);

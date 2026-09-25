@@ -57,7 +57,7 @@ for (let i = 8; i <= 20; i++) {
 type VistaAgenda = 'dia' | 'semana' | 'mes';
 
 function AgendaContent() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
   
   const [fechaBase, setFechaBase] = useState<Date>(new Date());
