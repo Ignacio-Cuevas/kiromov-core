@@ -6,7 +6,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, AlertTriangle, Clock } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { formatRut } from '@/lib/utils';
@@ -23,12 +23,6 @@ interface AppointmentModalProps {
     telefono?: string;
   } | null;
   initialDate?: string;
-}
-
-const timeBlocks: string[] = [];
-for (let i = 8; i <= 20; i++) {
-  timeBlocks.push(`${String(i).padStart(2, '0')}:00`);
-  timeBlocks.push(`${String(i).padStart(2, '0')}:30`);
 }
 
 function getFormattedLocalDate(d: Date): string {
@@ -58,6 +52,37 @@ export function AppointmentModal({
   
   const [citasOcupadas, setCitasOcupadas] = useState<any[]>([]);
   const [savingCita, setSavingCita] = useState(false);
+  const [configAgenda, setConfigAgenda] = useState<any>(null);
+
+  // Cargar configuración de agenda para conocer horarios día por día
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const loadConfig = async () => {
+      let cfg: any = null;
+      if (supabase) {
+        try {
+          const { data } = await supabase
+            .from('configuracion_agenda')
+            .select('*')
+            .limit(1)
+            .maybeSingle();
+          if (data) cfg = data;
+        } catch (e) {
+          console.warn('Error leyendo configuracion_agenda:', e);
+        }
+      }
+      if (!cfg) {
+        try {
+          const cached = localStorage.getItem('kiromov_configuracion_agenda');
+          if (cached) cfg = JSON.parse(cached);
+        } catch (e) {}
+      }
+      if (cfg) setConfigAgenda(cfg);
+    };
+
+    loadConfig();
+  }, [isOpen]);
 
   useEffect(() => {
     if (preselectedPatient?.id) {
@@ -73,6 +98,73 @@ export function AppointmentModal({
       cargarCitasOcupadas(fecha);
     }
   }, [isOpen, preselectedPatient, fecha]);
+
+  // Día de la semana (0 = Domingo, 1 = Lunes, ..., 6 = Sábado)
+  const diaSemana = useMemo(() => {
+    if (!fecha) return 1;
+    const [y, m, d] = fecha.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    return dateObj.getDay();
+  }, [fecha]);
+
+  // Horario del día según configuración
+  const horarioDia = useMemo(() => {
+    if (!configAgenda) {
+      const esDomingo = diaSemana === 0;
+      return {
+        activo: !esDomingo,
+        hora_inicio: '09:00',
+        hora_fin: esDomingo ? '14:00' : '20:00',
+      };
+    }
+
+    if (configAgenda.horarios_por_dia && (configAgenda.horarios_por_dia[diaSemana] || configAgenda.horarios_por_dia[String(diaSemana)])) {
+      const h = configAgenda.horarios_por_dia[diaSemana] || configAgenda.horarios_por_dia[String(diaSemana)];
+      return {
+        activo: Boolean(h.activo),
+        hora_inicio: h.hora_inicio || '09:00',
+        hora_fin: h.hora_fin || '20:00',
+      };
+    }
+
+    const diasActivos = Array.isArray(configAgenda.dias_activos) ? configAgenda.dias_activos : [1, 2, 3, 4, 5, 6];
+    return {
+      activo: diasActivos.includes(diaSemana),
+      hora_inicio: configAgenda.hora_apertura || '09:00',
+      hora_fin: configAgenda.hora_cierre || '20:00',
+    };
+  }, [configAgenda, diaSemana]);
+
+  // Generar exclusivamente bloques dentro del horario del día
+  const timeBlocksDisponibles = useMemo(() => {
+    if (!horarioDia.activo) return [];
+
+    const [startH, startM] = (horarioDia.hora_inicio || '09:00').split(':').map(Number);
+    const [endH, endM] = (horarioDia.hora_fin || '20:00').split(':').map(Number);
+
+    const startMin = (startH || 0) * 60 + (startM || 0);
+    const endMin = (endH || 0) * 60 + (endM || 0);
+
+    const duracionMin = 30;
+    const blocks: string[] = [];
+
+    for (let m = startMin; m < endMin; m += duracionMin) {
+      const hh = String(Math.floor(m / 60)).padStart(2, '0');
+      const mm = String(m % 60).padStart(2, '0');
+      blocks.push(`${hh}:${mm}`);
+    }
+
+    return blocks;
+  }, [horarioDia]);
+
+  // Ajustar hora seleccionada si queda fuera de los bloques disponibles
+  useEffect(() => {
+    if (timeBlocksDisponibles.length > 0) {
+      if (!timeBlocksDisponibles.includes(hora)) {
+        setHora(timeBlocksDisponibles[0]);
+      }
+    }
+  }, [timeBlocksDisponibles]);
 
   const cargarPacientes = async () => {
     if (!supabase) return;
@@ -102,6 +194,10 @@ export function AppointmentModal({
   const handleCreateCita = async () => {
     if (!selectedPatientId || !fecha || !hora) {
       toast.error('Completa los campos obligatorios');
+      return;
+    }
+    if (!horarioDia.activo) {
+      toast.error('No es posible agendar: Día no laboral según tu configuración de box.');
       return;
     }
     setSavingCita(true);
@@ -215,15 +311,44 @@ export function AppointmentModal({
             <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className="bg-slate-50/50" />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">Hora</label>
-            <select value={hora} onChange={e => setHora(e.target.value)} className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10">
-              {timeBlocks.map(t => {
-                const isOccupied = citasOcupadas.some(c => c.hora?.startsWith(t));
-                return <option key={t} value={t} disabled={isOccupied}>{t} {isOccupied ? '(Ocupado)' : ''}</option>;
-              })}
-            </select>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700">Hora</label>
+              {horarioDia.activo && (
+                <span className="text-[10px] text-slate-400 font-mono font-medium">
+                  {horarioDia.hora_inicio} - {horarioDia.hora_fin}
+                </span>
+              )}
+            </div>
+            {horarioDia.activo ? (
+              <select
+                value={hora}
+                onChange={e => setHora(e.target.value)}
+                className="w-full p-2.5 bg-slate-50/50 border border-slate-200/80 rounded-xl text-sm h-10 font-mono"
+              >
+                {timeBlocksDisponibles.map(t => {
+                  const isOccupied = citasOcupadas.some(c => c.hora?.startsWith(t));
+                  return (
+                    <option key={t} value={t} disabled={isOccupied}>
+                      {t} {isOccupied ? '(Ocupado)' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            ) : (
+              <div className="h-10 px-3 bg-slate-100 border border-slate-200 rounded-xl flex items-center text-xs text-slate-400 italic">
+                Cerrado
+              </div>
+            )}
           </div>
         </div>
+
+        {!horarioDia.activo && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="font-semibold">Día no laboral según tu configuración de box</span>
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-slate-700">Motivo de Consulta</label>
           <Input value={motivo} onChange={e => setMotivo(e.target.value)} className="bg-slate-50/50" />
@@ -231,7 +356,11 @@ export function AppointmentModal({
       </DialogBody>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Cancelar</Button>
-        <Button onClick={handleCreateCita} disabled={savingCita} className="bg-blue-600 hover:bg-blue-700 text-white">
+        <Button
+          onClick={handleCreateCita}
+          disabled={savingCita || !horarioDia.activo}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold"
+        >
           {savingCita ? 'Guardando...' : 'Agendar Cita'}
         </Button>
       </DialogFooter>

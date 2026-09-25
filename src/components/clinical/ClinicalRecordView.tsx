@@ -276,13 +276,52 @@ export function ClinicalRecordView({
     }
   }, [evaluacionActivaIndex, evaluacionesTMO]);
 
+  // Sintetizar los puntos del gráfico:
+  const puntosGrafico = useMemo(() => {
+    const puntos: Array<{
+      id: string;
+      etiqueta: string;
+      fecha: string;
+      ena: number;
+      esIngreso: boolean;
+    }> = [];
+
+    // 1. Punto 0: Dolor de Ingreso de la Evaluación Inicial TMO
+    if (evaluacionInicialTMO && evaluacionInicialTMO.dolor_inicial_ena !== undefined && evaluacionInicialTMO.dolor_inicial_ena !== null) {
+      puntos.push({
+        id: 'eval-inicial',
+        etiqueta: 'Ingreso',
+        fecha: evaluacionInicialTMO.fecha_evaluacion || evaluacionInicialTMO.fecha,
+        ena: Number(evaluacionInicialTMO.dolor_inicial_ena),
+        esIngreso: true
+      });
+    }
+
+    // 2. Sesiones SOAP cronológicas (S1, S2, S3...)
+    const soapsOrdenados = [...historialSOAP].sort(
+      (a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
+    );
+
+    soapsOrdenados.forEach((s, idx) => {
+      puntos.push({
+        id: s.id,
+        etiqueta: `S${idx + 1}`,
+        fecha: s.fecha,
+        ena: Number(s.nivel_dolor_ena) || 0,
+        esIngreso: false
+      });
+    });
+
+    return puntos;
+  }, [evaluacionInicialTMO, historialSOAP]);
+
   // Orden cronológico estricto: S1 (antigua) -> Sn (reciente)
   const notasCronologicas = useMemo(() => {
     return [...historialSOAP].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
   }, [historialSOAP]);
 
-  const dolorInicial = notasCronologicas[0]?.nivel_dolor_ena ?? 0;
-  const dolorActual = notasCronologicas[notasCronologicas.length - 1]?.nivel_dolor_ena ?? 0;
+  const dolorInicial = puntosGrafico[0]?.ena ?? 0;
+  const dolorActual = puntosGrafico[puntosGrafico.length - 1]?.ena ?? 0;
   const pctMejoria = dolorInicial > 0 
     ? Math.round(((dolorInicial - dolorActual) / dolorInicial) * 100) 
     : 0;
@@ -615,7 +654,7 @@ export function ClinicalRecordView({
                       Curva de Dolor ENA
                     </h3>
                   </div>
-                  {notasCronologicas.length > 1 && (
+                  {puntosGrafico.length > 1 && (
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                       pctMejoria >= 0 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-rose-700 bg-rose-50 border-rose-200'
                     }`}>
@@ -647,7 +686,7 @@ export function ClinicalRecordView({
                 })()}
 
                 {/* GRÁFICO ENA CON EJE Y, LÍNEAS GUÍA Y BARRAS */}
-                {notasCronologicas.length > 0 ? (
+                {puntosGrafico.length > 0 ? (
                   <div className="pt-2">
                     <div className="relative h-44 pl-7 pr-2">
                       {/* Eje Y con escala del 0 al 10 y líneas guía punteadas */}
@@ -668,18 +707,24 @@ export function ClinicalRecordView({
 
                       {/* Barras de Dolor ENA */}
                       <div className="relative z-10 h-full flex items-end justify-around gap-1 pt-3 pb-0.5">
-                        {notasCronologicas.slice(-10).map((nota, idx) => {
-                          const ena = Number(nota.nivel_dolor_ena) || 0;
+                        {puntosGrafico.slice(-10).map((punto, idx) => {
+                          const ena = Number(punto.ena) || 0;
                           const alturaPct = Math.max(6, (ena / 10) * 100);
-                          const colorBarra = ena <= 3 ? 'bg-emerald-500 hover:bg-emerald-600' : ena <= 6 ? 'bg-amber-500 hover:bg-amber-600' : 'bg-rose-500 hover:bg-rose-600';
+                          const colorBarra = punto.esIngreso
+                            ? 'bg-indigo-600 hover:bg-indigo-700'
+                            : ena <= 3
+                            ? 'bg-emerald-500 hover:bg-emerald-600'
+                            : ena <= 6
+                            ? 'bg-amber-500 hover:bg-amber-600'
+                            : 'bg-rose-500 hover:bg-rose-600';
                           return (
-                            <div key={nota.id || idx} className="flex-1 max-w-[28px] flex flex-col items-center h-full justify-end group relative cursor-pointer">
+                            <div key={punto.id || idx} className="flex-1 max-w-[28px] flex flex-col items-center h-full justify-end group relative cursor-pointer">
                               {/* Número ENA sobre la barra */}
-                              <span className="text-[10px] font-bold font-mono text-slate-700 leading-none mb-1">
+                              <span className={`text-[10px] font-mono leading-none mb-1 ${punto.esIngreso ? 'font-extrabold text-indigo-700' : 'font-bold text-slate-700'}`}>
                                 {ena}
                               </span>
                               {/* Barra */}
-                              <div className="w-full bg-slate-100 rounded-t-md overflow-hidden flex items-end h-full">
+                              <div className={`w-full ${punto.esIngreso ? 'bg-indigo-100 ring-1 ring-indigo-400' : 'bg-slate-100'} rounded-t-md overflow-hidden flex items-end h-full`}>
                                 <div
                                   className={`w-full ${colorBarra} rounded-t-md transition-all duration-300 shadow-xs`}
                                   style={{ height: `${alturaPct}%` }}
@@ -687,7 +732,7 @@ export function ClinicalRecordView({
                               </div>
                               {/* Tooltip Hover */}
                               <div className="absolute -top-9 hidden group-hover:block bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded shadow whitespace-nowrap z-30 pointer-events-none">
-                                {nota.fecha} • ENA {ena}/10
+                                {punto.esIngreso ? 'Ingreso TMO (Basal)' : punto.etiqueta}: ENA {ena}/10 • {punto.fecha}
                               </div>
                             </div>
                           );
@@ -695,11 +740,17 @@ export function ClinicalRecordView({
                       </div>
                     </div>
 
-                    {/* Etiquetas de Sesión (S1, S2, etc.) */}
+                    {/* Etiquetas de Sesión (Ingreso, S1, S2, etc.) */}
                     <div className="flex justify-around pl-7 pr-2 pt-1.5 border-t border-slate-200">
-                      {notasCronologicas.slice(-10).map((nota, idx) => (
-                        <span key={nota.id || idx} className="flex-1 max-w-[28px] text-center text-[9px] font-bold text-slate-500 font-mono">
-                          S{idx + 1}
+                      {puntosGrafico.slice(-10).map((punto, idx) => (
+                        <span
+                          key={punto.id || idx}
+                          className={`flex-1 max-w-[28px] text-center text-[9px] font-mono truncate ${
+                            punto.esIngreso ? 'font-extrabold text-indigo-700 underline decoration-indigo-300' : 'font-bold text-slate-500'
+                          }`}
+                          title={punto.etiqueta}
+                        >
+                          {punto.etiqueta === 'Ingreso' ? 'Ing' : punto.etiqueta}
                         </span>
                       ))}
                     </div>
@@ -707,6 +758,10 @@ export function ClinicalRecordView({
                     {/* Leyenda al pie */}
                     <div className="flex items-center justify-between pt-3 mt-1 border-t border-slate-100 text-[10px] text-slate-500">
                       <div className="flex items-center gap-2.5">
+                        <span className="flex items-center gap-1 font-bold text-indigo-700">
+                          <span className="w-2 h-2 rounded-full bg-indigo-600 inline-block" />
+                          Ingreso
+                        </span>
                         <span className="flex items-center gap-1">
                           <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
                           Leve (0-3)
@@ -720,7 +775,7 @@ export function ClinicalRecordView({
                           Sev (7-10)
                         </span>
                       </div>
-                      {notasCronologicas.length > 1 && (
+                      {puntosGrafico.length > 1 && (
                         <span className="font-semibold text-slate-700">
                           {pctMejoria >= 0 ? `-${pctMejoria}% dolor` : `+${Math.abs(pctMejoria)}%`}
                         </span>
@@ -1189,6 +1244,14 @@ export function ClinicalRecordView({
                       <span className="text-[10px] font-bold text-slate-400 uppercase block">Comportamiento 24h</span>
                       <p className="font-semibold text-slate-800 mt-0.5">{evaluacionInicialTMO.comportamiento_24h || 'No registrado'}</p>
                     </div>
+                    {evaluacionInicialTMO.anamnesis_reciente && (
+                      <div className="col-span-2 pt-2 border-t border-slate-100">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Anamnesis Reciente / Historia de la Enfermedad Actual</span>
+                        <p className="text-slate-800 mt-0.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200 whitespace-pre-line font-medium leading-relaxed">
+                          {evaluacionInicialTMO.anamnesis_reciente}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1199,17 +1262,41 @@ export function ClinicalRecordView({
                     <span>4. Examen Físico Funcional TMO</span>
                   </h3>
                   <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Juego Articular (Joint Play)</span>
-                      <p className="font-semibold text-slate-800 mt-0.5">{evaluacionInicialTMO.juego_articular || 'Normal Gr. 3'}</p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Movilidad Activa / ROM</span>
-                      <p className="font-semibold text-slate-800 mt-0.5">{evaluacionInicialTMO.movilidad_activa || 'Libre / Sin déficit'}</p>
-                    </div>
                     <div className="col-span-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Juego Articular (Joint Play - Kaltenborn / Maitland)</span>
+                      {evaluacionInicialTMO.juego_articular_1_zona ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+                          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase block">{evaluacionInicialTMO.juego_articular_1_zona}</span>
+                            <span className="font-bold text-slate-800 text-xs block mt-0.5">{evaluacionInicialTMO.juego_articular_1_grado}</span>
+                            <span className="text-[10px] text-slate-500 block font-medium">{evaluacionInicialTMO.juego_articular_1_endfeel}</span>
+                          </div>
+                          {evaluacionInicialTMO.juego_articular_2_zona && (
+                            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase block">{evaluacionInicialTMO.juego_articular_2_zona}</span>
+                              <span className="font-bold text-slate-800 text-xs block mt-0.5">{evaluacionInicialTMO.juego_articular_2_grado}</span>
+                              <span className="text-[10px] text-slate-500 block font-medium">{evaluacionInicialTMO.juego_articular_2_endfeel}</span>
+                            </div>
+                          )}
+                          {evaluacionInicialTMO.juego_articular_3_zona && (
+                            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase block">{evaluacionInicialTMO.juego_articular_3_zona}</span>
+                              <span className="font-bold text-slate-800 text-xs block mt-0.5">{evaluacionInicialTMO.juego_articular_3_grado}</span>
+                              <span className="text-[10px] text-slate-500 block font-medium">{evaluacionInicialTMO.juego_articular_3_endfeel}</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="font-semibold text-slate-800 mt-0.5">{evaluacionInicialTMO.juego_articular || 'Normal Gr. 3'}</p>
+                      )}
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Movilidad Activa / ROM</span>
+                      <p className="font-semibold text-slate-800 mt-0.5 whitespace-pre-line">{evaluacionInicialTMO.movilidad_activa || 'Libre / Sin déficit'}</p>
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
                       <span className="text-[10px] font-bold text-slate-400 uppercase block">Pruebas Neurodinámicas</span>
-                      <p className="font-semibold text-slate-800 mt-0.5">{evaluacionInicialTMO.neurodinamia || 'Negativas'}</p>
+                      <p className="font-semibold text-slate-800 mt-0.5 whitespace-pre-line">{evaluacionInicialTMO.neurodinamia || 'Negativas'}</p>
                     </div>
                     {evaluacionInicialTMO.hallazgos_fisicos && (
                       <div className="col-span-2">

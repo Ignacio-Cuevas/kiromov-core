@@ -43,9 +43,21 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
   const [evolucion, setEvolucion] = useState('Agudo <6 sem');
   const [comportamiento24h, setComportamiento24h] = useState('');
   const [dolorInicial, setDolorInicial] = useState(5);
+  const [anamnesisReciente, setAnamnesisReciente] = useState('');
 
-  // Blq 4: Examen Físico
-  const [juegoArticular, setJuegoArticular] = useState('Normal Gr. 3');
+  // Blq 4: Examen Físico - Juego Articular (3 filas estructuradas)
+  const [juego1Zona, setJuego1Zona] = useState('');
+  const [juego1Grado, setJuego1Grado] = useState('Normal Gr. 3');
+  const [juego1Endfeel, setJuego1Endfeel] = useState('Firme capsular');
+
+  const [juego2Zona, setJuego2Zona] = useState('');
+  const [juego2Grado, setJuego2Grado] = useState('Normal Gr. 3');
+  const [juego2Endfeel, setJuego2Endfeel] = useState('Firme capsular');
+
+  const [juego3Zona, setJuego3Zona] = useState('');
+  const [juego3Grado, setJuego3Grado] = useState('Normal Gr. 3');
+  const [juego3Endfeel, setJuego3Endfeel] = useState('Firme capsular');
+
   const [movilidad, setMovilidad] = useState('');
   const [neurodinamia, setNeurodinamia] = useState('');
   const [hallazgos, setHallazgos] = useState('');
@@ -69,7 +81,20 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
       setEvolucion(evaluacionExistente.tiempo_evolucion || 'Agudo <6 sem');
       setComportamiento24h(evaluacionExistente.comportamiento_24h || '');
       setDolorInicial(evaluacionExistente.dolor_inicial_ena ?? 5);
-      setJuegoArticular(evaluacionExistente.juego_articular || 'Normal Gr. 3');
+      setAnamnesisReciente(evaluacionExistente.anamnesis_reciente || '');
+
+      setJuego1Zona(evaluacionExistente.juego_articular_1_zona || '');
+      setJuego1Grado(evaluacionExistente.juego_articular_1_grado || 'Normal Gr. 3');
+      setJuego1Endfeel(evaluacionExistente.juego_articular_1_endfeel || 'Firme capsular');
+
+      setJuego2Zona(evaluacionExistente.juego_articular_2_zona || '');
+      setJuego2Grado(evaluacionExistente.juego_articular_2_grado || 'Normal Gr. 3');
+      setJuego2Endfeel(evaluacionExistente.juego_articular_2_endfeel || 'Firme capsular');
+
+      setJuego3Zona(evaluacionExistente.juego_articular_3_zona || '');
+      setJuego3Grado(evaluacionExistente.juego_articular_3_grado || 'Normal Gr. 3');
+      setJuego3Endfeel(evaluacionExistente.juego_articular_3_endfeel || 'Firme capsular');
+
       setMovilidad(evaluacionExistente.movilidad_activa || '');
       setNeurodinamia(evaluacionExistente.neurodinamia || '');
       setHallazgos(evaluacionExistente.hallazgos_fisicos || '');
@@ -89,7 +114,20 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
       setEvolucion('Agudo <6 sem');
       setComportamiento24h('');
       setDolorInicial(5);
-      setJuegoArticular('Normal Gr. 3');
+      setAnamnesisReciente('');
+
+      setJuego1Zona('');
+      setJuego1Grado('Normal Gr. 3');
+      setJuego1Endfeel('Firme capsular');
+
+      setJuego2Zona('');
+      setJuego2Grado('Normal Gr. 3');
+      setJuego2Endfeel('Firme capsular');
+
+      setJuego3Zona('');
+      setJuego3Grado('Normal Gr. 3');
+      setJuego3Endfeel('Firme capsular');
+
       setMovilidad('');
       setNeurodinamia('');
       setHallazgos('');
@@ -113,6 +151,12 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
     if (!supabase) return;
     setLoading(true);
     try {
+      const resumenJuegos = [
+        juego1Zona ? `${juego1Zona}: ${juego1Grado} (${juego1Endfeel})` : '',
+        juego2Zona ? `${juego2Zona}: ${juego2Grado} (${juego2Endfeel})` : '',
+        juego3Zona ? `${juego3Zona}: ${juego3Grado} (${juego3Endfeel})` : '',
+      ].filter(Boolean).join(' | ');
+
       const payload = {
         paciente_id: paciente.id,
         fecha_evaluacion: fechaEvaluacion,
@@ -123,19 +167,29 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
         cirugias_traumatismos: cirugias,
         farmacos_actuales: farmacos,
         banderas_rojas: banderasRojas,
-        banderas_rojas_alerta: banderasRojas, // Mapeo solicitado
+        banderas_rojas_alerta: banderasRojas,
         apto_hvla: aptoHvla,
         notas_contraindicaciones: notasContraindicaciones,
         mecanismo_inicio: mecanismo,
         tiempo_evolucion: evolucion,
         comportamiento_24h: comportamiento24h,
         dolor_inicial_ena: dolorInicial,
-        juego_articular: juegoArticular,
+        anamnesis_reciente: anamnesisReciente.trim(),
+        juego_articular_1_zona: juego1Zona.trim(),
+        juego_articular_1_grado: juego1Grado,
+        juego_articular_1_endfeel: juego1Endfeel,
+        juego_articular_2_zona: juego2Zona.trim(),
+        juego_articular_2_grado: juego2Grado,
+        juego_articular_2_endfeel: juego2Endfeel,
+        juego_articular_3_zona: juego3Zona.trim(),
+        juego_articular_3_grado: juego3Grado,
+        juego_articular_3_endfeel: juego3Endfeel,
+        juego_articular: resumenJuegos || juego1Grado,
         movilidad_activa: movilidad,
         neurodinamia: neurodinamia,
         hallazgos_fisicos: hallazgos,
         hipotesis_diagnostica_tmo: diagnostico,
-        hipotesis_diagnostica: diagnostico, // Mapeo solicitado
+        hipotesis_diagnostica: diagnostico,
         objetivos_terapeuticos: objetivos,
         estimacion_alta: altaEstimada,
         updated_at: new Date().toISOString()
@@ -143,10 +197,38 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
 
       if (modo === 'editar' && evaluacionExistente?.id) {
         const { error } = await supabase.from('evaluaciones_iniciales_tmo').update(payload).eq('id', evaluacionExistente.id);
-        if (error) throw error;
+        if (error) {
+          if (error.message?.includes('juego_articular_1') || error.message?.includes('anamnesis_reciente')) {
+            const { 
+              anamnesis_reciente, 
+              juego_articular_1_zona, juego_articular_1_grado, juego_articular_1_endfeel,
+              juego_articular_2_zona, juego_articular_2_grado, juego_articular_2_endfeel,
+              juego_articular_3_zona, juego_articular_3_grado, juego_articular_3_endfeel,
+              ...fallbackPayload 
+            } = payload as any;
+            const { error: fallbackErr } = await supabase.from('evaluaciones_iniciales_tmo').update(fallbackPayload).eq('id', evaluacionExistente.id);
+            if (fallbackErr) throw fallbackErr;
+          } else {
+            throw error;
+          }
+        }
       } else {
         const { error } = await supabase.from('evaluaciones_iniciales_tmo').insert([payload]);
-        if (error) throw error;
+        if (error) {
+          if (error.message?.includes('juego_articular_1') || error.message?.includes('anamnesis_reciente')) {
+            const { 
+              anamnesis_reciente, 
+              juego_articular_1_zona, juego_articular_1_grado, juego_articular_1_endfeel,
+              juego_articular_2_zona, juego_articular_2_grado, juego_articular_2_endfeel,
+              juego_articular_3_zona, juego_articular_3_grado, juego_articular_3_endfeel,
+              ...fallbackPayload 
+            } = payload as any;
+            const { error: fallbackErr } = await supabase.from('evaluaciones_iniciales_tmo').insert([fallbackPayload]);
+            if (fallbackErr) throw fallbackErr;
+          } else {
+            throw error;
+          }
+        }
         
         // Crear el primer SOAP
         const { data: soaps } = await supabase.from('evoluciones_soap').select('id').eq('paciente_id', paciente.id).limit(1);
@@ -334,32 +416,209 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
           </div>
         </div>
 
+        {/* Anamnesis del Cuadro Actual / Historia de la Enfermedad Actual (Antes del Examen Físico) */}
+        <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <Activity className="w-4 h-4 text-blue-600" />
+            <span>Anamnesis Reciente / Historia de la Enfermedad Actual</span>
+          </label>
+          <Textarea
+            rows={4}
+            value={anamnesisReciente}
+            onChange={(e) => setAnamnesisReciente(e.target.value)}
+            placeholder="¿Cómo y cuándo comenzó el dolor? Actividades agravantes/atenuantes, irradiación, tratamientos previos..."
+            className="min-h-[100px] text-xs leading-relaxed bg-white"
+          />
+        </div>
+
         {/* Bloque 4 */}
         <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
           <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
             <Stethoscope className="w-4 h-4 text-emerald-600" />
-            4. Examen Físico Basal TMO (Hallazgos Articulares)
+            4. Examen Físico Basal TMO (Hallazgos Articulares y Tejidos)
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Juego Articular Accesorio (Joint Play)</label>
-              <select value={juegoArticular} onChange={e => setJuegoArticular(e.target.value)} className="w-full text-sm p-2 border border-slate-300 rounded-lg">
-                <option value="Hipomóvil Gr. 0-2">Hipomóvil Gr. 0-2</option>
-                <option value="Normal Gr. 3">Normal Gr. 3</option>
-                <option value="Hipermóvil Gr. 4-6">Hipermóvil Gr. 4-6</option>
-              </select>
+
+          {/* 3 Filas de Juego Articular (Kaltenborn / Maitland) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700">
+                Juego Articular Accesorio (Joint Play - Kaltenborn / Maitland)
+              </label>
+              <span className="text-[10px] text-slate-400 font-semibold">3 Segmentos evaluables</span>
             </div>
+
+            <div className="space-y-2.5">
+              {/* Fila 1 */}
+              <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                  <span>Segmento 1</span>
+                  <div className="flex flex-wrap gap-1">
+                    {['L4-L5', 'Sacroilíaca D°', 'C5-C6', 'Glenohumeral'].map(ej => (
+                      <button
+                        key={ej}
+                        type="button"
+                        onClick={() => setJuego1Zona(ej)}
+                        className="text-[9px] px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded cursor-pointer"
+                      >
+                        {ej}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <Input
+                    value={juego1Zona}
+                    onChange={(e) => setJuego1Zona(e.target.value)}
+                    placeholder="Articulación / Segmento (ej: L4-L5)"
+                    className="text-xs h-9 bg-slate-50/50"
+                  />
+                  <select
+                    value={juego1Grado}
+                    onChange={(e) => setJuego1Grado(e.target.value)}
+                    className="text-xs h-9 px-2 border border-slate-300 rounded-lg bg-white font-medium"
+                  >
+                    <option value="Hipomóvil Gr. 0-2">Hipomóvil Gr. 0-2</option>
+                    <option value="Normal Gr. 3">Normal Gr. 3</option>
+                    <option value="Hipermóvil Gr. 4-6">Hipermóvil Gr. 4-6</option>
+                  </select>
+                  <select
+                    value={juego1Endfeel}
+                    onChange={(e) => setJuego1Endfeel(e.target.value)}
+                    className="text-xs h-9 px-2 border border-slate-300 rounded-lg bg-white font-medium"
+                  >
+                    <option value="Firme capsular">Firme capsular</option>
+                    <option value="Duro óseo">Duro óseo</option>
+                    <option value="Blando elástico">Blando elástico</option>
+                    <option value="Vacío / Espasmo protector">Vacío / Espasmo protector</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Fila 2 */}
+              <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                  <span>Segmento 2 (Opcional)</span>
+                  <div className="flex flex-wrap gap-1">
+                    {['L5-S1', 'Sacroilíaca I°', 'C6-C7', 'Cadera D°'].map(ej => (
+                      <button
+                        key={ej}
+                        type="button"
+                        onClick={() => setJuego2Zona(ej)}
+                        className="text-[9px] px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded cursor-pointer"
+                      >
+                        {ej}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <Input
+                    value={juego2Zona}
+                    onChange={(e) => setJuego2Zona(e.target.value)}
+                    placeholder="Articulación / Segmento 2"
+                    className="text-xs h-9 bg-slate-50/50"
+                  />
+                  <select
+                    value={juego2Grado}
+                    onChange={(e) => setJuego2Grado(e.target.value)}
+                    className="text-xs h-9 px-2 border border-slate-300 rounded-lg bg-white font-medium"
+                  >
+                    <option value="Hipomóvil Gr. 0-2">Hipomóvil Gr. 0-2</option>
+                    <option value="Normal Gr. 3">Normal Gr. 3</option>
+                    <option value="Hipermóvil Gr. 4-6">Hipermóvil Gr. 4-6</option>
+                  </select>
+                  <select
+                    value={juego2Endfeel}
+                    onChange={(e) => setJuego2Endfeel(e.target.value)}
+                    className="text-xs h-9 px-2 border border-slate-300 rounded-lg bg-white font-medium"
+                  >
+                    <option value="Firme capsular">Firme capsular</option>
+                    <option value="Duro óseo">Duro óseo</option>
+                    <option value="Blando elástico">Blando elástico</option>
+                    <option value="Vacío / Espasmo protector">Vacío / Espasmo protector</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Fila 3 */}
+              <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                  <span>Segmento 3 (Opcional)</span>
+                  <div className="flex flex-wrap gap-1">
+                    {['T12-L1', 'Escápulotorácica', 'Tobillo', 'Rodilla'].map(ej => (
+                      <button
+                        key={ej}
+                        type="button"
+                        onClick={() => setJuego3Zona(ej)}
+                        className="text-[9px] px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded cursor-pointer"
+                      >
+                        {ej}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <Input
+                    value={juego3Zona}
+                    onChange={(e) => setJuego3Zona(e.target.value)}
+                    placeholder="Articulación / Segmento 3"
+                    className="text-xs h-9 bg-slate-50/50"
+                  />
+                  <select
+                    value={juego3Grado}
+                    onChange={(e) => setJuego3Grado(e.target.value)}
+                    className="text-xs h-9 px-2 border border-slate-300 rounded-lg bg-white font-medium"
+                  >
+                    <option value="Hipomóvil Gr. 0-2">Hipomóvil Gr. 0-2</option>
+                    <option value="Normal Gr. 3">Normal Gr. 3</option>
+                    <option value="Hipermóvil Gr. 4-6">Hipermóvil Gr. 4-6</option>
+                  </select>
+                  <select
+                    value={juego3Endfeel}
+                    onChange={(e) => setJuego3Endfeel(e.target.value)}
+                    className="text-xs h-9 px-2 border border-slate-300 rounded-lg bg-white font-medium"
+                  >
+                    <option value="Firme capsular">Firme capsular</option>
+                    <option value="Duro óseo">Duro óseo</option>
+                    <option value="Blando elástico">Blando elástico</option>
+                    <option value="Vacío / Espasmo protector">Vacío / Espasmo protector</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Cajas de Texto Espaciosas en Examen Físico (rows=4, min-h-[100px]) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-700">Movilidad Activa (ROM)</label>
-              <Input value={movilidad} onChange={e => setMovilidad(e.target.value)} placeholder="Ej: Limitación flexión lumbar a 50%" />
+              <Textarea 
+                rows={4} 
+                value={movilidad} 
+                onChange={e => setMovilidad(e.target.value)} 
+                placeholder="Ej: Limitación flexión lumbar a 50%, dolor en extensión terminal..." 
+                className="min-h-[100px] text-xs leading-relaxed bg-white"
+              />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Neurodinamia</label>
-              <Input value={neurodinamia} onChange={e => setNeurodinamia(e.target.value)} placeholder="Ej: Slump (+) der, Lasègue (-)" />
+              <label className="text-xs font-semibold text-slate-700">Neurodinamia Basal (Slump / Lasègue / ULNT)</label>
+              <Textarea 
+                rows={4} 
+                value={neurodinamia} 
+                onChange={e => setNeurodinamia(e.target.value)} 
+                placeholder="Ej: Slump (+) der con reproducción de dolor a 45°, Lasègue (-), ULNT bilateral..." 
+                className="min-h-[100px] text-xs leading-relaxed bg-white"
+              />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Otros Hallazgos (PGs, control motor)</label>
-              <Input value={hallazgos} onChange={e => setHallazgos(e.target.value)} placeholder="Ej: PG activo en trapecio superior" />
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs font-semibold text-slate-700">Otros Hallazgos (Puntos Gatillo, Control Motor)</label>
+              <Textarea 
+                rows={4} 
+                value={hallazgos} 
+                onChange={e => setHallazgos(e.target.value)} 
+                placeholder="Ej: PG activo en cuadrado lumbar derecho, alteración control motor transverso/multífidos..." 
+                className="min-h-[100px] text-xs leading-relaxed bg-white"
+              />
             </div>
           </div>
         </div>
