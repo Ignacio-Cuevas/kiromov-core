@@ -31,9 +31,10 @@ import {
   Lock, Settings,
 } from 'lucide-react';
 import { BlockTimeModal, BloqueoAgenda } from '@/components/agenda/BlockTimeModal';
-import { AgendaHeader } from '@/components/agenda/AgendaHeader';
-import { TimeGridWeekly } from '@/components/agenda/TimeGridWeekly';
-import { MedicalTimeGrid } from '@/components/agenda/MedicalTimeGrid';
+import { AgendaSidebar, FiltroEstadoCitas } from '@/components/agenda/AgendaSidebar';
+import { ClinicalNavbar } from '@/components/agenda/ClinicalNavbar';
+import { ClinicalTimeGrid } from '@/components/agenda/ClinicalTimeGrid';
+import { AppointmentPopover, AppointmentPopoverData } from '@/components/agenda/AppointmentPopover';
 import { BoxScheduleView } from '@/components/agenda/BoxScheduleView';
 import {
   SemanaHorariosBox,
@@ -62,7 +63,7 @@ for (let i = 8; i <= 20; i++) {
   timeBlocks.push(`${String(i).padStart(2, '0')}:30`);
 }
 
-type VistaAgenda = 'dia' | 'semana' | 'mes';
+type VistaAgenda = 'dia' | 'semana';
 
 function AgendaContent() {
   const supabase = useMemo(() => createClient(), []);
@@ -70,6 +71,9 @@ function AgendaContent() {
   
   const [fechaBase, setFechaBase] = useState<Date>(new Date());
   const [vista, setVista] = useState<VistaAgenda>('semana');
+  const [filtroEstado, setFiltroEstado] = useState<FiltroEstadoCitas>('todas');
+  const [selectedCitaForPopover, setSelectedCitaForPopover] = useState<AppointmentPopoverData | null>(null);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   const [citas, setCitas] = useState<CitaExtendida[]>([]);
   const [showNoSessionsAlert, setShowNoSessionsAlert] = useState<{isOpen: boolean, pacienteId: string, reason?: string} | null>(null);
@@ -193,7 +197,7 @@ function AgendaContent() {
       const { data: citasData, error: citasError } = await supabase
         .from('citas_atenciones')
         .select(`
-          id, fecha, hora, profesional, estado, motivo_consulta, paciente_id, google_event_id,
+          id, fecha, hora, profesional, estado, motivo_consulta, notas, paciente_id, google_event_id,
           pacientes:paciente_id ( id, nombre_completo, rut, telefono, email, prevision, motivo_consulta, alertas_seguridad, antecedentes_morbidos )
         `)
         .gte('fecha', fechaInicioStr)
@@ -380,40 +384,68 @@ function AgendaContent() {
     return { citadosHoy, confirmadas, enSala, asistio, pendientes };
   }, [citas]);
 
+  const conteosFiltro = useMemo(() => {
+    const todas = citas.length;
+    const pendientes = citas.filter(c => String(c?.estado || 'pendiente').toLowerCase() === 'pendiente').length;
+    const confirmadas = citas.filter(c => ['confirmada', 'asistio', 'asistió', 'atendida', 'atendido'].includes(String(c?.estado || '').toLowerCase())).length;
+    return { todas, pendientes, confirmadas };
+  }, [citas]);
+
+  const citasFiltradas = useMemo(() => {
+    if (filtroEstado === 'pendientes') {
+      return citas.filter(c => String(c?.estado || 'pendiente').toLowerCase() === 'pendiente');
+    }
+    if (filtroEstado === 'confirmadas') {
+      return citas.filter(c => ['confirmada', 'asistio', 'asistió', 'atendida', 'atendido'].includes(String(c?.estado || '').toLowerCase()));
+    }
+    return citas;
+  }, [citas, filtroEstado]);
+
+  const diasAMostrar = useMemo(() => {
+    if (vista === 'dia') {
+      return [fechaBase];
+    }
+    // Vista semana: Lunes a Sábado (6 días estándar, o 7 si Domingo está activo)
+    const domingoActivo = semanaConfig[0]?.activo ?? false;
+    const count = domingoActivo ? 7 : 6;
+    const inicioSemana = getMonday(fechaBase);
+    return Array.from({ length: count }).map((_, i) => {
+      const d = new Date(inicioSemana);
+      d.setDate(d.getDate() + i);
+      return d;
+    });
+  }, [fechaBase, vista, semanaConfig]);
+
   const changeDate = (dir: number) => {
     const next = new Date(fechaBase);
     if (vista === 'dia') {
       next.setDate(next.getDate() + dir);
-    } else if (vista === 'semana') {
+    } else {
       next.setDate(next.getDate() + (dir * 7));
-    } else if (vista === 'mes') {
-      next.setMonth(next.getMonth() + dir);
     }
     setFechaBase(next);
   };
   const setToday = () => setFechaBase(new Date());
 
-  const formattedTitleDate = useMemo(() => {
-    if (vista === 'dia') {
-      return fechaBase.toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    } else if (vista === 'semana') {
-      const inicio = getMonday(fechaBase);
-      const fin = new Date(inicio); fin.setDate(fin.getDate() + 6);
-      const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-      const diaIni = inicio.getDate();
-      const mesIni = meses[inicio.getMonth()];
-      const diaFin = fin.getDate();
-      const mesFin = meses[fin.getMonth()];
-      const ano = fin.getFullYear();
+  const handleGuardarNotaCita = async (citaId: string, nuevaNota: string) => {
+    if (!supabase) return;
+    const { error } = await supabase
+      .from('citas_atenciones')
+      .update({ notas: nuevaNota })
+      .eq('id', citaId);
 
-      if (mesIni === mesFin) {
-        return `Semana del ${diaIni} al ${diaFin} de ${mesFin} de ${ano}`;
-      }
-      return `Semana del ${diaIni} de ${mesIni} al ${diaFin} de ${mesFin} de ${ano}`;
-    } else {
-      return fechaBase.toLocaleDateString('es-CL', { year: 'numeric', month: 'long' });
+    if (error) {
+      console.error('Error guardando nota de cita:', error);
+      throw error;
     }
-  }, [fechaBase, vista]);
+
+    setCitas(prev =>
+      prev.map(c => (c.id === citaId ? { ...c, notas: nuevaNota } : c))
+    );
+    if (selectedCitaForPopover && selectedCitaForPopover.id === citaId) {
+      setSelectedCitaForPopover(prev => prev ? { ...prev, notas: nuevaNota } : null);
+    }
+  };
 
   // Actions
     const handleRegistrarInasistencia = async (citaId: string, pacienteId: string) => {
@@ -1083,158 +1115,12 @@ function AgendaContent() {
     );
   };
 
-  const renderSemana = () => {
-    const inicioSemana = getMonday(fechaBase);
-    const dias = Array.from({ length: 7 }).map((_, i) => {
-      const d = new Date(inicioSemana);
-      d.setDate(d.getDate() + i);
-      return d;
-    });
-
-    return (
-      <div className="p-3 sm:p-5 bg-slate-50 min-h-[400px]">
-        <TimeGridWeekly
-          dias={dias}
-          citas={citas}
-          bloqueos={bloqueos}
-          semanaConfig={semanaConfig}
-          duracionPredeterminada={duracionPredeterminada}
-          onSelectEmptySlot={(fecha, hora) => {
-            setNewCita((prev) => ({ ...prev, fecha, hora, pacienteId: '' }));
-            setShowNewCitaModal(true);
-          }}
-          onSelectCita={(cita) => {
-            if (cita.pacientes?.id) {
-              setSelectedPatientForDrawer(cita.pacientes);
-              setSelectedCitaForSuite(cita);
-              setIsDrawerOpen(true);
-            } else {
-              toast.info('Cita sin ficha clínica vinculada en el sistema.');
-            }
-          }}
-          onDesbloquear={(b) => handleDesbloquearDirecto(b)}
-          onCambiarEstadoCita={(c, nuevoEstado) => handleCambiarEstadoCita(c, nuevoEstado)}
-        />
-      </div>
-    );
-  };
-
-  const renderMes = () => {
-    const year = fechaBase.getFullYear();
-    const month = fechaBase.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    
-    // Calcular días para la grilla (Lunes a Domingo)
-    let firstDayIndex = firstDay.getDay() - 1;
-    if (firstDayIndex === -1) firstDayIndex = 6; // Si es domingo, índice 6
-    
-    const daysArray: (Date|null)[] = [];
-    for (let i = 0; i < firstDayIndex; i++) daysArray.push(null);
-    for (let i = 1; i <= lastDay.getDate(); i++) daysArray.push(new Date(year, month, i));
-    while (daysArray.length % 7 !== 0) daysArray.push(null);
-
-    const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-
-    return (
-        <div className="p-3 sm:p-6 bg-paper min-h-[500px] overflow-x-auto">
-            <div className="grid grid-cols-7 border-t border-l border-hairline rounded-cards overflow-hidden min-w-[700px] lg:min-w-0">
-                {weekDays.map(wd => (
-                    <div key={wd} className="p-2 sm:p-3 border-b border-r border-hairline text-center bg-cloud text-[11px] sm:text-[12px] font-bold uppercase text-slate-gray tracking-wider">
-                        {wd}
-                    </div>
-                ))}
-                {daysArray.map((dia, idx) => {
-                    if (!dia) return <div key={idx} className="border-b border-r border-hairline bg-cloud/50 min-h-[110px] sm:min-h-[130px]"></div>;
-                    
-                    const diaStr = getFormattedLocalDate(dia);
-                    const isToday = diaStr === getFormattedLocalDate(new Date());
-                    const citasDia = citas.filter(c => c.fecha === diaStr);
-                    const bloqueosDia = bloqueos.filter(b => b.fecha_inicio <= diaStr && b.fecha_fin >= diaStr);
-                    const citasToShow = citasDia.slice(0, 3);
-                    const hasMore = (citasDia.length + bloqueosDia.length) > 3;
-
-                    return (
-                        <div 
-                            key={idx} 
-                            onClick={() => {
-                                setFechaBase(dia);
-                                setVista('dia');
-                            }}
-                            className={`p-1.5 sm:p-2 border-b border-r border-hairline min-h-[110px] sm:min-h-[130px] overflow-hidden relative cursor-pointer hover:bg-pebble transition-colors ${isToday ? 'bg-signal-blue/5' : 'bg-paper'}`}
-                        >
-                            <div className="text-right mb-1 sm:mb-2">
-                                <span className={`inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[12px] sm:text-[14px] font-bold ${isToday ? 'bg-signal-blue text-white' : 'text-slate-gray'}`}>{dia.getDate()}</span>
-                            </div>
-                            <div className="space-y-1 sm:space-y-1.5">
-                                {/* Bloqueos en celda de mes */}
-                                {bloqueosDia.map(b => (
-                                  <div
-                                    key={b.id}
-                                    className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-[repeating-linear-gradient(45deg,#fef3c7,#fef3c7_6px,#fde68a_6px,#fde68a_12px)] text-amber-950 border border-amber-300 truncate shadow-2xs"
-                                    title={`🔒 ${b.titulo} (${b.dia_completo ? 'Día completo' : `${b.hora_inicio || '09:00'}-${b.hora_fin || '10:00'}`})`}
-                                  >
-                                    🔒 {b.titulo}
-                                  </div>
-                                ))}
-
-                                {citasToShow.map(c => {
-                                    const s = String(c?.estado || 'pendiente').toLowerCase();
-                                    const tokens = getCitaColorTokens(s);
-                                    
-                                    const primerNombre = c.pacientes?.nombre_completo?.split(' ')[0] || (c.motivo_consulta ? c.motivo_consulta.replace(/^Atención Kinésica - /i, '').split(' ')[0] : 'Externo');
-                                    const { tienePlan, sesionesUsadas, sesionesTotales } = getResumenPlan(c.pacientes || {});
-                                    const planStr = tienePlan ? `${c.pacientes?.nombre_plan} (${sesionesUsadas}/${sesionesTotales} ses)` : 'Sin plan';
-
-                                    return (
-                                        <div key={c.id} className={`px-1.5 py-0.5 rounded-md text-[10px] truncate relative group font-medium ${tokens.pillMensual}`}>
-                                            <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle ${tokens.dot}`} />
-                                            {c.hora?.slice(0,5)} • {primerNombre}
-                                            
-                                            {/* Hover Tooltip */}
-                                            <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-48 bg-ink-navy text-paper p-3 rounded-inputs shadow-calendly-lg z-[60] text-[12px] whitespace-normal pointer-events-none">
-                                                <p className="font-bold text-[14px]">{c.pacientes?.nombre_completo || c.motivo_consulta || 'Paciente Sin Ficha'}</p>
-                                                <p className="text-mist-gray text-[11px] mt-1">{c.pacientes?.prevision || 'Particular'} • {c.pacientes?.telefono || 'Sin tel.'}</p>
-                                                <p className="text-signal-blue text-[11px] mt-1.5 font-semibold">{planStr}</p>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                                {hasMore && (
-                                    <div className="text-[10px] sm:text-[11px] text-center font-bold text-mist-gray mt-1 sm:mt-2 hover:text-slate-gray transition-colors">+{citasDia.length + bloqueosDia.length - 3} más</div>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-cloud pb-20 font-gilroy text-ink-navy">
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6 sm:space-y-8 print:hidden">
         
         {/* Pestañas Principales: Agenda / Disponibilidad de Box */}
-        {/* Barra Superior Unificada Médica: AgendaHeader */}
-        <AgendaHeader
-          fechaBase={fechaBase}
-          vista={vista}
-          onVistaChange={(v) => setVista(v)}
-          onChangeDate={(dir) => changeDate(dir)}
-          onToday={setToday}
-          kpis={kpis}
-          onNuevaCita={() => setShowNewCitaModal(true)}
-          onBloquearHorario={() => setShowBlockModal(true)}
-          onSincronizarCalendario={handleSincronizarCalendario}
-          isSyncing={isSyncing}
-          onHorariosBox={() => setActiveTab('disponibilidad')}
-          activeTab={activeTab}
-          onActiveTabChange={(tab) => setActiveTab(tab)}
-        />
-
         {activeTab === 'disponibilidad' ? (
           <BoxScheduleView
             onBackToAgenda={() => setActiveTab('agenda')}
@@ -1244,17 +1130,100 @@ function AgendaContent() {
             }}
           />
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-24 text-mist-gray min-h-[400px]">
-                <Loader2 className="w-8 h-8 animate-spin mb-3 text-signal-blue" />
-                <p className="text-[16px] font-medium text-slate-gray">Cargando agenda clínica...</p>
-              </div>
-            ) : (
-              vista === 'dia' ? renderDia() : vista === 'semana' ? renderSemana() : renderMes()
-            )}
+          <div className="flex flex-col lg:flex-row gap-5 items-start">
+            {/* Panel Lateral Izquierdo (Sidebar 280px Fijo) */}
+            <AgendaSidebar
+              fechaSeleccionada={fechaBase}
+              onSelectFecha={(d) => {
+                setFechaBase(d);
+              }}
+              filtroEstado={filtroEstado}
+              onFiltroEstadoChange={(f) => setFiltroEstado(f)}
+              conteos={conteosFiltro}
+              onConfigurarHorariosBox={() => setActiveTab('disponibilidad')}
+              onSincronizarGoogleCalendar={handleSincronizarCalendario}
+              isSyncing={isSyncing}
+            />
+
+            {/* Panel Central (Grilla Horaria Médica) */}
+            <div className="flex-1 min-w-0 w-full space-y-4">
+              {/* Barra Superior Central: Conmutador [ Día ] [ Semana ], Hoy, Flechas, Título y + Nueva Cita */}
+              <ClinicalNavbar
+                fechaBase={fechaBase}
+                vista={vista}
+                onVistaChange={(v) => setVista(v)}
+                onChangeDate={(dir) => changeDate(dir)}
+                onToday={setToday}
+                onNuevaCita={() => setShowNewCitaModal(true)}
+                onBloquearHorario={() => setShowBlockModal(true)}
+              />
+
+              {/* Grilla Médica o Loader */}
+              {loading ? (
+                <div className="bg-white rounded-2xl p-16 border border-slate-200/90 shadow-sm flex flex-col items-center justify-center min-h-[450px]">
+                  <Loader2 className="w-8 h-8 animate-spin mb-3 text-indigo-600" />
+                  <p className="text-sm font-semibold text-slate-600">Cargando agenda clínica...</p>
+                </div>
+              ) : (
+                <ClinicalTimeGrid
+                  dias={diasAMostrar}
+                  citas={citasFiltradas}
+                  bloqueos={bloqueos}
+                  semanaConfig={semanaConfig}
+                  duracionPredeterminada={duracionPredeterminada}
+                  onSelectEmptySlot={(fecha, hora) => {
+                    setNewCita((prev) => ({ ...prev, fecha, hora, pacienteId: '' }));
+                    setShowNewCitaModal(true);
+                  }}
+                  onSelectCita={(cita) => {
+                    setSelectedCitaForPopover(cita);
+                    setIsPopoverOpen(true);
+                  }}
+                  onDesbloquear={(b) => handleDesbloquearDirecto(b)}
+                />
+              )}
+            </div>
           </div>
         )}
+
+        {/* Popover Flotante de Detalle de Cita (AgendaPro / Reservo) */}
+        <AppointmentPopover
+          cita={selectedCitaForPopover}
+          isOpen={isPopoverOpen}
+          onClose={() => {
+            setIsPopoverOpen(false);
+            setSelectedCitaForPopover(null);
+          }}
+          onCambiarEstado={async (cita, nuevoEstado) => {
+            await handleCambiarEstadoCita(cita as any, nuevoEstado);
+            if (selectedCitaForPopover && selectedCitaForPopover.id === cita.id) {
+              setSelectedCitaForPopover((prev) => (prev ? { ...prev, estado: nuevoEstado } : null));
+            }
+          }}
+          onGuardarNota={handleGuardarNotaCita}
+          onIrAFicha={(pacienteId, pacienteObj, citaObj) => {
+            const p = pacienteObj || citas.find(c => c.paciente_id === pacienteId)?.pacientes;
+            if (p?.id || pacienteId) {
+              setSelectedPatientForDrawer(p || { id: pacienteId });
+              setSelectedCitaForSuite(citaObj as any);
+              setIsDrawerOpen(true);
+            } else {
+              toast.info('Cita sin ficha clínica vinculada.');
+            }
+          }}
+          onEditarHorario={(cita) => {
+            setEditingCita(cita as any);
+            setEditForm({
+              fecha: cita.fecha || '',
+              hora: cita.hora || '',
+              motivo: cita.motivo_consulta || '',
+              profesional: cita.profesional || ''
+            });
+          }}
+          onCancelarCita={(cita) => {
+            setDeletingCita(cita as any);
+          }}
+        />
       
       <Dialog open={!!showNoSessionsAlert} onOpenChange={(open) => !open && setShowNoSessionsAlert(null)}>
         <DialogHeader>
