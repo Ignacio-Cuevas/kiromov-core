@@ -31,6 +31,8 @@ import {
   Lock, Settings,
 } from 'lucide-react';
 import { BlockTimeModal, BloqueoAgenda } from '@/components/agenda/BlockTimeModal';
+import { AgendaHeader } from '@/components/agenda/AgendaHeader';
+import { TimeGridWeekly } from '@/components/agenda/TimeGridWeekly';
 import { MedicalTimeGrid } from '@/components/agenda/MedicalTimeGrid';
 import { BoxScheduleView } from '@/components/agenda/BoxScheduleView';
 import {
@@ -67,7 +69,7 @@ function AgendaContent() {
   const searchParams = useSearchParams();
   
   const [fechaBase, setFechaBase] = useState<Date>(new Date());
-  const [vista, setVista] = useState<VistaAgenda>('dia');
+  const [vista, setVista] = useState<VistaAgenda>('semana');
 
   const [citas, setCitas] = useState<CitaExtendida[]>([]);
   const [showNoSessionsAlert, setShowNoSessionsAlert] = useState<{isOpen: boolean, pacienteId: string, reason?: string} | null>(null);
@@ -1090,8 +1092,8 @@ function AgendaContent() {
     });
 
     return (
-      <div className="p-3 sm:p-5 bg-cloud min-h-[400px]">
-        <MedicalTimeGrid
+      <div className="p-3 sm:p-5 bg-slate-50 min-h-[400px]">
+        <TimeGridWeekly
           dias={dias}
           citas={citas}
           bloqueos={bloqueos}
@@ -1216,41 +1218,22 @@ function AgendaContent() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6 sm:space-y-8 print:hidden">
         
         {/* Pestañas Principales: Agenda / Disponibilidad de Box */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/90 pb-3">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab('agenda')}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
-                activeTab === 'agenda'
-                  ? 'bg-ink-navy text-white shadow-xs'
-                  : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
-              }`}
-            >
-              <CalendarDays className="w-4 h-4 text-signal-blue" />
-              <span>Agenda de Citas</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('disponibilidad')}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
-                activeTab === 'disponibilidad'
-                  ? 'bg-ink-navy text-white shadow-xs'
-                  : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
-              }`}
-            >
-              <Clock className="w-4 h-4 text-signal-blue" />
-              <span>Disponibilidad y Horarios de Box</span>
-            </button>
-          </div>
-
-          <span className="text-xs text-slate-400 hidden sm:inline-block font-medium">
-            {activeTab === 'agenda'
-              ? 'Grilla médica semanal interactiva (Time-Grid)'
-              : 'Configuración semanal persistente de jornada'}
-          </span>
-        </div>
+        {/* Barra Superior Unificada Médica: AgendaHeader */}
+        <AgendaHeader
+          fechaBase={fechaBase}
+          vista={vista}
+          onVistaChange={(v) => setVista(v)}
+          onChangeDate={(dir) => changeDate(dir)}
+          onToday={setToday}
+          kpis={kpis}
+          onNuevaCita={() => setShowNewCitaModal(true)}
+          onBloquearHorario={() => setShowBlockModal(true)}
+          onSincronizarCalendario={handleSincronizarCalendario}
+          isSyncing={isSyncing}
+          onHorariosBox={() => setActiveTab('disponibilidad')}
+          activeTab={activeTab}
+          onActiveTabChange={(tab) => setActiveTab(tab)}
+        />
 
         {activeTab === 'disponibilidad' ? (
           <BoxScheduleView
@@ -1261,89 +1244,16 @@ function AgendaContent() {
             }}
           />
         ) : (
-          <>
-            {/* Barra de Navegación de Fecha */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-paper p-4 sm:p-6 rounded-cards border border-hairline shadow-calendly">
-              <div className="flex items-center gap-2">
-                <button onClick={() => changeDate(-1)} className="min-h-[44px] min-w-[44px] flex items-center justify-center border border-hairline rounded-buttons hover:bg-pebble text-slate-gray transition-colors">
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button onClick={setToday} className="min-h-[44px] px-4 py-2 flex items-center justify-center border border-hairline rounded-buttons hover:bg-pebble font-semibold text-slate-gray text-sm transition-colors">
-                  Hoy
-                </button>
-                <button onClick={() => changeDate(1)} className="min-h-[44px] min-w-[44px] flex items-center justify-center border border-hairline rounded-buttons hover:bg-pebble text-slate-gray transition-colors">
-                  <ChevronRight className="w-5 h-5" />
-                </button>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-24 text-mist-gray min-h-[400px]">
+                <Loader2 className="w-8 h-8 animate-spin mb-3 text-signal-blue" />
+                <p className="text-[16px] font-medium text-slate-gray">Cargando agenda clínica...</p>
               </div>
-              
-              <div className="text-center md:text-left flex-1 md:pl-4">
-                <h2 className="text-xl sm:text-[28px] leading-tight font-bold text-ink-navy">{formattedTitleDate}</h2>
-              </div>
-              
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={handleSincronizarCalendario}
-                  disabled={isSyncing}
-                  className="min-h-[44px] px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-50"
-                  title="Sincronizar citas huérfanas hacia Google Calendar"
-                >
-                  <span>🔄</span> {isSyncing ? 'Sincronizando...' : 'Sincronizar Google Calendar'}
-                </button>
-
-                <div className="flex items-center gap-1 sm:gap-2 border border-hairline p-1 rounded-inputs bg-pebble">
-                  <button onClick={() => setVista('dia')} className={`min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center ${vista === 'dia' ? 'bg-paper shadow-calendly text-ink-navy border border-hairline' : 'text-slate-gray hover:text-ink-navy'}`}>Día</button>
-                  <button onClick={() => setVista('semana')} className={`min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center ${vista === 'semana' ? 'bg-paper shadow-calendly text-ink-navy border border-hairline' : 'text-slate-gray hover:text-ink-navy'}`}>Semana</button>
-                  <button onClick={() => setVista('mes')} className={`min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center ${vista === 'mes' ? 'bg-paper shadow-calendly text-ink-navy border border-hairline' : 'text-slate-gray hover:text-ink-navy'}`}>Mes</button>
-                </div>
-              </div>
-            </div>
-
-            {/* KPIs del Rango */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-paper p-6 rounded-cards border border-hairline shadow-calendly flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg"><span className="text-[12px] font-semibold text-slate-gray uppercase tracking-wider">Citados</span><span className="text-[38px] font-bold text-ink-navy leading-tight">{kpis.citadosHoy}</span></div>
-              <div className="bg-paper p-6 rounded-cards border border-hairline shadow-calendly flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg"><span className="text-[12px] font-semibold text-slate-gray uppercase tracking-wider">Pendientes</span><span className="text-[38px] font-bold text-ink-navy leading-tight">{kpis.pendientes}</span></div>
-              <div className="bg-paper p-6 rounded-cards border border-hairline shadow-calendly flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg"><span className="text-[12px] font-semibold text-slate-gray uppercase tracking-wider">Confirmadas</span><span className="text-[38px] font-bold text-ink-navy leading-tight">{kpis.confirmadas}</span></div>
-              <div className="bg-paper p-6 rounded-cards border border-hairline shadow-calendly flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg"><span className="text-[12px] font-semibold text-slate-gray uppercase tracking-wider">En Box / Sala</span><span className="text-[38px] font-bold text-ink-navy leading-tight">{kpis.enSala}</span></div>
-              <div className="bg-paper p-6 rounded-cards border border-hairline shadow-calendly flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg"><span className="text-[12px] font-semibold text-slate-gray uppercase tracking-wider">Atendidos</span><span className="text-[38px] font-bold text-ink-navy leading-tight">{kpis.asistio}</span></div>
-            </div>
-
-            {/* Contenedor Principal Agenda */}
-            <div className="bg-paper rounded-cards shadow-calendly border border-hairline overflow-hidden">
-              <div className="p-6 bg-cloud border-b border-hairline flex flex-wrap justify-between items-center gap-3">
-                <h3 className="text-[24px] font-semibold text-ink-navy flex items-center gap-2">
-                  <CalendarDays className="w-6 h-6 text-slate-gray" /> Citas Programadas
-                </h3>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setActiveTab('disponibilidad')}
-                    className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold rounded-buttons px-3 sm:px-4 py-2 flex items-center gap-1.5 shadow-xs cursor-pointer"
-                  >
-                    <Settings className="w-4 h-4 text-slate-500" /> Horarios de Box
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowBlockModal(true)}
-                    className="border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs sm:text-sm font-semibold rounded-buttons px-3 sm:px-4 py-2 flex items-center gap-1.5 shadow-xs cursor-pointer"
-                  >
-                    <Lock className="w-4 h-4 text-amber-700" /> Bloquear Horario
-                  </Button>
-                  <Button onClick={() => setShowNewCitaModal(true)} className="bg-signal-blue hover:bg-deep-cobalt text-white rounded-buttons text-[16px] font-semibold px-4 py-2 shadow-calendly-btn cursor-pointer">
-                    <Plus className="w-5 h-5 mr-1.5" /> Agendar Cita
-                  </Button>
-                </div>
-              </div>
-
-              {loading ? (
-                  <div className="flex flex-col items-center justify-center py-24 text-mist-gray min-h-[400px]">
-                    <Loader2 className="w-8 h-8 animate-spin mb-3 text-signal-blue" />
-                    <p className="text-[16px] font-medium text-slate-gray">Cargando agenda clínica...</p>
-                  </div>
-              ) : (
-                  vista === 'dia' ? renderDia() : vista === 'semana' ? renderSemana() : renderMes()
-              )}
-            </div>
-          </>
+            ) : (
+              vista === 'dia' ? renderDia() : vista === 'semana' ? renderSemana() : renderMes()
+            )}
+          </div>
         )}
       
       <Dialog open={!!showNoSessionsAlert} onOpenChange={(open) => !open && setShowNoSessionsAlert(null)}>
