@@ -277,10 +277,10 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
     </div>
   );
 
+  if (!paciente) return <Dialog open={isOpen} onOpenChange={onClose}><div className="flex h-64 items-center justify-center"><p className="text-slate-500">Cargando...</p></div></Dialog>;
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()} className="max-w-4xl min-h-[500px]">
           <DialogHeader className="p-6 border-b border-slate-100 flex-shrink-0 flex justify-between items-start">
             <div>
               <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -338,8 +338,6 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
               )}
             </div>
           </DialogFooter>
-        </div>
-      </div>
     </Dialog>
   );
 }
