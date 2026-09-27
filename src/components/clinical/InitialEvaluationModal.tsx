@@ -12,6 +12,9 @@ import { ShieldAlert, Activity, UserCog, Stethoscope, AlertTriangle, User, Chevr
 import { FormularioLumbar } from './evaluacion/FormularioLumbar';
 import { FormularioCervical } from './evaluacion/FormularioCervical';
 import { FormularioHombro } from './evaluacion/FormularioHombro';
+import { FormularioCadera } from './evaluacion/FormularioCadera';
+import { FormularioRodilla } from './evaluacion/FormularioRodilla';
+import { FormularioTobillo } from './evaluacion/FormularioTobillo';
 
 interface InitialEvaluationModalProps {
   isOpen: boolean;
@@ -196,12 +199,15 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
   );
 
   const renderPaso2 = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4">
       {[
-        { id: 'lumbar', icon: '🦴', label: 'Columna Lumbar y Pelvis' },
+        { id: 'lumbar', icon: '🦴', label: 'Columna Lumbar' },
         { id: 'cervical', icon: '🧠', label: 'Columna Cervical' },
         { id: 'hombro', icon: '💪', label: 'Hombro y Escápula' },
-        { id: 'otro', icon: '➕', label: 'Evaluación General / Otro' },
+        { id: 'cadera', icon: '🦵', label: 'Cadera y Pelvis' },
+        { id: 'rodilla', icon: '🦵', label: 'Rodilla' },
+        { id: 'tobillo_pie', icon: '🦶', label: 'Tobillo y Pie' },
+        { id: 'otro', icon: '➕', label: 'Otro' },
       ].map((seg) => (
         <button
           key={seg.id}
@@ -222,10 +228,13 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
     if (segmento === 'lumbar') return <FormularioLumbar datos={datosSegmento} setDatos={setDatosSegmento} />;
     if (segmento === 'cervical') return <FormularioCervical datos={datosSegmento} setDatos={setDatosSegmento} />;
     if (segmento === 'hombro') return <FormularioHombro datos={datosSegmento} setDatos={setDatosSegmento} />;
+    if (segmento === 'cadera') return <FormularioCadera datos={datosSegmento} setDatos={setDatosSegmento} />;
+    if (segmento === 'rodilla') return <FormularioRodilla datos={datosSegmento} setDatos={setDatosSegmento} />;
+    if (segmento === 'tobillo_pie') return <FormularioTobillo datos={datosSegmento} setDatos={setDatosSegmento} />;
     
     return (
       <div className="p-8 text-center text-slate-500">
-        Sección genérica. (Próximamente más formularios específicos).
+        Sección genérica. (Formulario en desarrollo).
       </div>
     );
   };
