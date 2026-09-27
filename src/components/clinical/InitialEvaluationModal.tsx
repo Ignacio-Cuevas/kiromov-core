@@ -8,7 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { getChileanDate } from '@/lib/utils';
-import { ShieldAlert, Activity, UserCog, Stethoscope, AlertTriangle } from 'lucide-react';
+import { ShieldAlert, Activity, UserCog, Stethoscope, AlertTriangle, User, ChevronRight, ChevronLeft } from 'lucide-react';
+import { FormularioLumbar } from './evaluacion/FormularioLumbar';
+import { FormularioCervical } from './evaluacion/FormularioCervical';
+import { FormularioHombro } from './evaluacion/FormularioHombro';
 
 interface InitialEvaluationModalProps {
   isOpen: boolean;
@@ -19,644 +22,324 @@ interface InitialEvaluationModalProps {
   onSuccess: () => void;
 }
 
-export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, modo = 'editar', onClose, onSuccess }: InitialEvaluationModalProps) {
+export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, modo = 'nueva', onClose, onSuccess }: InitialEvaluationModalProps) {
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
+  const [paso, setPaso] = useState(1);
 
   const [fechaEvaluacion, setFechaEvaluacion] = useState<string>(
-    evaluacionExistente?.fecha_evaluacion || new Date().toISOString().split('T')[0]
+    evaluacionExistente?.fecha_evaluacion || getChileanDate()
   );
 
-  // Blq 1: Perfil Laboral
-  const [ocupacion, setOcupacion] = useState('');
-  const [actividadFisica, setActividadFisica] = useState('');
-  const [cirugias, setCirugias] = useState('');
-  const [farmacos, setFarmacos] = useState('');
+  // Paso 1: Anamnesis y Dolor
+  const [anamnesis, setAnamnesis] = useState({
+    motivo_consulta: '',
+    tiempo_evolucion: 'agudo',
+    eva: 5,
+    dolor_nocturno: false,
+    aumenta_con: '',
+    disminuye_con: '',
+    banderas_rojas: [] as string[]
+  });
 
-  // Blq 2: Seguridad / Banderas Rojas
-  const [banderasRojas, setBanderasRojas] = useState<string[]>([]);
-  const [aptoHvla, setAptoHvla] = useState(true);
-  const [notasContraindicaciones, setNotasContraindicaciones] = useState('');
+  // Paso 2: Segmento
+  const [segmento, setSegmento] = useState<string>('lumbar'); // lumbar, cervical, hombro, otro
 
-  // Blq 3: Comportamiento Síntoma
-  const [mecanismo, setMecanismo] = useState('Insidioso');
-  const [evolucion, setEvolucion] = useState('Agudo <6 sem');
-  const [comportamiento24h, setComportamiento24h] = useState('');
-  const [dolorInicial, setDolorInicial] = useState(5);
-  const [anamnesisReciente, setAnamnesisReciente] = useState('');
+  // Paso 3: Datos de segmento dinámico
+  const [datosSegmento, setDatosSegmento] = useState<any>({});
 
-  // Blq 4: Examen Físico - Juego Articular (3 filas estructuradas)
-  const [juego1Zona, setJuego1Zona] = useState('');
-  const [juego1Grado, setJuego1Grado] = useState('Normal Gr. 3');
-  const [juego1Endfeel, setJuego1Endfeel] = useState('Firme capsular');
-
-  const [juego2Zona, setJuego2Zona] = useState('');
-  const [juego2Grado, setJuego2Grado] = useState('Normal Gr. 3');
-  const [juego2Endfeel, setJuego2Endfeel] = useState('Firme capsular');
-
-  const [juego3Zona, setJuego3Zona] = useState('');
-  const [juego3Grado, setJuego3Grado] = useState('Normal Gr. 3');
-  const [juego3Endfeel, setJuego3Endfeel] = useState('Firme capsular');
-
-  const [movilidad, setMovilidad] = useState('');
-  const [neurodinamia, setNeurodinamia] = useState('');
-  const [hallazgos, setHallazgos] = useState('');
-
-  // Blq 5: Diagnóstico
+  // Paso 4: Conclusión y Plan
   const [diagnostico, setDiagnostico] = useState('');
-  const [objetivos, setObjetivos] = useState('');
-  const [altaEstimada, setAltaEstimada] = useState('4 a 6 sesiones');
+  const [planTratamiento, setPlanTratamiento] = useState('Plan Integral - 10 ses');
+  const [frecuencia, setFrecuencia] = useState('');
+  const [objetivosCortoPlazo, setObjetivosCortoPlazo] = useState('');
 
   useEffect(() => {
     if (modo === 'editar' && evaluacionExistente) {
       setFechaEvaluacion(evaluacionExistente.fecha_evaluacion || getChileanDate());
-      setOcupacion(evaluacionExistente.ocupacion_laboral || '');
-      setActividadFisica(evaluacionExistente.actividad_fisica || '');
-      setCirugias(evaluacionExistente.cirugias_traumatismos || '');
-      setFarmacos(evaluacionExistente.farmacos_actuales || '');
-      setBanderasRojas(evaluacionExistente.banderas_rojas || []);
-      setAptoHvla(evaluacionExistente.apto_hvla ?? true);
-      setNotasContraindicaciones(evaluacionExistente.notas_contraindicaciones || '');
-      setMecanismo(evaluacionExistente.mecanismo_inicio || 'Insidioso');
-      setEvolucion(evaluacionExistente.tiempo_evolucion || 'Agudo <6 sem');
-      setComportamiento24h(evaluacionExistente.comportamiento_24h || '');
-      setDolorInicial(evaluacionExistente.dolor_inicial_ena ?? 5);
-      setAnamnesisReciente(evaluacionExistente.anamnesis_reciente || '');
-
-      setJuego1Zona(evaluacionExistente.juego_articular_1_zona || '');
-      setJuego1Grado(evaluacionExistente.juego_articular_1_grado || 'Normal Gr. 3');
-      setJuego1Endfeel(evaluacionExistente.juego_articular_1_endfeel || 'Firme capsular');
-
-      setJuego2Zona(evaluacionExistente.juego_articular_2_zona || '');
-      setJuego2Grado(evaluacionExistente.juego_articular_2_grado || 'Normal Gr. 3');
-      setJuego2Endfeel(evaluacionExistente.juego_articular_2_endfeel || 'Firme capsular');
-
-      setJuego3Zona(evaluacionExistente.juego_articular_3_zona || '');
-      setJuego3Grado(evaluacionExistente.juego_articular_3_grado || 'Normal Gr. 3');
-      setJuego3Endfeel(evaluacionExistente.juego_articular_3_endfeel || 'Firme capsular');
-
-      setMovilidad(evaluacionExistente.movilidad_activa || '');
-      setNeurodinamia(evaluacionExistente.neurodinamia || '');
-      setHallazgos(evaluacionExistente.hallazgos_fisicos || '');
-      setDiagnostico(evaluacionExistente.hipotesis_diagnostica_tmo || evaluacionExistente.hipotesis_diagnostica || '');
-      setObjetivos(evaluacionExistente.objetivos_terapeuticos || '');
-      setAltaEstimada(evaluacionExistente.estimacion_alta || '4 a 6 sesiones');
-    } else if (modo === 'nueva') {
-      setFechaEvaluacion(getChileanDate());
-      setOcupacion('');
-      setActividadFisica('');
-      setCirugias('');
-      setFarmacos('');
-      setBanderasRojas([]);
-      setAptoHvla(true);
-      setNotasContraindicaciones('');
-      setMecanismo('Insidioso');
-      setEvolucion('Agudo <6 sem');
-      setComportamiento24h('');
-      setDolorInicial(5);
-      setAnamnesisReciente('');
-
-      setJuego1Zona('');
-      setJuego1Grado('Normal Gr. 3');
-      setJuego1Endfeel('Firme capsular');
-
-      setJuego2Zona('');
-      setJuego2Grado('Normal Gr. 3');
-      setJuego2Endfeel('Firme capsular');
-
-      setJuego3Zona('');
-      setJuego3Grado('Normal Gr. 3');
-      setJuego3Endfeel('Firme capsular');
-
-      setMovilidad('');
-      setNeurodinamia('');
-      setHallazgos('');
-      setDiagnostico('');
-      setObjetivos('');
-      setAltaEstimada('4 a 6 sesiones');
+      setSegmento(evaluacionExistente.segmento_evaluado || 'lumbar');
+      setAnamnesis(evaluacionExistente.anamnesis || anamnesis);
+      setDatosSegmento(evaluacionExistente.datos_segmento || {});
+      setDiagnostico(evaluacionExistente.diagnostico_tmo || '');
+      setPlanTratamiento(evaluacionExistente.plan_tratamiento || '');
     }
-  }, [evaluacionExistente, modo, isOpen]);
-
-  const toggleBandera = (bandera: string) => {
-    setBanderasRojas(prev => prev.includes(bandera) ? prev.filter(b => b !== bandera) : [...prev, bandera]);
-  };
-
-  const addChip = (setter: React.Dispatch<React.SetStateAction<string>>, val: string, text: string) => {
-    if (!val.includes(text)) {
-      setter(prev => prev ? `${prev}, ${text}` : text);
-    }
-  };
+  }, [evaluacionExistente, modo]);
 
   const handleGuardar = async () => {
     if (!supabase) return;
-    setLoading(true);
     try {
-      const resumenJuegos = [
-        juego1Zona ? `${juego1Zona}: ${juego1Grado} (${juego1Endfeel})` : '',
-        juego2Zona ? `${juego2Zona}: ${juego2Grado} (${juego2Endfeel})` : '',
-        juego3Zona ? `${juego3Zona}: ${juego3Grado} (${juego3Endfeel})` : '',
-      ].filter(Boolean).join(' | ');
+      setLoading(true);
 
       const payload = {
         paciente_id: paciente.id,
         fecha_evaluacion: fechaEvaluacion,
-        fecha: fechaEvaluacion,
-        kinesiologo: 'Klgo. Ignacio Cuevas Silva',
-        ocupacion_laboral: ocupacion,
-        actividad_fisica: actividadFisica,
-        cirugias_traumatismos: cirugias,
-        farmacos_actuales: farmacos,
-        banderas_rojas: banderasRojas,
-        banderas_rojas_alerta: banderasRojas,
-        apto_hvla: aptoHvla,
-        notas_contraindicaciones: notasContraindicaciones,
-        mecanismo_inicio: mecanismo,
-        tiempo_evolucion: evolucion,
-        comportamiento_24h: comportamiento24h,
-        dolor_inicial_ena: dolorInicial,
-        anamnesis_reciente: anamnesisReciente.trim(),
-        juego_articular_1_zona: juego1Zona.trim(),
-        juego_articular_1_grado: juego1Grado,
-        juego_articular_1_endfeel: juego1Endfeel,
-        juego_articular_2_zona: juego2Zona.trim(),
-        juego_articular_2_grado: juego2Grado,
-        juego_articular_2_endfeel: juego2Endfeel,
-        juego_articular_3_zona: juego3Zona.trim(),
-        juego_articular_3_grado: juego3Grado,
-        juego_articular_3_endfeel: juego3Endfeel,
-        juego_articular: resumenJuegos || juego1Grado,
-        movilidad_activa: movilidad,
-        neurodinamia: neurodinamia,
-        hallazgos_fisicos: hallazgos,
-        hipotesis_diagnostica_tmo: diagnostico,
-        hipotesis_diagnostica: diagnostico,
-        objetivos_terapeuticos: objetivos,
-        estimacion_alta: altaEstimada,
-        updated_at: new Date().toISOString()
+        segmento_evaluado: segmento,
+        anamnesis,
+        datos_segmento: datosSegmento,
+        diagnostico_tmo: diagnostico,
+        plan_tratamiento: planTratamiento,
       };
 
-      if (modo === 'editar' && evaluacionExistente?.id) {
-        const { error } = await supabase.from('evaluaciones_iniciales_tmo').update(payload).eq('id', evaluacionExistente.id);
-        if (error) {
-          if (error.message?.includes('juego_articular_1') || error.message?.includes('anamnesis_reciente')) {
-            const { 
-              anamnesis_reciente, 
-              juego_articular_1_zona, juego_articular_1_grado, juego_articular_1_endfeel,
-              juego_articular_2_zona, juego_articular_2_grado, juego_articular_2_endfeel,
-              juego_articular_3_zona, juego_articular_3_grado, juego_articular_3_endfeel,
-              ...fallbackPayload 
-            } = payload as any;
-            const { error: fallbackErr } = await supabase.from('evaluaciones_iniciales_tmo').update(fallbackPayload).eq('id', evaluacionExistente.id);
-            if (fallbackErr) throw fallbackErr;
-          } else {
-            throw error;
-          }
-        }
-      } else {
+      if (modo === 'nueva' || !evaluacionExistente?.id) {
         const { error } = await supabase.from('evaluaciones_iniciales_tmo').insert([payload]);
-        if (error) {
-          if (error.message?.includes('juego_articular_1') || error.message?.includes('anamnesis_reciente')) {
-            const { 
-              anamnesis_reciente, 
-              juego_articular_1_zona, juego_articular_1_grado, juego_articular_1_endfeel,
-              juego_articular_2_zona, juego_articular_2_grado, juego_articular_2_endfeel,
-              juego_articular_3_zona, juego_articular_3_grado, juego_articular_3_endfeel,
-              ...fallbackPayload 
-            } = payload as any;
-            const { error: fallbackErr } = await supabase.from('evaluaciones_iniciales_tmo').insert([fallbackPayload]);
-            if (fallbackErr) throw fallbackErr;
-          } else {
-            throw error;
-          }
-        }
-        
-        // Crear el primer SOAP
-        const { data: soaps } = await supabase.from('evoluciones_soap').select('id').eq('paciente_id', paciente.id).limit(1);
-        if (!soaps || soaps.length === 0) {
-          await supabase.from('evoluciones_soap').insert([{
-            paciente_id: paciente.id,
-            fecha: getChileanDate(),
-            nivel_dolor_ena: dolorInicial,
-            s_subjetivo: 'Evaluación Inicial TMO',
-            o_objetivo: 'Ver Ficha de Evaluación TMO para detalles de examen físico.',
-            a_analisis: diagnostico,
-            p_plan: objetivos,
-            pronostico_sesiones: altaEstimada,
-            profesional: 'Kinesiólogo(a)'
-          }]);
-        }
+        if (error) throw error;
+        toast.success('Evaluación Inicial guardada correctamente');
+      } else {
+        const { error } = await supabase
+          .from('evaluaciones_iniciales_tmo')
+          .update(payload)
+          .eq('id', evaluacionExistente.id);
+        if (error) throw error;
+        toast.success('Evaluación Inicial actualizada correctamente');
       }
 
-      // Actualizar paciente
-      await supabase.from('pacientes').update({
-        diagnostico_principal: diagnostico,
-        alertas_seguridad: notasContraindicaciones + (aptoHvla ? '' : ' [No Apto HVLA]'),
-        antecedentes_morbidos: `Cirugías: ${cirugias} | Fármacos: ${farmacos}`
-      }).eq('id', paciente.id);
-
-      toast.success('Evaluación TMO guardada exitosamente');
       onSuccess();
+      onClose();
     } catch (err: any) {
+      console.error('Error guardando evaluación:', err);
       toast.error('Error al guardar: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogHeader>
-        <DialogTitle>Evaluación Kinésica Inicial & Examen Basal TMO</DialogTitle>
-        <DialogDescription>
-          Historia clínica de ingreso, banderas rojas y biomecánica articular — {paciente?.nombre_completo}
-        </DialogDescription>
-      </DialogHeader>
-
-      <DialogBody className="max-h-[70vh] overflow-y-auto space-y-6 p-1">
-        {/* Cabecera del Formulario: Fecha y Evaluador */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
-          <div className="flex-1 space-y-1 w-full sm:w-auto">
-            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
-              📅 Fecha de Evaluación Inicial
-            </label>
-            <input
-              type="date"
-              value={fechaEvaluacion}
-              onChange={(e) => setFechaEvaluacion(e.target.value)}
-              className="text-xs p-2 rounded-lg border border-slate-300 bg-white font-medium focus:ring-2 focus:ring-blue-500/20 w-full"
-            />
-          </div>
-          <div className="flex-1 space-y-1">
-            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
-              Evaluador Responsable
-            </span>
-            <p className="text-xs text-slate-600 font-semibold pt-1 sm:pt-2">Klgo. Ignacio Cuevas Silva</p>
-          </div>
-        </div>
-
-        {/* Bloque 1 */}
-        <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-            <UserCog className="w-4 h-4 text-blue-600" />
-            1. Perfil Laboral y Carga Biomecánica
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Ocupación / Tipo de Trabajo</label>
-              <Input value={ocupacion} onChange={e => setOcupacion(e.target.value)} placeholder="Ej: Oficinista" />
-              <div className="flex flex-wrap gap-1 mt-1">
-                {['Sedente prolongado', 'Manejo manual de cargas', 'Bipedestación continua', 'Vibración / Conducción'].map(chip => (
-                  <span key={chip} onClick={() => addChip(setOcupacion, ocupacion, chip)} className="text-[10px] bg-white border border-slate-300 px-2 py-0.5 rounded-full cursor-pointer hover:bg-slate-100">{chip}</span>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Actividad Física / Deporte</label>
-              <Input value={actividadFisica} onChange={e => setActividadFisica(e.target.value)} placeholder="Ej: Running 3v/sem" />
-            </div>
-            <div className="space-y-1 md:col-span-2">
-              <label className="text-xs font-semibold text-slate-700">Cirugías y Fracturas Previas</label>
-              <Input value={cirugias} onChange={e => setCirugias(e.target.value)} placeholder="Ej: Apendicectomía 2015, sin fracturas" />
-            </div>
-            <div className="space-y-1 md:col-span-2">
-              <label className="text-xs font-semibold text-slate-700">Fármacos de Uso Habitual</label>
-              <Input value={farmacos} onChange={e => setFarmacos(e.target.value)} placeholder="Ej: Paracetamol en caso de dolor" />
-              <div className="flex flex-wrap gap-1 mt-1">
-                {['Uso de AINEs', 'Anticoagulantes', 'Corticoides prolongados'].map(chip => (
-                  <span key={chip} onClick={() => addChip(setFarmacos, farmacos, chip)} className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full cursor-pointer hover:bg-rose-100">{chip}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bloque 2 */}
-        <div className="space-y-4 bg-rose-50/50 p-4 rounded-xl border border-rose-200">
-          <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-rose-600" />
-            2. Tamizaje de Seguridad y Banderas Rojas TMO
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {['Dolor nocturno constante', 'Pérdida de peso', 'Compromiso neurológico severo', 'Síntomas de arteria vertebral'].map(bandera => (
-              <label key={bandera} className="flex items-start gap-2 text-xs text-slate-700">
-                <input type="checkbox" checked={banderasRojas.includes(bandera)} onChange={() => toggleBandera(bandera)} className="mt-0.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500" />
-                <span className="leading-tight">{bandera}</span>
-              </label>
-            ))}
-          </div>
-          
-          <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200 mt-4">
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" checked={aptoHvla} onChange={e => setAptoHvla(e.target.checked)} className="sr-only peer" />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-            </label>
-            <span className={`font-bold text-sm ${aptoHvla ? 'text-emerald-700' : 'text-amber-600'}`}>
-              {aptoHvla ? '⚡ Paciente Apto para Manipulación Articular HVLA' : '⚠️ Precaución / Contraindicación para HVLA'}
-            </span>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700">Notas Adicionales de Seguridad</label>
-            <Input value={notasContraindicaciones} onChange={e => setNotasContraindicaciones(e.target.value)} placeholder="Ej: Osteopenia leve, preferir movilizaciones grado I-II" />
-          </div>
-        </div>
-
-        {/* Bloque 3 */}
-        <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-amber-600" />
-            3. Comportamiento del Síntoma
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Mecanismo de Inicio</label>
-              <select value={mecanismo} onChange={e => setMecanismo(e.target.value)} className="w-full text-sm p-2 border border-slate-300 rounded-lg">
-                <option value="Traumático">Traumático</option>
-                <option value="Sobrecarga repetitiva">Sobrecarga repetitiva</option>
-                <option value="Insidioso">Insidioso</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Tiempo de Evolución</label>
-              <select value={evolucion} onChange={e => setEvolucion(e.target.value)} className="w-full text-sm p-2 border border-slate-300 rounded-lg">
-                <option value="Agudo <6 sem">Agudo &lt;6 sem</option>
-                <option value="Subagudo 6-12 sem">Subagudo 6-12 sem</option>
-                <option value="Crónico >12 sem">Crónico &gt;12 sem</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Comportamiento 24h</label>
-              <select value={comportamiento24h} onChange={e => setComportamiento24h(e.target.value)} className="w-full text-sm p-2 border border-slate-300 rounded-lg">
-                <option value="">Seleccionar...</option>
-                <option value="Rigidez matutina">Rigidez matutina</option>
-                <option value="Dolor vespertino por fatiga">Dolor vespertino por fatiga</option>
-                <option value="Dolor nocturno">Dolor nocturno</option>
-                <option value="Variable">Variable</option>
-              </select>
-            </div>
-          </div>
-          <div className="space-y-2 mt-4 pt-4 border-t border-slate-200">
-            <div className="flex justify-between items-center">
-              <label className="text-xs font-semibold text-slate-700">Dolor Inicial (Escala Numérica 0-10)</label>
-              <span className={`text-lg font-black ${dolorInicial >= 7 ? 'text-rose-600' : dolorInicial >= 4 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                {dolorInicial}/10
-              </span>
-            </div>
-            <input 
-              type="range" min="0" max="10" step="1" 
-              value={dolorInicial} 
-              onChange={(e) => setDolorInicial(Number(e.target.value))} 
-              className="w-full accent-blue-600 cursor-pointer" 
-            />
-            <div className="flex justify-between text-[10px] text-slate-400 font-bold px-1">
-              <span>0 (Sin dolor)</span>
-              <span>5 (Moderado)</span>
-              <span>10 (Máximo)</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Anamnesis del Cuadro Actual / Historia de la Enfermedad Actual (Antes del Examen Físico) */}
-        <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-            <Activity className="w-4 h-4 text-blue-600" />
-            <span>Anamnesis Reciente / Historia de la Enfermedad Actual</span>
-          </label>
-          <Textarea
-            rows={4}
-            value={anamnesisReciente}
-            onChange={(e) => setAnamnesisReciente(e.target.value)}
-            placeholder="¿Cómo y cuándo comenzó el dolor? Actividades agravantes/atenuantes, irradiación, tratamientos previos..."
-            className="min-h-[100px] text-xs leading-relaxed bg-white"
+  const renderPaso1 = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-semibold text-slate-700">Motivo de consulta</label>
+          <Textarea 
+            placeholder="Ej: Dolor en zona baja de la espalda..."
+            value={anamnesis.motivo_consulta}
+            onChange={(e) => setAnamnesis({ ...anamnesis, motivo_consulta: e.target.value })}
           />
         </div>
-
-        {/* Bloque 4 */}
-        <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-            <Stethoscope className="w-4 h-4 text-emerald-600" />
-            4. Examen Físico Basal TMO (Hallazgos Articulares y Tejidos)
-          </h3>
-
-          {/* 3 Filas de Juego Articular (Kaltenborn / Maitland) */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-700">
-                Juego Articular Accesorio (Joint Play - Kaltenborn / Maitland)
-              </label>
-              <span className="text-[10px] text-slate-400 font-semibold">3 Segmentos evaluables</span>
-            </div>
-
-            <div className="space-y-2.5">
-              {/* Fila 1 */}
-              <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
-                <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
-                  <span>Segmento 1</span>
-                  <div className="flex flex-wrap gap-1">
-                    {['L4-L5', 'Sacroilíaca D°', 'C5-C6', 'Glenohumeral'].map(ej => (
-                      <button
-                        key={ej}
-                        type="button"
-                        onClick={() => setJuego1Zona(ej)}
-                        className="text-[9px] px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded cursor-pointer"
-                      >
-                        {ej}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <Input
-                    value={juego1Zona}
-                    onChange={(e) => setJuego1Zona(e.target.value)}
-                    placeholder="Articulación / Segmento (ej: L4-L5)"
-                    className="text-xs h-9 bg-slate-50/50"
-                  />
-                  <select
-                    value={juego1Grado}
-                    onChange={(e) => setJuego1Grado(e.target.value)}
-                    className="text-xs h-9 px-2 border border-slate-300 rounded-lg bg-white font-medium"
-                  >
-                    <option value="Hipomóvil Gr. 0-2">Hipomóvil Gr. 0-2</option>
-                    <option value="Normal Gr. 3">Normal Gr. 3</option>
-                    <option value="Hipermóvil Gr. 4-6">Hipermóvil Gr. 4-6</option>
-                  </select>
-                  <select
-                    value={juego1Endfeel}
-                    onChange={(e) => setJuego1Endfeel(e.target.value)}
-                    className="text-xs h-9 px-2 border border-slate-300 rounded-lg bg-white font-medium"
-                  >
-                    <option value="Firme capsular">Firme capsular</option>
-                    <option value="Duro óseo">Duro óseo</option>
-                    <option value="Blando elástico">Blando elástico</option>
-                    <option value="Vacío / Espasmo protector">Vacío / Espasmo protector</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Fila 2 */}
-              <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
-                <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
-                  <span>Segmento 2 (Opcional)</span>
-                  <div className="flex flex-wrap gap-1">
-                    {['L5-S1', 'Sacroilíaca I°', 'C6-C7', 'Cadera D°'].map(ej => (
-                      <button
-                        key={ej}
-                        type="button"
-                        onClick={() => setJuego2Zona(ej)}
-                        className="text-[9px] px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded cursor-pointer"
-                      >
-                        {ej}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <Input
-                    value={juego2Zona}
-                    onChange={(e) => setJuego2Zona(e.target.value)}
-                    placeholder="Articulación / Segmento 2"
-                    className="text-xs h-9 bg-slate-50/50"
-                  />
-                  <select
-                    value={juego2Grado}
-                    onChange={(e) => setJuego2Grado(e.target.value)}
-                    className="text-xs h-9 px-2 border border-slate-300 rounded-lg bg-white font-medium"
-                  >
-                    <option value="Hipomóvil Gr. 0-2">Hipomóvil Gr. 0-2</option>
-                    <option value="Normal Gr. 3">Normal Gr. 3</option>
-                    <option value="Hipermóvil Gr. 4-6">Hipermóvil Gr. 4-6</option>
-                  </select>
-                  <select
-                    value={juego2Endfeel}
-                    onChange={(e) => setJuego2Endfeel(e.target.value)}
-                    className="text-xs h-9 px-2 border border-slate-300 rounded-lg bg-white font-medium"
-                  >
-                    <option value="Firme capsular">Firme capsular</option>
-                    <option value="Duro óseo">Duro óseo</option>
-                    <option value="Blando elástico">Blando elástico</option>
-                    <option value="Vacío / Espasmo protector">Vacío / Espasmo protector</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Fila 3 */}
-              <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
-                <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
-                  <span>Segmento 3 (Opcional)</span>
-                  <div className="flex flex-wrap gap-1">
-                    {['T12-L1', 'Escápulotorácica', 'Tobillo', 'Rodilla'].map(ej => (
-                      <button
-                        key={ej}
-                        type="button"
-                        onClick={() => setJuego3Zona(ej)}
-                        className="text-[9px] px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded cursor-pointer"
-                      >
-                        {ej}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <Input
-                    value={juego3Zona}
-                    onChange={(e) => setJuego3Zona(e.target.value)}
-                    placeholder="Articulación / Segmento 3"
-                    className="text-xs h-9 bg-slate-50/50"
-                  />
-                  <select
-                    value={juego3Grado}
-                    onChange={(e) => setJuego3Grado(e.target.value)}
-                    className="text-xs h-9 px-2 border border-slate-300 rounded-lg bg-white font-medium"
-                  >
-                    <option value="Hipomóvil Gr. 0-2">Hipomóvil Gr. 0-2</option>
-                    <option value="Normal Gr. 3">Normal Gr. 3</option>
-                    <option value="Hipermóvil Gr. 4-6">Hipermóvil Gr. 4-6</option>
-                  </select>
-                  <select
-                    value={juego3Endfeel}
-                    onChange={(e) => setJuego3Endfeel(e.target.value)}
-                    className="text-xs h-9 px-2 border border-slate-300 rounded-lg bg-white font-medium"
-                  >
-                    <option value="Firme capsular">Firme capsular</option>
-                    <option value="Duro óseo">Duro óseo</option>
-                    <option value="Blando elástico">Blando elástico</option>
-                    <option value="Vacío / Espasmo protector">Vacío / Espasmo protector</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Cajas de Texto Espaciosas en Examen Físico (rows=4, min-h-[100px]) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Movilidad Activa (ROM)</label>
-              <Textarea 
-                rows={4} 
-                value={movilidad} 
-                onChange={e => setMovilidad(e.target.value)} 
-                placeholder="Ej: Limitación flexión lumbar a 50%, dolor en extensión terminal..." 
-                className="min-h-[100px] text-xs leading-relaxed bg-white"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Neurodinamia Basal (Slump / Lasègue / ULNT)</label>
-              <Textarea 
-                rows={4} 
-                value={neurodinamia} 
-                onChange={e => setNeurodinamia(e.target.value)} 
-                placeholder="Ej: Slump (+) der con reproducción de dolor a 45°, Lasègue (-), ULNT bilateral..." 
-                className="min-h-[100px] text-xs leading-relaxed bg-white"
-              />
-            </div>
-            <div className="space-y-1 md:col-span-2">
-              <label className="text-xs font-semibold text-slate-700">Otros Hallazgos (Puntos Gatillo, Control Motor)</label>
-              <Textarea 
-                rows={4} 
-                value={hallazgos} 
-                onChange={e => setHallazgos(e.target.value)} 
-                placeholder="Ej: PG activo en cuadrado lumbar derecho, alteración control motor transverso/multífidos..." 
-                className="min-h-[100px] text-xs leading-relaxed bg-white"
-              />
-            </div>
-          </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-semibold text-slate-700">Tiempo de evolución</label>
+          <select 
+            className="px-3 py-2 text-sm border border-slate-200 rounded-md"
+            value={anamnesis.tiempo_evolucion}
+            onChange={(e) => setAnamnesis({ ...anamnesis, tiempo_evolucion: e.target.value })}
+          >
+            <option value="agudo">Agudo (&lt; 4 semanas)</option>
+            <option value="subagudo">Subagudo (4 - 12 semanas)</option>
+            <option value="cronico">Crónico (&gt; 12 semanas)</option>
+          </select>
         </div>
+      </div>
 
-        {/* Bloque 5 */}
-        <div className="space-y-4 bg-blue-50/40 p-4 rounded-xl border border-blue-200">
-          <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-blue-600" />
-            5. Diagnóstico Funcional TMO
-          </h3>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Hipótesis Diagnóstica Kinésica Integral</label>
-              <Textarea value={diagnostico} onChange={e => setDiagnostico(e.target.value)} placeholder="Ej: Síndrome facetario lumbar L4-L5 derecho hipomóvil secundario a sedestación prolongada" className="min-h-[80px]" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Objetivos Terapéuticos</label>
-              <Textarea value={objetivos} onChange={e => setObjetivos(e.target.value)} placeholder="Ej: Disminuir dolor, recuperar ROM lumbar, mejorar control motor core" className="min-h-[60px]" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Estimación de Alta Funcional</label>
-              <select value={altaEstimada} onChange={e => setAltaEstimada(e.target.value)} className="w-full text-sm p-2 border border-slate-300 rounded-lg bg-white">
-                <option value="1 a 3 sesiones">1 a 3 sesiones</option>
-                <option value="4 a 6 sesiones">4 a 6 sesiones</option>
-                <option value="6 a 10 sesiones">6 a 10 sesiones</option>
-                <option value="Más de 10 sesiones">Más de 10 sesiones</option>
-                <option value="Manejo crónico">Manejo crónico</option>
-              </select>
-            </div>
-          </div>
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-semibold text-slate-700">Escala EVA del Dolor ({anamnesis.eva}/10)</label>
+        <input 
+          type="range" min="0" max="10" 
+          value={anamnesis.eva} 
+          onChange={(e) => setAnamnesis({ ...anamnesis, eva: parseInt(e.target.value) })}
+          className="w-full accent-blue-600"
+        />
+        <div className="flex justify-between text-xs text-slate-500">
+          <span>0 (Sin dolor)</span>
+          <span>5 (Moderado)</span>
+          <span>10 (Máximo)</span>
         </div>
-      </DialogBody>
-      <DialogFooter className="bg-slate-50 border-t border-slate-200 mt-0">
-        <Button variant="outline" onClick={onClose} disabled={loading}>Cancelar</Button>
-        <Button onClick={handleGuardar} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold">
-          {loading ? 'Guardando...' : '✓ Guardar Evaluación Inicial TMO'}
-        </Button>
-      </DialogFooter>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-semibold text-slate-700">El dolor aumenta con:</label>
+          <Input 
+            placeholder="Ej: Estar sentado, agacharse..."
+            value={anamnesis.aumenta_con}
+            onChange={(e) => setAnamnesis({ ...anamnesis, aumenta_con: e.target.value })}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-semibold text-slate-700">El dolor disminuye con:</label>
+          <Input 
+            placeholder="Ej: Calor, reposo, analgésicos..."
+            value={anamnesis.disminuye_con}
+            onChange={(e) => setAnamnesis({ ...anamnesis, disminuye_con: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input 
+          type="checkbox" 
+          id="dolor_nocturno"
+          checked={anamnesis.dolor_nocturno}
+          onChange={(e) => setAnamnesis({ ...anamnesis, dolor_nocturno: e.target.checked })}
+        />
+        <label htmlFor="dolor_nocturno" className="text-sm text-slate-700">Presenta dolor nocturno (despierta por la noche)</label>
+      </div>
+
+      <div className="p-3 bg-red-50 rounded-lg border border-red-100 flex flex-col gap-2">
+        <label className="text-sm font-bold text-red-800 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4" /> Descarte de Banderas Rojas
+        </label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-red-700">
+          {['Pérdida de fuerza súbita', 'Compromiso esfinteriano', 'Fiebre/baja peso inexplicable'].map((bandera) => (
+            <div key={bandera} className="flex items-center gap-2">
+              <input 
+                type="checkbox" 
+                checked={anamnesis.banderas_rojas.includes(bandera)}
+                onChange={(e) => {
+                  if (e.target.checked) setAnamnesis({ ...anamnesis, banderas_rojas: [...anamnesis.banderas_rojas, bandera] });
+                  else setAnamnesis({ ...anamnesis, banderas_rojas: anamnesis.banderas_rojas.filter(b => b !== bandera) });
+                }}
+              />
+              <span>{bandera}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderPaso2 = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+      {[
+        { id: 'lumbar', icon: '🦴', label: 'Columna Lumbar y Pelvis' },
+        { id: 'cervical', icon: '🧠', label: 'Columna Cervical' },
+        { id: 'hombro', icon: '💪', label: 'Hombro y Escápula' },
+        { id: 'otro', icon: '➕', label: 'Evaluación General / Otro' },
+      ].map((seg) => (
+        <button
+          key={seg.id}
+          type="button"
+          onClick={() => setSegmento(seg.id)}
+          className={`p-6 flex flex-col items-center justify-center gap-2 rounded-xl border-2 transition-all ${
+            segmento === seg.id ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white hover:border-blue-300'
+          }`}
+        >
+          <span className="text-3xl">{seg.icon}</span>
+          <span className="font-semibold">{seg.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+
+  const renderPaso3 = () => {
+    if (segmento === 'lumbar') return <FormularioLumbar datos={datosSegmento} setDatos={setDatosSegmento} />;
+    if (segmento === 'cervical') return <FormularioCervical datos={datosSegmento} setDatos={setDatosSegmento} />;
+    if (segmento === 'hombro') return <FormularioHombro datos={datosSegmento} setDatos={setDatosSegmento} />;
+    
+    return (
+      <div className="p-8 text-center text-slate-500">
+        Sección genérica. (Próximamente más formularios específicos).
+      </div>
+    );
+  };
+
+  const renderPaso4 = () => (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-semibold text-slate-700">Diagnóstico Kinésico Funcional</label>
+        <Textarea 
+          placeholder='Ej: "Síndrome de dolor subacromial derecho asociado a discinesia escapular..."'
+          value={diagnostico}
+          onChange={(e) => setDiagnostico(e.target.value)}
+          className="h-24"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-semibold text-slate-700">Plan Recomendado</label>
+          <select 
+            className="px-3 py-2 text-sm border border-slate-200 rounded-md bg-white"
+            value={planTratamiento}
+            onChange={(e) => setPlanTratamiento(e.target.value)}
+          >
+            <option value="Plan Activa Care - 4 ses">Plan Activa Care - 4 ses</option>
+            <option value="Plan Pro Care - 6 ses">Plan Pro Care - 6 ses</option>
+            <option value="Plan Integral - 10 ses">Plan Integral - 10 ses</option>
+            <option value="Sesión Individual">Sesión Individual</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-semibold text-slate-700">Frecuencia Semanal</label>
+          <Input 
+            placeholder="Ej: 2 veces por semana"
+            value={frecuencia}
+            onChange={(e) => setFrecuencia(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-semibold text-slate-700">Objetivos a Corto Plazo</label>
+        <Textarea 
+          placeholder="Ej: Disminuir EVA a 3/10, mejorar ROM..."
+          value={objetivosCortoPlazo}
+          onChange={(e) => setObjetivosCortoPlazo(e.target.value)}
+        />
+      </div>
+    </div>
+  );
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="p-6 border-b border-slate-100 flex-shrink-0 flex justify-between items-start">
+            <div>
+              <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <Stethoscope className="w-5 h-5 text-blue-600" />
+                Nueva Evaluación Inicial TMO
+              </DialogTitle>
+              <DialogDescription>
+                Paciente: {paciente?.nombre_completo || paciente?.full_name}
+              </DialogDescription>
+            </div>
+            
+            {/* Stepper Header */}
+            <div className="flex gap-2 text-xs font-semibold">
+              {[1, 2, 3, 4].map((step) => (
+                <div 
+                  key={step} 
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    paso === step ? 'bg-blue-600 text-white' : paso > step ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'
+                  }`}
+                >
+                  {step}
+                </div>
+              ))}
+            </div>
+          </DialogHeader>
+
+          <DialogBody className="p-6 overflow-y-auto bg-slate-50 flex-1">
+            {paso === 1 && renderPaso1()}
+            {paso === 2 && renderPaso2()}
+            {paso === 3 && renderPaso3()}
+            {paso === 4 && renderPaso4()}
+          </DialogBody>
+
+          <DialogFooter className="p-6 border-t border-slate-100 bg-white flex justify-between items-center flex-shrink-0">
+            {paso > 1 ? (
+              <Button variant="outline" onClick={() => setPaso(paso - 1)} type="button">
+                <ChevronLeft className="w-4 h-4 mr-1" /> Atrás
+              </Button>
+            ) : (
+              <div /> // Spacer
+            )}
+
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={onClose} type="button">
+                Cancelar
+              </Button>
+              {paso < 4 ? (
+                <Button onClick={() => setPaso(paso + 1)} type="button" className="bg-blue-600 hover:bg-blue-700 text-white">
+                  Siguiente <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              ) : (
+                <Button onClick={handleGuardar} disabled={loading} type="button" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
+                  {loading ? 'Guardando...' : 'Guardar Evaluación Inicial TMO'}
+                </Button>
+              )}
+            </div>
+          </DialogFooter>
+        </div>
+      </div>
     </Dialog>
   );
 }

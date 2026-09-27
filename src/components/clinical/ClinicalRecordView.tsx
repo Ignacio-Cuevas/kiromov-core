@@ -1148,195 +1148,88 @@ export function ClinicalRecordView({
             {/* Contenido de la Evaluación TMO */}
             {evaluacionInicialTMO ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-8">
-                
-                {/* Tarjeta 1: Anamnesis y Perfil Laboral */}
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2 border-b border-slate-100 pb-2">
-                    <User className="w-4 h-4 text-blue-600" />
-                    <span>1. Anamnesis & Perfil Laboral</span>
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Ocupación / Trabajo</span>
-                      <p className="font-semibold text-slate-800 mt-0.5">{evaluacionInicialTMO.ocupacion_laboral || 'No registrada'}</p>
+                {/* Tarjeta Resumen */}
+                <div className="col-span-1 md:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-2xl">
+                      {evaluacionInicialTMO.segmento_evaluado === 'lumbar' ? '🦴' : 
+                       evaluacionInicialTMO.segmento_evaluado === 'cervical' ? '🧠' : 
+                       evaluacionInicialTMO.segmento_evaluado === 'hombro' ? '💪' : '➕'}
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Actividad Física</span>
-                      <p className="font-semibold text-slate-800 mt-0.5">{evaluacionInicialTMO.actividad_fisica || 'Sedentario / No refiere'}</p>
+                      <h3 className="text-lg font-bold text-slate-800">
+                        {evaluacionInicialTMO.segmento_evaluado === 'lumbar' ? 'Columna Lumbar' : 
+                         evaluacionInicialTMO.segmento_evaluado === 'cervical' ? 'Columna Cervical' : 
+                         evaluacionInicialTMO.segmento_evaluado === 'hombro' ? 'Hombro' : 'Evaluación General'}
+                      </h3>
+                      <p className="text-sm text-slate-500">Fecha: {evaluacionInicialTMO.fecha_evaluacion}</p>
                     </div>
+                  </div>
+                  <div className="flex gap-4 text-center">
                     <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Cirugías / Traumatismos</span>
-                      <p className="font-semibold text-slate-800 mt-0.5">{evaluacionInicialTMO.cirugias_traumatismos || 'Sin antecedentes quirúrgicos'}</p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Fármacos Actuales</span>
-                      <p className="font-semibold text-slate-800 mt-0.5">{evaluacionInicialTMO.farmacos_actuales || 'No registra medicación'}</p>
+                      <span className="block text-xs font-bold text-slate-400 uppercase">EVA Inicial</span>
+                      <span className="font-bold text-blue-600 text-lg">{evaluacionInicialTMO.anamnesis?.eva ?? evaluacionInicialTMO.dolor_inicial_ena ?? 0}/10</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Tarjeta 2: Seguridad Clínica & Banderas Rojas */}
+                {/* Detalles de Anamnesis */}
                 <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2 border-b border-slate-100 pb-2">
-                    <ShieldAlert className="w-4 h-4 text-rose-600" />
-                    <span>2. Seguridad Clínica & Banderas Rojas</span>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
+                    1. Anamnesis y Dolor
                   </h3>
-                  <div className="space-y-3 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-700">Aptitud Manipulación HVLA:</span>
-                      <span className={`px-2.5 py-1 rounded-lg font-bold text-xs ${
-                        evaluacionInicialTMO.apto_hvla 
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                          : 'bg-rose-100 text-rose-800 border border-rose-200'
-                      }`}>
-                        {evaluacionInicialTMO.apto_hvla ? '⚡ Apto para HVLA' : '⚠️ Precaución / No Apto HVLA'}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Banderas Rojas Detectadas:</span>
-                      {evaluacionInicialTMO.banderas_rojas && evaluacionInicialTMO.banderas_rojas.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {(Array.isArray(evaluacionInicialTMO.banderas_rojas) ? evaluacionInicialTMO.banderas_rojas : [evaluacionInicialTMO.banderas_rojas]).map((b: string, i: number) => (
-                            <span key={i} className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-semibold text-[11px]">
-                              🚩 {b}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-emerald-700 font-medium">✓ Sin banderas rojas reportadas</span>
-                      )}
-                    </div>
-
-                    {evaluacionInicialTMO.notas_contraindicaciones && (
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Observaciones de Seguridad</span>
-                        <p className="text-slate-700 italic bg-slate-50 p-2 rounded-lg border border-slate-200 mt-1">
-                          {evaluacionInicialTMO.notas_contraindicaciones}
-                        </p>
+                  <div className="space-y-2 text-xs">
+                    <p><span className="font-bold text-slate-700">Motivo:</span> {evaluacionInicialTMO.anamnesis?.motivo_consulta || '-'}</p>
+                    <p><span className="font-bold text-slate-700">Tiempo de evolución:</span> {evaluacionInicialTMO.anamnesis?.tiempo_evolucion || '-'}</p>
+                    <p><span className="font-bold text-slate-700">Dolor nocturno:</span> {evaluacionInicialTMO.anamnesis?.dolor_nocturno ? 'Sí' : 'No'}</p>
+                    <p><span className="font-bold text-slate-700">Aumenta con:</span> {evaluacionInicialTMO.anamnesis?.aumenta_con || '-'}</p>
+                    <p><span className="font-bold text-slate-700">Disminuye con:</span> {evaluacionInicialTMO.anamnesis?.disminuye_con || '-'}</p>
+                    
+                    {evaluacionInicialTMO.anamnesis?.banderas_rojas?.length > 0 && (
+                      <div className="mt-2 p-2 bg-rose-50 rounded text-rose-700">
+                        <span className="font-bold">Banderas Rojas:</span> {evaluacionInicialTMO.anamnesis.banderas_rojas.join(', ')}
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Tarjeta 3: Comportamiento del Dolor */}
+                {/* Pruebas Físicas (Expansible o directo) */}
                 <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2 border-b border-slate-100 pb-2">
-                    <Activity className="w-4 h-4 text-amber-600" />
-                    <span>3. Comportamiento del Síntoma</span>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
+                    2. Pruebas y Segmento
                   </h3>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Mecanismo de Inicio</span>
-                      <p className="font-semibold text-slate-800 mt-0.5">{evaluacionInicialTMO.mecanismo_inicio || 'Insidioso'}</p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Tiempo de Evolución</span>
-                      <p className="font-semibold text-slate-800 mt-0.5">{evaluacionInicialTMO.tiempo_evolucion || 'No especificado'}</p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Dolor Inicial (Línea Base)</span>
-                      <p className="font-bold text-blue-700 font-mono text-sm mt-0.5">
-                        ENA {evaluacionInicialTMO.dolor_inicial_ena ?? 5}/10
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Comportamiento 24h</span>
-                      <p className="font-semibold text-slate-800 mt-0.5">{evaluacionInicialTMO.comportamiento_24h || 'No registrado'}</p>
-                    </div>
-                    {evaluacionInicialTMO.anamnesis_reciente && (
-                      <div className="col-span-2 pt-2 border-t border-slate-100">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Anamnesis Reciente / Historia de la Enfermedad Actual</span>
-                        <p className="text-slate-800 mt-0.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200 whitespace-pre-line font-medium leading-relaxed">
-                          {evaluacionInicialTMO.anamnesis_reciente}
-                        </p>
-                      </div>
+                  <div className="space-y-2 text-xs overflow-auto max-h-48">
+                    {evaluacionInicialTMO.datos_segmento && Object.keys(evaluacionInicialTMO.datos_segmento).length > 0 ? (
+                      <ul className="space-y-1">
+                        {Object.entries(evaluacionInicialTMO.datos_segmento).map(([key, val]) => (
+                          <li key={key} className="flex justify-between border-b border-slate-50 pb-1">
+                            <span className="text-slate-500 capitalize">{key.replace(/_/g, ' ')}:</span>
+                            <span className="font-semibold text-slate-800">{String(val)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-slate-400">No hay datos de segmento registrados.</p>
                     )}
                   </div>
                 </div>
 
-                {/* Tarjeta 4: Examen Físico Funcional TMO */}
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2 border-b border-slate-100 pb-2">
-                    <Stethoscope className="w-4 h-4 text-purple-600" />
-                    <span>4. Examen Físico Funcional TMO</span>
+                {/* Diagnóstico y Plan */}
+                <div className="col-span-1 md:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
+                    3. Diagnóstico y Plan
                   </h3>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="col-span-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Juego Articular (Joint Play - Kaltenborn / Maitland)</span>
-                      {evaluacionInicialTMO.juego_articular_1_zona ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
-                          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase block">{evaluacionInicialTMO.juego_articular_1_zona}</span>
-                            <span className="font-bold text-slate-800 text-xs block mt-0.5">{evaluacionInicialTMO.juego_articular_1_grado}</span>
-                            <span className="text-[10px] text-slate-500 block font-medium">{evaluacionInicialTMO.juego_articular_1_endfeel}</span>
-                          </div>
-                          {evaluacionInicialTMO.juego_articular_2_zona && (
-                            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
-                              <span className="text-[10px] font-bold text-slate-500 uppercase block">{evaluacionInicialTMO.juego_articular_2_zona}</span>
-                              <span className="font-bold text-slate-800 text-xs block mt-0.5">{evaluacionInicialTMO.juego_articular_2_grado}</span>
-                              <span className="text-[10px] text-slate-500 block font-medium">{evaluacionInicialTMO.juego_articular_2_endfeel}</span>
-                            </div>
-                          )}
-                          {evaluacionInicialTMO.juego_articular_3_zona && (
-                            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
-                              <span className="text-[10px] font-bold text-slate-500 uppercase block">{evaluacionInicialTMO.juego_articular_3_zona}</span>
-                              <span className="font-bold text-slate-800 text-xs block mt-0.5">{evaluacionInicialTMO.juego_articular_3_grado}</span>
-                              <span className="text-[10px] text-slate-500 block font-medium">{evaluacionInicialTMO.juego_articular_3_endfeel}</span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="font-semibold text-slate-800 mt-0.5">{evaluacionInicialTMO.juego_articular || 'Normal Gr. 3'}</p>
-                      )}
-                    </div>
-                    <div className="col-span-2 sm:col-span-1">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Movilidad Activa / ROM</span>
-                      <p className="font-semibold text-slate-800 mt-0.5 whitespace-pre-line">{evaluacionInicialTMO.movilidad_activa || 'Libre / Sin déficit'}</p>
-                    </div>
-                    <div className="col-span-2 sm:col-span-1">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Pruebas Neurodinámicas</span>
-                      <p className="font-semibold text-slate-800 mt-0.5 whitespace-pre-line">{evaluacionInicialTMO.neurodinamia || 'Negativas'}</p>
-                    </div>
-                    {evaluacionInicialTMO.hallazgos_fisicos && (
-                      <div className="col-span-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Hallazgos Físicos y Palpatorios</span>
-                        <p className="text-slate-800 mt-0.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                          {evaluacionInicialTMO.hallazgos_fisicos}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Tarjeta 5: Juicio Diagnóstico & Plan Terapéutico (Full Width) */}
-                <div className="md:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2 border-b border-slate-100 pb-2">
-                    <FileText className="w-4 h-4 text-emerald-600" />
-                    <span>5. Hipótesis Diagnóstica & Plan Terapéutico</span>
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Hipótesis Diagnóstica Kinésica</span>
-                      <p className="font-bold text-slate-900 mt-1 text-sm bg-blue-50/70 p-3 rounded-xl border border-blue-100">
-                        {evaluacionInicialTMO.hipotesis_diagnostica || evaluacionInicialTMO.hipotesis_diagnostica_tmo || 'En estudio'}
-                      </p>
+                      <span className="font-bold text-slate-700 block mb-1">Diagnóstico TMO</span>
+                      <p className="bg-slate-50 p-2 rounded">{evaluacionInicialTMO.diagnostico_tmo || evaluacionInicialTMO.diagnostico_funcional || '-'}</p>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Objetivos Terapéuticos</span>
-                      <p className="text-slate-800 mt-1 bg-slate-50 p-3 rounded-xl border border-slate-200 leading-relaxed">
-                        {evaluacionInicialTMO.objetivos_terapeuticos || 'Control del dolor y recuperación de la movilidad funcional.'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Estimación de Alta (Sesiones)</span>
-                      <p className="font-bold text-slate-900 mt-1 text-sm bg-slate-50 p-3 rounded-xl border border-slate-200">
-                        {evaluacionInicialTMO.estimacion_alta || '4 a 6 sesiones'}
-                      </p>
+                      <span className="font-bold text-slate-700 block mb-1">Plan de Tratamiento</span>
+                      <p className="bg-slate-50 p-2 rounded">{evaluacionInicialTMO.plan_tratamiento || '-'}</p>
                     </div>
                   </div>
                 </div>
-
               </div>
             ) : (
               <div className="bg-white p-12 rounded-xl border border-slate-200 text-center space-y-4">

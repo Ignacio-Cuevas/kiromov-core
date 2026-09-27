@@ -232,3 +232,16 @@ export interface EvolucionSOAP {
 
   created_at?: string;
 }
+
+export interface EvaluacionInicialTMO {
+  id?: string;
+  paciente_id: string;
+  fecha_evaluacion?: string;
+  segmento_evaluado: string;
+  anamnesis: any;
+  datos_segmento: any;
+  diagnostico_tmo: string;
+  plan_tratamiento: string;
+  created_at?: string;
+  updated_at?: string;
+}
