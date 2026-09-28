@@ -69,7 +69,7 @@ export default function LoginPage() {
         <div className="p-8 pb-6 text-center bg-slate-50/70 border-b border-slate-100">
           <div className="flex justify-center mb-4">
             <img
-              src="https://nxlabwiewewwkwemtvfj.supabase.co/storage/v1/object/public/branding/public:logo.png"
+              src="/kiromov-logo.png"
               alt="Kiromov Centro Clínico"
               className="h-12 w-auto object-contain drop-shadow-xs"
             />

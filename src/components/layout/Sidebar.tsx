@@ -70,8 +70,8 @@ export function Sidebar() {
       {/* Cabecera del Sidebar */}
       <div className="p-5 border-b border-slate-800/80">
         <Link href="/agenda" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center font-black text-white text-base shadow-md shadow-blue-600/30 ring-1 ring-blue-400/30 group-hover:bg-blue-500 transition-all shrink-0">
-            K
+          <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-md shadow-blue-600/30 ring-1 ring-blue-400/30 shrink-0 overflow-hidden">
+            <img src="/kiromov-logo.png" alt="Kiromov Logo" className="w-full h-full object-contain p-1" />
           </div>
           <div className="flex flex-col min-w-0">
             <span className="font-extrabold text-white text-sm tracking-tight leading-none group-hover:text-blue-400 transition-colors">

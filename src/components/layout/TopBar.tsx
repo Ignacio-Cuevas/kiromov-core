@@ -120,6 +120,11 @@ export function TopBar() {
     <>
       <header className="h-14 bg-white border-b border-slate-200 px-4 md:px-6 flex items-center justify-between gap-4 sticky top-0 z-30 flex-shrink-0 select-none">
         
+        {/* Logo en Móviles */}
+        <div className="md:hidden flex items-center shrink-0">
+          <img src="/kiromov-logo.png" alt="Kiromov Logo" className="h-8 w-auto object-contain" />
+        </div>
+
         {/* Buscador Global ⌘K */}
         <div className="relative flex-1 max-w-md">
           <div className="relative">
