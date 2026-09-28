@@ -1160,7 +1160,7 @@ export function ClinicalRecordView({
                        evaluacionInicialTMO.segmento_evaluado === 'tobillo_pie' ? '🦶' : '➕'}
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-slate-800">
+                      <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                         {evaluacionInicialTMO.segmento_evaluado === 'lumbar' ? 'Columna Lumbar' : 
                          evaluacionInicialTMO.segmento_evaluado === 'cervical' ? 'Columna Cervical' : 
                          evaluacionInicialTMO.segmento_evaluado === 'hombro' ? 'Hombro' : 
@@ -1168,7 +1168,7 @@ export function ClinicalRecordView({
                          evaluacionInicialTMO.segmento_evaluado === 'rodilla' ? 'Rodilla' : 
                          evaluacionInicialTMO.segmento_evaluado === 'tobillo_pie' ? 'Tobillo y Pie' : 'Evaluación General'}
                       </h3>
-                      <p className="text-sm text-slate-500">Fecha: {evaluacionInicialTMO.fecha_evaluacion}</p>
+                      <p className="text-sm font-medium text-slate-500">Evaluación Inicial — {evaluacionInicialTMO.fecha_evaluacion ? evaluacionInicialTMO.fecha_evaluacion.split('T')[0].split('-').reverse().join('/') : '-'}</p>
                     </div>
                   </div>
                   <div className="flex gap-4 text-center">

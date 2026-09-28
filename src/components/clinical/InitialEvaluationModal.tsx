@@ -75,7 +75,9 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
 
       const payload = {
         paciente_id: paciente.id,
-        fecha_evaluacion: fechaEvaluacion,
+        fecha_evaluacion: fechaEvaluacion 
+          ? new Date(fechaEvaluacion + 'T12:00:00Z').toISOString() 
+          : new Date().toISOString(),
         segmento_evaluado: segmento,
         anamnesis,
         datos_segmento: datosSegmento,
@@ -108,6 +110,15 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
 
   const renderPaso1 = () => (
     <div className="space-y-4">
+      <div className="flex flex-col gap-1 w-full md:w-1/2 mb-4">
+        <label className="text-sm font-semibold text-slate-700">Fecha de Evaluación <span className="text-rose-500">*</span></label>
+        <Input 
+          type="date"
+          value={fechaEvaluacion}
+          onChange={(e) => setFechaEvaluacion(e.target.value)}
+          required
+        />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="flex flex-col gap-1">
           <label className="text-sm font-semibold text-slate-700">Motivo de consulta</label>
