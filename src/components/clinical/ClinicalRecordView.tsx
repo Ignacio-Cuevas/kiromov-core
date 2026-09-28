@@ -49,7 +49,7 @@ export interface ClinicalRecordViewProps {
   onSuccess?: () => void;
 }
 
-export const calcularPronosticoAltaClinica = (historialSOAP: any[]) => {
+export const calcularPronosticoAltaClinica = (historialSOAP: any[], evaluacionInicial: any = null) => {
   // CASO A: Menos de 2 sesiones (Modo Calibración)
   if (!historialSOAP || historialSOAP.length < 2) {
     const dolorInicial = historialSOAP?.[0]?.nivel_dolor_ena ?? 7;
@@ -73,7 +73,20 @@ export const calcularPronosticoAltaClinica = (historialSOAP: any[]) => {
   const s1 = notas[0];
   const sn = notas[notas.length - 1];
 
-  const dolorInicial = Number(s1.nivel_dolor_ena) || 7;
+  let dolorInicial = Number(s1.nivel_dolor_ena) || 7;
+  if (evaluacionInicial) {
+    const evaReal = Number(
+        evaluacionInicial.anamnesis?.eva_dolor ??
+        evaluacionInicial.anamnesis?.eva ??
+        evaluacionInicial.anamnesis?.eva_inicial ??
+        evaluacionInicial.anamnesis?.nivel_dolor ??
+        evaluacionInicial.dolor_inicial_ena ??
+        evaluacionInicial.eva ??
+        dolorInicial
+    );
+    dolorInicial = evaReal;
+  }
+  
   const dolorActual = Number(sn.nivel_dolor_ena) || 0;
   const totalSesiones = notas.length;
 
@@ -287,12 +300,22 @@ export function ClinicalRecordView({
     }> = [];
 
     // 1. Punto 0: Dolor de Ingreso de la Evaluación Inicial TMO
-    if (evaluacionInicialTMO && evaluacionInicialTMO.dolor_inicial_ena !== undefined && evaluacionInicialTMO.dolor_inicial_ena !== null) {
+    if (evaluacionInicialTMO) {
+      const evaIngreso = Number(
+        evaluacionInicialTMO.anamnesis?.eva_dolor ??
+        evaluacionInicialTMO.anamnesis?.eva ??
+        evaluacionInicialTMO.anamnesis?.eva_inicial ??
+        evaluacionInicialTMO.anamnesis?.nivel_dolor ??
+        evaluacionInicialTMO.dolor_inicial_ena ??
+        evaluacionInicialTMO.eva ??
+        0
+      );
+
       puntos.push({
         id: 'eval-inicial',
         etiqueta: 'Ingreso',
         fecha: evaluacionInicialTMO.fecha_evaluacion || evaluacionInicialTMO.fecha,
-        ena: Number(evaluacionInicialTMO.dolor_inicial_ena),
+        ena: evaIngreso,
         esIngreso: true
       });
     }
@@ -656,16 +679,16 @@ export function ClinicalRecordView({
                   </div>
                   {puntosGrafico.length > 1 && (
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                      pctMejoria >= 0 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-rose-700 bg-rose-50 border-rose-200'
+                      pctMejoria > 0 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : pctMejoria === 0 ? 'text-slate-600 bg-slate-100 border-slate-200' : 'text-rose-700 bg-rose-50 border-rose-200'
                     }`}>
-                      {pctMejoria >= 0 ? `-${pctMejoria}% dolor` : `+${Math.abs(pctMejoria)}% dolor`}
+                      {pctMejoria > 0 ? `-${pctMejoria}% reducción de dolor` : pctMejoria === 0 ? '0% variación (sintomatología estable)' : `+${Math.abs(pctMejoria)}% aumento de dolor`}
                     </span>
                   )}
                 </div>
 
                 {/* Estimación de Alta Funcional Compacta */}
                 {(() => {
-                  const estimacion = calcularPronosticoAltaClinica(historialSOAP);
+                  const estimacion = calcularPronosticoAltaClinica(historialSOAP, evaluacionInicialTMO);
                   return (
                     <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-lg text-xs">
                       <div className="flex items-center gap-1.5 min-w-0">
@@ -777,7 +800,7 @@ export function ClinicalRecordView({
                       </div>
                       {puntosGrafico.length > 1 && (
                         <span className="font-semibold text-slate-700">
-                          {pctMejoria >= 0 ? `-${pctMejoria}% dolor` : `+${Math.abs(pctMejoria)}%`}
+                          {pctMejoria > 0 ? `-${pctMejoria}% dolor` : pctMejoria === 0 ? 'Estable' : `+${Math.abs(pctMejoria)}%`}
                         </span>
                       )}
                     </div>
