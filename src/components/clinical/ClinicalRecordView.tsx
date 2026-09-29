@@ -391,13 +391,13 @@ export function ClinicalRecordView({
   // Manejador de chips
   const toggleSegmento = (seg: string) => {
     setSegmentosSeleccionados(prev =>
-      prev.includes(seg) ? prev.filter(s => s !== seg) : [...prev, seg]
+      (prev || []).includes(seg) ? prev.filter(s => s !== seg) : [...prev, seg]
     );
   };
 
   const toggleTecnica = (tec: string) => {
     setTecnicasSeleccionadas(prev =>
-      prev.includes(tec) ? prev.filter(t => t !== tec) : [...prev, tec]
+      (prev || []).includes(tec) ? prev.filter(t => t !== tec) : [...prev, tec]
     );
   };
 
@@ -1010,7 +1010,7 @@ export function ClinicalRecordView({
                       Región:
                     </span>
                     {segmentosList.map((seg) => {
-                      const sel = segmentosSeleccionados.includes(seg);
+                      const sel = (segmentosSeleccionados || []).includes(seg);
                       return (
                         <button
                           key={seg}
@@ -1034,7 +1034,7 @@ export function ClinicalRecordView({
                       Técnicas:
                     </span>
                     {tecnicasList.map((tec) => {
-                      const sel = tecnicasSeleccionadas.includes(tec);
+                      const sel = (tecnicasSeleccionadas || []).includes(tec);
                       return (
                         <button
                           key={tec}

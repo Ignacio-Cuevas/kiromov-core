@@ -95,7 +95,7 @@ const parseHorariosPorDia = (
         };
       } else {
         result[d.id] = {
-          activo: diasActivos.includes(d.id),
+          activo: (diasActivos || []).includes(d.id),
           hora_inicio: apertura || '09:00',
           hora_fin: cierre || '20:00',
         };
@@ -104,7 +104,7 @@ const parseHorariosPorDia = (
   } else {
     DIAS_SEMANA.forEach((d) => {
       result[d.id] = {
-        activo: diasActivos.includes(d.id),
+        activo: (diasActivos || []).includes(d.id),
         hora_inicio: apertura || '09:00',
         hora_fin: cierre || '20:00',
       };

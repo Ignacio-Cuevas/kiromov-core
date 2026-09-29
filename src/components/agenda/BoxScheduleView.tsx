@@ -137,7 +137,7 @@ export function BoxScheduleView({ onBackToAgenda, onSavedSuccess }: BoxScheduleV
                   } else {
                     nuevaSemana[d.id] = {
                       ...nuevaSemana[d.id],
-                      activo: diasActivos.includes(d.id),
+                      activo: (diasActivos || []).includes(d.id),
                     };
                   }
                 });

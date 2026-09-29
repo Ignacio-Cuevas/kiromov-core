@@ -130,15 +130,15 @@ export function SoapEvolutionForm({
 
 
   const toggleSegmento = (seg: string) => {
-    setSegmentosSeleccionados(prev => prev.includes(seg) ? prev.filter(s => s !== seg) : [...prev, seg]);
+    setSegmentosSeleccionados(prev => (prev || []).includes(seg) ? prev.filter(s => s !== seg) : [...prev, seg]);
   };
   const toggleTecnica = (tec: string) => {
-    setTecnicasAplicadas(prev => prev.includes(tec) ? prev.filter(t => t !== tec) : [...prev, tec]);
+    setTecnicasAplicadas(prev => (prev || []).includes(tec) ? prev.filter(t => t !== tec) : [...prev, tec]);
   };
   // Alternar hallazgos rápidos (Chips)
   const toggleFinding = (finding: string) => {
     setSelectedFindings((prev) => {
-      const exists = prev.includes(finding);
+      const exists = (prev || []).includes(finding);
       let nextFindings: string[];
       if (exists) {
         nextFindings = prev.filter((f) => f !== finding);
@@ -150,7 +150,7 @@ export function SoapEvolutionForm({
       if (!exists) {
         setObjetivo((prevObj) => {
           const prefix = prevObj.trim() ? prevObj.trim() + "\n" : "";
-          if (!prevObj.includes(finding)) {
+          if (!(prevObj || "").includes(finding)) {
             return `${prefix}• ${finding}`;
           }
           return prevObj;
@@ -378,7 +378,7 @@ export function SoapEvolutionForm({
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {SEGMENTOS_ANATOMICOS.map((seg) => {
-                    const isSelected = segmentosSeleccionados.includes(seg);
+                    const isSelected = (segmentosSeleccionados || []).includes(seg);
                     return (
                       <button
                         key={seg}
@@ -422,7 +422,7 @@ export function SoapEvolutionForm({
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {TECNICAS_TMO.map((tec) => {
-                    const isSelected = tecnicasAplicadas.includes(tec);
+                    const isSelected = (tecnicasAplicadas || []).includes(tec);
                     return (
                       <button
                         key={tec}
@@ -467,7 +467,7 @@ export function SoapEvolutionForm({
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {HALLAZGOS_DISPONIBLES.map((finding) => {
-                    const isSelected = selectedFindings.includes(finding);
+                    const isSelected = (selectedFindings || []).includes(finding);
                     return (
                       <button
                         key={finding}

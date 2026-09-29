@@ -253,7 +253,7 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
             <div key={bandera} className="flex items-center gap-2">
               <input 
                 type="checkbox" 
-                checked={anamnesis.banderas_rojas.includes(bandera)}
+                checked={(anamnesis.banderas_rojas || []).includes(bandera)}
                 onChange={(e) => {
                   if (e.target.checked) setAnamnesis({ ...anamnesis, banderas_rojas: [...anamnesis.banderas_rojas, bandera] });
                   else setAnamnesis({ ...anamnesis, banderas_rojas: anamnesis.banderas_rojas.filter(b => b !== bandera) });

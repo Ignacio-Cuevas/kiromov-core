@@ -302,7 +302,7 @@ export function ScheduleAppointmentModal({
       : [1, 3, 4, 5, 6];
 
     return {
-      activo: diasActivos.includes(diaSemana),
+      activo: (diasActivos || []).includes(diaSemana),
       hora_inicio: configAgenda.hora_apertura || defaultKiromov[diaSemana]?.hora_inicio || '15:00',
       hora_fin: configAgenda.hora_cierre || defaultKiromov[diaSemana]?.hora_fin || '19:00',
     };
