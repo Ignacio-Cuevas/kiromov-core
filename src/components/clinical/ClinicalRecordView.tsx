@@ -1185,7 +1185,7 @@ export function ClinicalRecordView({
                 </h2>
                 <p className="text-xs text-slate-500">
                   {evaluacionInicialTMO 
-                    ? `Evaluación del ${evaluacionInicialTMO.fecha_evaluacion || evaluacionInicialTMO.fecha} • Klgo. ${evaluacionInicialTMO.kinesiologo || 'Ignacio Cuevas'}`
+                    ? `Evaluación del ${evaluacionInicialTMO.fecha_evaluacion || evaluacionInicialTMO.fecha} • ${(evaluacionInicialTMO.kinesiologo || 'Ignacio Cuevas').startsWith('Klgo.') ? (evaluacionInicialTMO.kinesiologo || 'Ignacio Cuevas') : `Klgo. ${evaluacionInicialTMO.kinesiologo || 'Ignacio Cuevas'}`}`
                     : 'Sin evaluación inicial registrada'}
                 </p>
               </div>
@@ -1320,17 +1320,17 @@ export function ClinicalRecordView({
                     <div>
                       <span className="font-bold text-slate-700 block mb-1">Diagnóstico TMO</span>
                       <p className="bg-slate-50 p-2 rounded">{
-                        typeof evaluacionInicialTMO.diagnostico_tmo === 'object' && evaluacionInicialTMO.diagnostico_tmo !== null
-                          ? (evaluacionInicialTMO.diagnostico_tmo.diagnostico || JSON.stringify(evaluacionInicialTMO.diagnostico_tmo))
-                          : (evaluacionInicialTMO.diagnostico_tmo || evaluacionInicialTMO.diagnostico_funcional || '-')
+                        typeof evaluacionInicialTMO.diagnostico_tmo === 'string'
+                          ? evaluacionInicialTMO.diagnostico_tmo
+                          : evaluacionInicialTMO.diagnostico_tmo?.diagnostico_tmo || evaluacionInicialTMO.diagnostico_tmo?.diagnostico || evaluacionInicialTMO.diagnostico_funcional || '-'
                       }</p>
                     </div>
                     <div>
                       <span className="font-bold text-slate-700 block mb-1">Plan de Tratamiento</span>
                       <p className="bg-slate-50 p-2 rounded">{
-                        typeof evaluacionInicialTMO.plan_tratamiento === 'object' && evaluacionInicialTMO.plan_tratamiento !== null
-                          ? (evaluacionInicialTMO.plan_tratamiento.plan_recomendado || evaluacionInicialTMO.plan_tratamiento.nombre || JSON.stringify(evaluacionInicialTMO.plan_tratamiento))
-                          : (evaluacionInicialTMO.plan_tratamiento || '-')
+                        typeof evaluacionInicialTMO.plan_tratamiento === 'string'
+                          ? evaluacionInicialTMO.plan_tratamiento
+                          : evaluacionInicialTMO.plan_tratamiento?.plan_recomendado || evaluacionInicialTMO.plan_tratamiento?.nombre || '-'
                       }</p>
                     </div>
                   </div>

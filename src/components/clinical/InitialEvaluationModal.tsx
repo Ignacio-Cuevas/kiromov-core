@@ -105,12 +105,24 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
 
   useEffect(() => {
     if (modo === 'editar' && evaluacionExistente) {
+      const planSanitizado = typeof evaluacionExistente?.plan_tratamiento === "object" && evaluacionExistente?.plan_tratamiento !== null
+        ? evaluacionExistente?.plan_tratamiento?.plan_recomendado || evaluacionExistente?.plan_tratamiento?.nombre || ""
+        : evaluacionExistente?.plan_tratamiento || "";
+
+      const diagSanitizado = typeof evaluacionExistente?.diagnostico_tmo === "object" && evaluacionExistente?.diagnostico_tmo !== null
+        ? evaluacionExistente?.diagnostico_tmo?.diagnostico_tmo || evaluacionExistente?.diagnostico_tmo?.diagnostico || ""
+        : evaluacionExistente?.diagnostico_tmo || evaluacionExistente?.diagnostico_funcional || "";
+
+      const segmentoValido = ["lumbar", "cervical", "hombro", "cadera", "rodilla", "tobillo_pie", "otro"].includes(evaluacionExistente?.segmento_evaluado)
+        ? evaluacionExistente.segmento_evaluado
+        : "lumbar"; // fallback seguro
+
       setFechaEvaluacion(evaluacionExistente.fecha_evaluacion || getChileanDate());
-      setSegmento(evaluacionExistente.segmento_evaluado || 'lumbar');
+      setSegmento(segmentoValido);
       setAnamnesis(evaluacionExistente.anamnesis || anamnesis);
       setDatosSegmento(evaluacionExistente.datos_segmento || {});
-      setDiagnostico(evaluacionExistente.diagnostico_tmo || '');
-      setPlanTratamiento(evaluacionExistente.plan_tratamiento || '');
+      setDiagnostico(diagSanitizado);
+      setPlanTratamiento(planSanitizado);
     }
   }, [evaluacionExistente, modo]);
 
