@@ -73,19 +73,31 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Error al analizar evaluación");
+        toast.error(typeof data.error === 'string' ? data.error : (data.error?.message || "Error al analizar evaluación"));
         return;
       }
 
-      if (data.diagnostico_tmo) setDiagnostico(data.diagnostico_tmo);
-      if (data.objetivos_corto_plazo) setObjetivosCortoPlazo(data.objetivos_corto_plazo);
-      if (data.plan_recomendado) setPlanTratamiento(data.plan_recomendado);
-      if (data.frecuencia_semanal) setFrecuencia(data.frecuencia_semanal);
+      if (data.diagnostico_tmo) {
+        setDiagnostico(typeof data.diagnostico_tmo === 'string' ? data.diagnostico_tmo : (data.diagnostico_tmo.diagnostico || JSON.stringify(data.diagnostico_tmo)));
+      }
+      if (data.objetivos_corto_plazo) {
+        setObjetivosCortoPlazo(
+          Array.isArray(data.objetivos_corto_plazo) 
+            ? data.objetivos_corto_plazo.join(', ') 
+            : (typeof data.objetivos_corto_plazo === 'string' ? data.objetivos_corto_plazo : JSON.stringify(data.objetivos_corto_plazo))
+        );
+      }
+      if (data.plan_recomendado) {
+        setPlanTratamiento(typeof data.plan_recomendado === 'string' ? data.plan_recomendado : (data.plan_recomendado.plan_recomendado || data.plan_recomendado.nombre || JSON.stringify(data.plan_recomendado)));
+      }
+      if (data.frecuencia_semanal) {
+        setFrecuencia(typeof data.frecuencia_semanal === 'string' ? data.frecuencia_semanal : (data.frecuencia_semanal.frecuencia || JSON.stringify(data.frecuencia_semanal)));
+      }
       
       toast.success("Razonamiento clínico generado exitosamente");
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "Hubo un error con el Copiloto IA");
+      toast.error(err instanceof Error ? err.message : "Hubo un error con el Copiloto IA");
     } finally {
       setCargandoIADiagnostico(false);
     }

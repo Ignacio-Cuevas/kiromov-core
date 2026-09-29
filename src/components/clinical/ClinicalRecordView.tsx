@@ -1319,11 +1319,19 @@ export function ClinicalRecordView({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div>
                       <span className="font-bold text-slate-700 block mb-1">Diagnóstico TMO</span>
-                      <p className="bg-slate-50 p-2 rounded">{evaluacionInicialTMO.diagnostico_tmo || evaluacionInicialTMO.diagnostico_funcional || '-'}</p>
+                      <p className="bg-slate-50 p-2 rounded">{
+                        typeof evaluacionInicialTMO.diagnostico_tmo === 'object' && evaluacionInicialTMO.diagnostico_tmo !== null
+                          ? (evaluacionInicialTMO.diagnostico_tmo.diagnostico || JSON.stringify(evaluacionInicialTMO.diagnostico_tmo))
+                          : (evaluacionInicialTMO.diagnostico_tmo || evaluacionInicialTMO.diagnostico_funcional || '-')
+                      }</p>
                     </div>
                     <div>
                       <span className="font-bold text-slate-700 block mb-1">Plan de Tratamiento</span>
-                      <p className="bg-slate-50 p-2 rounded">{evaluacionInicialTMO.plan_tratamiento || '-'}</p>
+                      <p className="bg-slate-50 p-2 rounded">{
+                        typeof evaluacionInicialTMO.plan_tratamiento === 'object' && evaluacionInicialTMO.plan_tratamiento !== null
+                          ? (evaluacionInicialTMO.plan_tratamiento.plan_recomendado || evaluacionInicialTMO.plan_tratamiento.nombre || JSON.stringify(evaluacionInicialTMO.plan_tratamiento))
+                          : (evaluacionInicialTMO.plan_tratamiento || '-')
+                      }</p>
                     </div>
                   </div>
                 </div>
