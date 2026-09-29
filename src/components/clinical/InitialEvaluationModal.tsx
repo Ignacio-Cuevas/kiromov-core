@@ -56,6 +56,40 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
   const [planTratamiento, setPlanTratamiento] = useState('Plan Integral - 10 ses');
   const [frecuencia, setFrecuencia] = useState('');
   const [objetivosCortoPlazo, setObjetivosCortoPlazo] = useState('');
+  
+  const [cargandoIADiagnostico, setCargandoIADiagnostico] = useState(false);
+
+  const handleGenerarDiagnosticoConIA = async () => {
+    setCargandoIADiagnostico(true);
+    try {
+      const res = await fetch('/api/ai/evaluacion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          anamnesis,
+          segmento_evaluado: segmento,
+          datos_segmento: datosSegmento
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Error al analizar evaluación");
+        return;
+      }
+
+      if (data.diagnostico_tmo) setDiagnostico(data.diagnostico_tmo);
+      if (data.objetivos_corto_plazo) setObjetivosCortoPlazo(data.objetivos_corto_plazo);
+      if (data.plan_recomendado) setPlanTratamiento(data.plan_recomendado);
+      if (data.frecuencia_semanal) setFrecuencia(data.frecuencia_semanal);
+      
+      toast.success("Razonamiento clínico generado exitosamente");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Hubo un error con el Copiloto IA");
+    } finally {
+      setCargandoIADiagnostico(false);
+    }
+  };
 
   useEffect(() => {
     if (modo === 'editar' && evaluacionExistente) {
@@ -252,6 +286,25 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
 
   const renderPaso4 = () => (
     <div className="space-y-4">
+      <div className="mb-4 flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/60 p-3.5">
+        <div>
+          <p className="text-xs font-semibold text-indigo-900 flex items-center gap-1.5">
+            ✨ Copiloto TMO: Razonamiento Diagnóstico
+          </p>
+          <p className="text-[11px] text-indigo-600">
+            Sintetiza los test ortopédicos, ROM y síntomas registrados en los pasos anteriores.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleGenerarDiagnosticoConIA}
+          disabled={cargandoIADiagnostico}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition-colors shadow-sm"
+        >
+          {cargandoIADiagnostico ? "✨ Analizando hallazgos..." : "✨ Generar Diagnóstico y Objetivos"}
+        </button>
+      </div>
+
       <div className="flex flex-col gap-2">
         <label className="text-sm font-semibold text-slate-700">Diagnóstico Kinésico Funcional</label>
         <Textarea 

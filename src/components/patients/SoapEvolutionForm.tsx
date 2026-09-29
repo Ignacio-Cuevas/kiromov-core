@@ -86,6 +86,48 @@ export function SoapEvolutionForm({
   const [cuestionario, setCuestionario] = React.useState<string>("");
   const [discapacidadPct, setDiscapacidadPct] = React.useState<string>("");
 
+  // Estados para Copiloto IA
+  const [notasRapidas, setNotasRapidas] = React.useState("");
+  const [isGeneratingSoap, setIsGeneratingSoap] = React.useState(false);
+
+  const handleGenerateSoap = async () => {
+    if (!notasRapidas.trim()) {
+      toast.error("Por favor, ingresa unas notas rápidas para el copiloto.");
+      return;
+    }
+    setIsGeneratingSoap(true);
+    try {
+      const response = await fetch('/api/ai/soap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          notas_rapidas: notasRapidas,
+          eva_actual: enaDolor,
+          diagnostico_base: "Paciente en tratamiento kinesiológico", // Fallback if no prev dx
+          segmento: segmentosSeleccionados.join(", ") || "No especificado",
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        toast.error(data.error || "Error al generar SOAP");
+        return;
+      }
+      
+      if (data.subjetivo) setSubjetivo(data.subjetivo);
+      if (data.objetivo) setObjetivo(data.objetivo);
+      if (data.analisis) setAnalisis(data.analisis);
+      if (data.plan) setPlan(data.plan);
+
+      toast.success("Nota SOAP generada exitosamente por IA");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Hubo un error al generar la nota SOAP con IA");
+    } finally {
+      setIsGeneratingSoap(false);
+    }
+  };
+
 
   const toggleSegmento = (seg: string) => {
     setSegmentosSeleccionados(prev => prev.includes(seg) ? prev.filter(s => s !== seg) : [...prev, seg]);
@@ -270,6 +312,34 @@ export function SoapEvolutionForm({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* ========================================================= */}
+          {/* COPILOTO IA */}
+          {/* ========================================================= */}
+          <div className="rounded-2xl border border-purple-200 bg-purple-50/40 p-4 space-y-3 shadow-sm">
+            <div className="flex items-center gap-2 text-purple-900 mb-1">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              <h4 className="text-sm font-bold">✨ Copiloto Clínico IA</h4>
+            </div>
+            <Textarea
+              placeholder="Escribe aquí 2 o 3 líneas rápidas de lo que hiciste hoy o lo que dijo el paciente..."
+              value={notasRapidas}
+              onChange={(e) => setNotasRapidas(e.target.value)}
+              rows={2}
+              className="resize-none focus:border-purple-500 focus:ring-purple-500 text-sm rounded-xl bg-white"
+            />
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                onClick={handleGenerateSoap}
+                disabled={isGeneratingSoap}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-semibold flex items-center gap-2 h-9 px-4 rounded-xl transition-all"
+              >
+                <Sparkles className="h-4 w-4" />
+                {isGeneratingSoap ? "Generando nota en lenguaje TMO..." : "✨ Redactar Nota SOAP"}
+              </Button>
+            </div>
+          </div>
+
           {/* ========================================================= */}
           {/* S - SUBJETIVO */}
           {/* ========================================================= */}

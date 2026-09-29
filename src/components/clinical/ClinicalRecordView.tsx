@@ -187,6 +187,45 @@ export function ClinicalRecordView({
   const [oObjetivo, setOObjetivo] = useState('');
   const [aAnalisis, setAAnalisis] = useState('');
   const [pPlan, setPPlan] = useState('');
+  const [notasRapidas, setNotasRapidas] = useState('');
+  const [cargandoIA, setCargandoIA] = useState(false);
+
+  const handleGenerarSoapConIA = async () => {
+    if (!notasRapidas.trim()) {
+      toast.error("Ingresa unas notas rápidas para el copiloto.");
+      return;
+    }
+    setCargandoIA(true);
+    try {
+      const response = await fetch('/api/ai/soap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          notas_rapidas: notasRapidas,
+          eva_actual: nivelDolor,
+          paciente_id: pacienteId,
+          diagnostico_base: paciente?.motivo_consulta || "No especificado",
+          segmento: segmentosSeleccionados.join(", ") || "General",
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        toast.error(data.error || "Error al generar SOAP");
+        return;
+      }
+      
+      if (data.subjetivo) setSSubjetivo(data.subjetivo);
+      if (data.objetivo) setOObjetivo(data.objetivo);
+      if (data.analisis) setAAnalisis(data.analisis);
+      if (data.plan) setPPlan(data.plan);
+      toast.success("Evolución redactada por IA");
+    } catch (err: any) {
+      toast.error(err.message || "Hubo un error con el Copiloto IA");
+    } finally {
+      setCargandoIA(false);
+    }
+  };
   const [pronostico, setPronostico] = useState('4 a 6 sesiones');
 
   // Control de acordeón en timeline histórico
@@ -1011,6 +1050,35 @@ export function ClinicalRecordView({
                         </button>
                       );
                     })}
+                  </div>
+                </div>
+
+                {/* ========================================================= */}
+                {/* COPILOTO IA */}
+                {/* ========================================================= */}
+                <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-sm text-indigo-900 flex items-center gap-1.5">
+                      ✨ Copiloto Clínico IA (TMO)
+                    </span>
+                    <span className="text-xs text-indigo-600">Redacción médica automática</span>
+                  </div>
+                  <textarea
+                    value={notasRapidas}
+                    onChange={(e) => setNotasRapidas(e.target.value)}
+                    placeholder="Escribe 2 líneas rápidas de lo que hiciste hoy o lo que dijo el paciente (ej: dolor bajó a 3, hoy hice manipulación C5-C6 y ejercicio escapular)..."
+                    className="w-full text-sm rounded-lg border border-indigo-200 p-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    rows={2}
+                  />
+                  <div className="mt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleGenerarSoapConIA}
+                      disabled={cargandoIA || !notasRapidas.trim()}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition-colors shadow-sm"
+                    >
+                      {cargandoIA ? "✨ Redactando en lenguaje TMO..." : "✨ Redactar Nota SOAP"}
+                    </button>
                   </div>
                 </div>
 
