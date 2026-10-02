@@ -218,8 +218,8 @@ function FinanzasContent() {
   
   const porCobrarPeriodo = useMemo(() => {
     const planesPendientes = transaccionesFiltradas
-      .filter((t) => t.estado_pago === 'pendiente')
-      .reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.valor_total) || 0), 0);
+      .filter((t) => t.estado_pago === 'pendiente' || t.estado_pago === 'parcial' || (t.saldo_pendiente && t.saldo_pendiente > 0))
+      .reduce((acc, curr) => acc + (Number(curr.saldo_pendiente ?? curr.monto_clp ?? curr.valor_total) || 0), 0);
     
     const citasPendientes = asistenciasFiltradas
       .filter((c) => c.estado_pago === 'pendiente_pago')
@@ -230,13 +230,13 @@ function FinanzasContent() {
 
   const deudoresCount = useMemo(() => {
     const ids = new Set<string>();
-    transaccionesFiltradas.filter((t) => t.estado_pago === 'pendiente').forEach(t => ids.add(t.paciente_id));
+    transaccionesFiltradas.filter((t) => t.estado_pago === 'pendiente' || t.estado_pago === 'parcial' || (t.saldo_pendiente && t.saldo_pendiente > 0)).forEach(t => ids.add(t.paciente_id));
     asistenciasFiltradas.filter((c) => c.estado_pago === 'pendiente_pago').forEach(c => ids.add(c.paciente_id));
     return ids.size;
   }, [transaccionesFiltradas, asistenciasFiltradas]);
 
   // Arrays derivados para las tabs de "Quién Debe"
-  const planesPendientesLista = useMemo(() => transaccionesFiltradas.filter(t => t.estado_pago === 'pendiente'), [transaccionesFiltradas]);
+  const planesPendientesLista = useMemo(() => transaccionesFiltradas.filter(t => t.estado_pago === 'pendiente' || t.estado_pago === 'parcial' || (t.saldo_pendiente && t.saldo_pendiente > 0)), [transaccionesFiltradas]);
   const citasPendientesLista = useMemo(() => asistenciasFiltradas.filter(c => c.estado_pago === 'pendiente_pago'), [asistenciasFiltradas]);
 
   const handleCobrarCita = (telefono: string, nombre: string, monto: number, fecha: string) => {
@@ -415,68 +415,96 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
                       <table className="w-full text-left text-sm whitespace-nowrap">
                         <thead className="bg-amber-50 text-amber-700 border-b border-amber-100 text-xs uppercase tracking-wider font-bold">
                           <tr>
-                            <th className="py-3 px-4">Origen</th>
                             <th className="py-3 px-4">Paciente</th>
+                            <th className="py-3 px-4">Teléfono</th>
                             <th className="py-3 px-4">Adeuda</th>
-                            <th className="py-3 px-4 text-right">Monto Deuda</th>
-                            <th className="py-3 px-4 text-right">Acción</th>
+                            <th className="py-3 px-4 text-right">Total</th>
+                            <th className="py-3 px-4 text-right">Pagado</th>
+                            <th className="py-3 px-4 text-right">Debe</th>
+                            <th className="py-3 px-4 text-center">Acción</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {planesPendientesLista.map((c) => (
+                          {planesPendientesLista.map((c) => {
+                            const valorTotal = c.valor_total ?? c.monto_clp ?? 0;
+                            const pagado = c.monto_pagado ?? 0;
+                            const deuda = c.saldo_pendiente ?? valorTotal;
+                            return (
                             <tr key={c.id} className="hover:bg-amber-50/30 transition-colors">
-                              <td className="py-3 px-4 text-slate-500 text-xs">{c.fecha_compra}</td>
                               <td className="py-3 px-4">
                                 <div className="font-bold text-slate-900">{c.pacientes?.nombre_completo}</div>
                                 <div className="text-[10px] text-slate-400 font-mono">{formatRut(c.pacientes?.rut)}</div>
                               </td>
-                              <td className="py-3 px-4 font-medium text-slate-700 text-xs">Plan: {c.nombre_plan}</td>
-                              <td className="py-3 px-4 text-right font-black text-amber-600 text-lg">
-                                {formatCLP(Number(c.monto_clp || c.valor_total) || 0)}
+                              <td className="py-3 px-4 text-slate-600 text-xs">{c.pacientes?.telefono || 'N/A'}</td>
+                              <td className="py-3 px-4 font-medium text-slate-700 text-xs">
+                                <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] mr-1 uppercase">Plan</span>
+                                {c.nombre_plan}
+                              </td>
+                              <td className="py-3 px-4 text-right text-slate-500 font-medium">
+                                {formatCLP(valorTotal)}
+                              </td>
+                              <td className="py-3 px-4 text-right text-emerald-600 font-medium">
+                                {formatCLP(pagado)}
+                              </td>
+                              <td className="py-3 px-4 text-right font-black text-rose-600 text-base">
+                                {formatCLP(deuda)}
                               </td>
                               <td className="py-3 px-4 text-right">
                                 <div className="flex items-center justify-end gap-2">
                                   <Button 
-                                    onClick={() => handleCobrarCita(c.pacientes?.telefono, c.pacientes?.nombre_completo, Number(c.monto_clp || c.valor_total) || 0, c.fecha_compra)} 
+                                    onClick={() => handleCobrarCita(c.pacientes?.telefono, c.pacientes?.nombre_completo, deuda, c.fecha_compra)} 
                                     variant="outline" 
                                     className="min-h-[44px] sm:min-h-0 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl text-xs font-bold shadow-2xs h-auto py-2 px-3 cursor-pointer"
                                   >
-                                    💬 Cobrar Plan
+                                    💬 Avisar
                                   </Button>
                                   <Button 
                                     onClick={() => setSettlingPlan(c)} 
                                     className="min-h-[44px] sm:min-h-0 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm h-auto py-2 px-3 cursor-pointer"
                                   >
-                                    <CreditCard className="w-3.5 h-3.5 mr-1.5" /> Liquidar
+                                    <CreditCard className="w-3.5 h-3.5 mr-1.5" /> Cobrar
                                   </Button>
                                 </div>
                               </td>
                             </tr>
-                          ))}
-                          {citasPendientesLista.map((c) => (
+                            );
+                          })}
+                          {citasPendientesLista.map((c) => {
+                            const valorTotal = Number(c.monto_cobrado) || 0;
+                            return (
                             <tr key={c.id} className="hover:bg-amber-50/30 transition-colors">
-                              <td className="py-3 px-4 text-slate-500 text-xs">{c.fecha}</td>
                               <td className="py-3 px-4">
                                 <div className="font-bold text-slate-900">{c.pacientes?.nombre_completo}</div>
                                 <div className="text-[10px] text-slate-400 font-mono">{formatRut(c.pacientes?.rut)}</div>
                               </td>
-                              <td className="py-3 px-4 font-medium text-slate-700 text-xs">Cita: {c.motivo_consulta}</td>
-                              <td className="py-3 px-4 text-right font-black text-amber-600 text-lg">
-                                {formatCLP(Number(c.monto_cobrado) || 0)}
+                              <td className="py-3 px-4 text-slate-600 text-xs">{c.pacientes?.telefono || 'N/A'}</td>
+                              <td className="py-3 px-4 font-medium text-slate-700 text-xs">
+                                <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] mr-1 uppercase">Cita</span>
+                                {c.motivo_consulta}
+                              </td>
+                              <td className="py-3 px-4 text-right text-slate-500 font-medium">
+                                {formatCLP(valorTotal)}
+                              </td>
+                              <td className="py-3 px-4 text-right text-emerald-600 font-medium">
+                                $0
+                              </td>
+                              <td className="py-3 px-4 text-right font-black text-rose-600 text-base">
+                                {formatCLP(valorTotal)}
                               </td>
                               <td className="py-3 px-4 text-right">
                                 <div className="flex items-center justify-end gap-2">
                                   <Button 
-                                    onClick={() => handleCobrarCita(c.pacientes?.telefono, c.pacientes?.nombre_completo, Number(c.monto_cobrado) || 0, c.fecha)} 
+                                    onClick={() => handleCobrarCita(c.pacientes?.telefono, c.pacientes?.nombre_completo, valorTotal, c.fecha)} 
                                     variant="outline" 
                                     className="min-h-[44px] sm:min-h-0 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl text-xs font-bold shadow-2xs h-auto py-2 px-3 cursor-pointer"
                                   >
-                                    💬 Cobrar Atención
+                                    💬 Avisar
                                   </Button>
                                 </div>
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     )}

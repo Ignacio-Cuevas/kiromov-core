@@ -56,7 +56,7 @@ export function PayPlanModal({
         plan.monto_clp ??
         plan.precio_base ??
         0;
-      setMontoCobro(initialAmount);
+      setMontoCobro(plan.saldo_pendiente ?? initialAmount);
       setBoletaNumber(plan.numero_boleta || '');
       setNotes(plan.notas || '');
 
@@ -92,22 +92,41 @@ export function PayPlanModal({
 
     try {
       if (supabase) {
+        const valorTotal = plan.valor_total ?? plan.monto_clp ?? 0;
+        const montoPagadoAnterior = plan.monto_pagado ?? 0;
+        const saldoPendienteAnterior = plan.saldo_pendiente ?? valorTotal;
+        
+        const nuevoMontoPagado = montoPagadoAnterior + finalAmount;
+        const nuevoSaldoPendiente = Math.max(0, valorTotal - nuevoMontoPagado);
+        
+        let nuevoEstadoPago = 'pendiente';
+        if (nuevoSaldoPendiente <= 0) nuevoEstadoPago = 'pagado';
+        else if (nuevoMontoPagado > 0) nuevoEstadoPago = 'parcial';
+
+        // Update compras_planes
         const { error } = await supabase
           .from('compras_planes')
           .update({
-            estado_pago: 'Pagado',
+            estado_pago: nuevoEstadoPago,
             metodo_pago: selectedMethod,
-            medio_pago: methodLabel,
+            monto_pagado: nuevoMontoPagado,
+            saldo_pendiente: nuevoSaldoPendiente,
             numero_boleta: cleanBoleta,
-            monto_clp: finalAmount,
-            valor_total: finalAmount,
-            total_final_clp: finalAmount,
             notas: notes.trim() || plan.notas || null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', plan.id);
 
         if (error) throw error;
+
+        // Insert into pagos_pacientes
+        await supabase.from('pagos_pacientes').insert([{
+          paciente_id: plan.paciente_id,
+          monto: finalAmount,
+          metodo_pago: selectedMethod,
+          fecha: new Date().toISOString(),
+          notas: notes.trim() || null,
+        }]);
       }
 
       toast.success('¡Pago registrado con éxito! Plan marcado como pagado.', {

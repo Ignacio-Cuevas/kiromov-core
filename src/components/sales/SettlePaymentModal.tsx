@@ -19,6 +19,15 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
   const [boletaNumber, setBoletaNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [montoPagaHoy, setMontoPagaHoy] = useState<number>(0);
+
+  // Initialize montoPagaHoy when modal opens
+  React.useEffect(() => {
+    if (planEnUso && isOpen) {
+      const valorTotal = planEnUso.valor_total ?? planEnUso.monto_clp ?? 0;
+      setMontoPagaHoy(planEnUso.saldo_pendiente ?? valorTotal);
+    }
+  }, [planEnUso, isOpen]);
 
   if (!isOpen || !planEnUso) return null;
 
@@ -31,12 +40,25 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
     try {
       const boletaClean = boletaNumber.trim() ? boletaNumber.trim() : null;
 
+      const valorTotal = planEnUso.valor_total ?? planEnUso.monto_clp ?? 0;
+      const montoPagadoAnterior = planEnUso.monto_pagado ?? 0;
+      const saldoPendienteAnterior = planEnUso.saldo_pendiente ?? valorTotal;
+      
+      const nuevoMontoPagado = montoPagadoAnterior + Number(montoPagaHoy);
+      const nuevoSaldoPendiente = Math.max(0, valorTotal - nuevoMontoPagado);
+      
+      let nuevoEstadoPago = 'pendiente';
+      if (nuevoSaldoPendiente <= 0) nuevoEstadoPago = 'pagado';
+      else if (nuevoMontoPagado > 0) nuevoEstadoPago = 'parcial';
+
       // 1. Update in compras_planes
       const { error: cpError } = await supabase
         .from('compras_planes')
         .update({
-          estado_pago: 'pagado',
+          estado_pago: nuevoEstadoPago,
           metodo_pago: paymentMethod,
+          monto_pagado: nuevoMontoPagado,
+          saldo_pendiente: nuevoSaldoPendiente,
           numero_boleta: boletaClean,
           notas: notes.trim() ? notes.trim() : null,
           observaciones: notes.trim() ? notes.trim() : null,
@@ -46,18 +68,18 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
 
       if (cpError) throw new Error(cpError.message);
 
-      // 2. Update in patient_plans if exists
+      // 2. Register payment in pagos_pacientes
       const { error: ppError } = await supabase
-        .from('patient_plans')
-        .update({
-          receipt_number: boletaClean
-        })
-        .eq('plan_name', planEnUso.nombre_plan)
-        .eq('patient_id', planEnUso.paciente_id);
+        .from('pagos_pacientes')
+        .insert([{
+          paciente_id: planEnUso.paciente_id,
+          monto: Number(montoPagaHoy),
+          metodo_pago: paymentMethod,
+          fecha: new Date().toISOString(),
+          notas: notes.trim() ? notes.trim() : null,
+        }]);
 
-      if (ppError) {
-        console.warn('patient_plans no encontrado o fallo secundario', ppError);
-      }
+      if (ppError) console.warn('Error insertando en pagos_pacientes', ppError);
 
       toast.success('Cobro registrado exitosamente');
       onSuccess?.();
@@ -69,23 +91,35 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
     }
   };
 
+  const valorTotalPlan = planEnUso.valor_total ?? planEnUso.monto_clp ?? 0;
+  const saldoPendienteActual = planEnUso.saldo_pendiente ?? valorTotalPlan;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
       <div className="relative w-full max-w-lg flex flex-col bg-slate-50 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh]">
         <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-100 sticky top-0 z-10">
           <div>
-            <h3 className="font-bold text-slate-800 text-lg">Registrar Cobro / Pago</h3>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">Liquidación de deuda activa</p>
+            <h3 className="font-bold text-slate-800 text-lg">Registrar Cobro / Pago de Plan</h3>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">Liquidación de deuda o abono parcial</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors p-2">✕</button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-2">
-              <p className="text-xs text-blue-600 font-semibold uppercase mb-1">Plan a Liquidar:</p>
-              <p className="text-sm font-bold text-slate-800">{planEnUso.nombre_plan}</p>
-              <p className="text-xs text-slate-600 mt-1">Monto Adeudado: <span className="font-bold text-emerald-700">${planEnUso.monto_clp?.toLocaleString('es-CL')}</span></p>
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-2 grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <p className="text-xs text-blue-600 font-semibold uppercase mb-1">Plan a Liquidar:</p>
+                <p className="text-sm font-bold text-slate-800">{planEnUso.nombre_plan}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 font-semibold">Valor Total:</p>
+                <p className="text-sm font-bold text-slate-800">${valorTotalPlan.toLocaleString('es-CL')}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 font-semibold">Saldo Pendiente:</p>
+                <p className="text-sm font-bold text-rose-600">${saldoPendienteActual.toLocaleString('es-CL')}</p>
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -95,48 +129,63 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
               </h4>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Método de Pago</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Monto que Paga Hoy (CLP) *</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={saldoPendienteActual}
+                  value={montoPagaHoy}
+                  onChange={(e) => setMontoPagaHoy(Number(e.target.value))}
+                  className="w-full rounded-xl border border-slate-300 p-2.5 text-lg font-black text-emerald-600 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Método de Pago *</label>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                   className="w-full rounded-xl border border-slate-300 p-2.5 text-sm bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none font-medium"
                 >
-                  <option value="transferencia">Transferencia Bancaria</option>
-                  <option value="tarjeta">Débito / Crédito (Transbank)</option>
                   <option value="efectivo">Efectivo</option>
-                  <option value="convenio">Convenio Institucional</option>
+                  <option value="transferencia">Transferencia Bancaria</option>
+                  <option value="tarjeta_debito">Tarjeta Débito</option>
+                  <option value="tarjeta_credito">Tarjeta Crédito</option>
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <FileText className="h-3.5 w-3.5 text-blue-600" />
-                    Fecha de Pago
-                  </span>
-                </label>
-                <input
-                  type="date"
-                  value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 p-2.5 text-sm font-bold bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <FileText className="h-3.5 w-3.5 text-blue-600" />
+                      Fecha de Pago
+                    </span>
+                  </label>
+                  <input
+                    type="date"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 p-2.5 text-sm font-bold bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <FileText className="h-3.5 w-3.5 text-blue-600" />
-                    N° de Boleta / Documento Tributario (Opcional)
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: 14582"
-                  value={boletaNumber}
-                  onChange={(e) => setBoletaNumber(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 p-2.5 text-sm font-mono font-bold bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <FileText className="h-3.5 w-3.5 text-blue-600" />
+                      N° de Boleta
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Opcional"
+                    value={boletaNumber}
+                    onChange={(e) => setBoletaNumber(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 p-2.5 text-sm font-mono font-bold bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
               </div>
 
               <div>

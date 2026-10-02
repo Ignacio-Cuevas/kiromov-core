@@ -179,8 +179,9 @@ export function RenewPlanDialog({
         codigo_cupon: appliedCoupon?.codigo || null,
         valor_total: valorTotal,
         total_final_clp: valorTotal,
-        medio_pago: "Transferencia",
-        estado_pago: "Pagado",
+        estado_pago: "pendiente",
+        monto_pagado: 0,
+        saldo_pendiente: valorTotal,
         fecha_compra: getChileanDate(),
         estado: "activo",
       });
@@ -240,7 +241,7 @@ export function RenewPlanDialog({
                   {plan.nombre_plan} ({plan.total_sesiones} ses.) — {formatCLP(plan.precio_clp)}
                 </option>
               ))}
-              <option value="custom">✏️ Plan Personalizado / Ajuste Manual</option>
+              <option value="custom">✨ Plan Personalizado / A Medida</option>
             </select>
           </div>
 
@@ -253,7 +254,7 @@ export function RenewPlanDialog({
               placeholder="Ej: Plan 6 Sesiones Lumbar"
               value={customNombre}
               onChange={(e) => setCustomNombre(e.target.value)}
-              disabled={isSaving}
+              disabled={isSaving || selectedPlanId !== "custom"}
               className="h-10 text-sm font-medium bg-white rounded-xl"
               required
             />
@@ -271,7 +272,7 @@ export function RenewPlanDialog({
                 max={50}
                 value={sesiones}
                 onChange={(e) => setSesiones(parseInt(e.target.value, 10) || 1)}
-                disabled={isSaving}
+                disabled={isSaving || selectedPlanId !== "custom"}
                 className="h-10 text-sm font-semibold bg-white rounded-xl"
                 required
               />
@@ -287,7 +288,7 @@ export function RenewPlanDialog({
                 step={1000}
                 value={precioBase}
                 onChange={(e) => setPrecioBase(parseInt(e.target.value, 10) || 0)}
-                disabled={isSaving}
+                disabled={isSaving || selectedPlanId !== "custom"}
                 className="h-10 text-sm font-semibold bg-white rounded-xl"
                 required
               />

@@ -153,7 +153,9 @@ export interface CompraPlan {
   numero_boleta?: string | null;
   medio_pago?: MedioPago;
   metodo_pago?: string;
-  estado_pago?: EstadoPago;
+  estado_pago?: EstadoPago | 'parcial' | 'pendiente' | string;
+  monto_pagado?: number;
+  saldo_pendiente?: number;
   fecha_compra: string;
   estado: "activo" | "finalizado" | "cancelado";
   notas?: string | null;
