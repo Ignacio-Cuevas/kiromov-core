@@ -378,8 +378,10 @@ export function RenewPlanDialog({
                 className="mt-1 w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" 
               />
               <div>
-                <p className="text-sm font-bold text-blue-900">Aplicar pago anterior como abono</p>
-                <p className="text-xs text-blue-700 mt-0.5">El paciente pagó {formatCLP(pagoReciente.monto)} hoy por una sesión simple. Descontar este monto del total a pagar, y contar esa sesión como la 1° del plan.</p>
+                <p className="text-sm font-bold text-blue-900">Aplicar pago de sesión anterior ({formatCLP(pagoReciente.monto)}) como abono al plan</p>
+                <p className="text-xs text-blue-700 mt-0.5 flex items-center gap-1">
+                  <Check className="w-3 h-3" /> Contabilizar sesión anterior como Sesión 1 consumida (Inicia en 1/{sesiones})
+                </p>
               </div>
             </div>
           )}

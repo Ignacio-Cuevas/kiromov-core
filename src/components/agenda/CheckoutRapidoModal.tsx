@@ -111,7 +111,7 @@ export function CheckoutRapidoModal({ isOpen, onClose, cita, onSuccess }: Checko
                   disabled={loading}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg cursor-pointer"
                 >
-                  {loading ? 'Procesando...' : 'Descontar del Plan y Marcar Atendida'}
+                  {loading ? 'Procesando...' : 'Descontar Sesión del Plan'}
                 </Button>
               </div>
             ) : (

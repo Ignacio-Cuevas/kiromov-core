@@ -98,13 +98,21 @@ export function CuentaCorrienteTab({ pacienteId }: CuentaCorrienteTabProps) {
           <p className="text-xs text-slate-500 font-bold uppercase">Total Pagado</p>
           <p className="text-2xl font-black text-emerald-600">{formatCLP(totalPagado)}</p>
         </div>
-        <div className={`p-4 rounded-xl shadow-xs border ${saldoPendiente > 0 ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
-          <p className={`text-xs font-bold uppercase ${saldoPendiente > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
-            Saldo Pendiente / Deuda
+        <div className={`p-4 rounded-xl shadow-xs border flex flex-col justify-center ${saldoPendiente > 0 ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
+          <p className={`text-xs font-bold uppercase mb-1 ${saldoPendiente > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+            Estado de Cuenta
           </p>
-          <p className={`text-2xl font-black ${saldoPendiente > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
-            {formatCLP(saldoPendiente)}
-          </p>
+          <div className="flex items-center gap-2">
+            {saldoPendiente <= 0 ? (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-bold bg-emerald-100 text-emerald-800">
+                ✓ Al día ($0 deuda)
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-bold bg-rose-100 text-rose-800">
+                Debe {formatCLP(saldoPendiente)}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

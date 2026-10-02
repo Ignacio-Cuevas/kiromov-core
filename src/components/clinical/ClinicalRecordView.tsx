@@ -1462,10 +1462,10 @@ export function ClinicalRecordView({
                     <button
                       type="button"
                       onClick={() => setAbrirRenewPlanModal(true)}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 cursor-pointer"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
                     >
                       <Plus className="w-4 h-4" />
-                      <span>Activar / Convertir a Plan</span>
+                      <span>📦 Contratar Plan de Tratamiento</span>
                     </button>
                   </div>
                 )}
@@ -1614,7 +1614,7 @@ export function ClinicalRecordView({
                   {citaHoyPagada && pagoReciente && (
                     <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4" />
-                      Sesión Pagada: {formatCLP(pagoReciente.monto)} — Disponible para abono si contrata un plan en la siguiente visita.
+                      Última sesión pagada: {formatCLP(pagoReciente.monto)} el {formatearFechaLimpia(pagoReciente.fecha)} (Elegible como abono para plan)
                     </div>
                   )}
                   <div className="flex gap-2">
@@ -1634,7 +1634,7 @@ export function ClinicalRecordView({
                       className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs inline-flex items-center gap-2 cursor-pointer transition-colors"
                     >
                       <Plus className="w-4 h-4" />
-                      <span>Activar / Convertir a Plan</span>
+                      <span>📦 Contratar Plan de Tratamiento</span>
                     </button>
                   </div>
                 </div>
