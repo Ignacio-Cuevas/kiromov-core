@@ -77,32 +77,35 @@ function calcularHoraFin(horaInicio?: string | null, duracionMin: number = 45): 
 // Estilo Pastel Suave con Barra Lateral de 4px sólida
 function getPastelCardTheme(cita: any) {
   const estado = String(cita?.estado || 'pendiente').toLowerCase();
-  const motivo = String(cita?.motivo_consulta || cita?.tipo_prestacion || '').toLowerCase();
 
-  if (estado === 'cancelada') {
-    return {
-      card: 'bg-slate-100/90 border-slate-200 border-l-4 border-l-slate-400 text-slate-400 opacity-60 line-through',
-      dot: 'bg-slate-400'
-    };
-  }
+  const isCancelada = estado === 'cancelada';
+  const isConfirmada = estado === 'confirmada';
+  const isAtendida = ['asistio', 'asistió', 'atendida', 'atendido'].includes(estado);
+  const isNoAsistio = ['no_asistio', 'no asistió'].includes(estado);
 
-  // 1. Evaluación Inicial: Fondo azul pastel
-  if (motivo.includes('evaluación inicial') || motivo.includes('evaluacion inicial') || motivo.includes('evaluación') || motivo.includes('evaluacion')) {
-    return {
-      card: 'bg-sky-50 border-sky-200 border-l-4 border-l-sky-500 text-sky-950 hover:bg-sky-100/70',
-      dot: 'bg-sky-500'
-    };
-  }
-
-  // 2. Confirmada: Fondo verde menta suave
-  if (estado === 'confirmada' || estado === 'asistio' || estado === 'asistió' || estado === 'atendida' || estado === 'atendido') {
+  if (isConfirmada) {
     return {
       card: 'bg-emerald-50 border-emerald-200 border-l-4 border-l-emerald-500 text-emerald-950 hover:bg-emerald-100/70',
       dot: 'bg-emerald-500'
     };
+  } else if (isAtendida) {
+    return {
+      card: 'bg-blue-50 border-blue-200 border-l-4 border-l-blue-500 text-blue-950 hover:bg-blue-100/70',
+      dot: 'bg-blue-600'
+    };
+  } else if (isNoAsistio) {
+    return {
+      card: 'bg-rose-50 border-rose-200 border-l-4 border-l-rose-500 text-rose-950 hover:bg-rose-100/70',
+      dot: 'bg-rose-500'
+    };
+  } else if (isCancelada) {
+    return {
+      card: 'bg-rose-50 border-rose-200 border-l-4 border-l-rose-500 text-rose-950 opacity-60 hover:bg-rose-100/70 line-through',
+      dot: 'bg-rose-500'
+    };
   }
 
-  // 3. Pendiente: Fondo ámbar suave
+  // Por defecto: Pendiente
   return {
     card: 'bg-amber-50 border-amber-200 border-l-4 border-l-amber-500 text-amber-950 hover:bg-amber-100/70',
     dot: 'bg-amber-500'
@@ -376,8 +379,12 @@ export function ClinicalTimeGrid({
             <span className="font-semibold text-slate-700">Confirmada</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-sky-50 border border-sky-300 border-l-4 border-l-sky-500" />
-            <span className="font-semibold text-slate-700">Evaluación Inicial</span>
+            <span className="w-3 h-3 rounded bg-blue-50 border border-blue-300 border-l-4 border-l-blue-500" />
+            <span className="font-semibold text-slate-700">Atendida</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded bg-rose-50 border border-rose-300 border-l-4 border-l-rose-500" />
+            <span className="font-semibold text-slate-700">Inasistencia / Cancelada</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded bg-slate-50 border border-slate-200" />
