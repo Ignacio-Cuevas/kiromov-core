@@ -39,14 +39,26 @@ export function CuentaCorrienteTab({ pacienteId }: CuentaCorrienteTabProps) {
           .eq('paciente_id', pacienteId)
           .order('fecha', { ascending: false });
 
+        // 3. Planes contratados
+        const { data: planesData } = await supabase
+          .from('compras_planes')
+          .select('id, fecha_compra, total_final_clp, nombre_plan')
+          .eq('paciente_id', pacienteId)
+          .order('fecha_compra', { ascending: false });
+
         const citas = citasData || [];
         const pagos = pagosData || [];
+        const planes = planesData || [];
         
         let tCobrado = 0;
         let tPagado = 0;
         
         citas.forEach(c => {
           if (c.monto_cobrado) tCobrado += Number(c.monto_cobrado);
+        });
+
+        planes.forEach(p => {
+          if (p.total_final_clp) tCobrado += Number(p.total_final_clp);
         });
         
         pagos.forEach(p => {

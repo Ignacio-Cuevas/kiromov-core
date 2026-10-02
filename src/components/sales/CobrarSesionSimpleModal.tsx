@@ -66,7 +66,7 @@ export function CobrarSesionSimpleModal({ isOpen, onClose, pacienteId, categoria
   return (
     <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
         <DialogHeader>
-          <DialogTitle>Cobrar Sesión Simple</DialogTitle>
+          <DialogTitle>Cobrar Sesión Individual</DialogTitle>
           <DialogDescription>Registra el pago para una única atención sin activar un plan.</DialogDescription>
         </DialogHeader>
         <DialogBody>

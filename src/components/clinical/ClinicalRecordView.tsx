@@ -1456,7 +1456,7 @@ export function ClinicalRecordView({
                         className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl shadow-xs border border-slate-200 flex items-center gap-2 cursor-pointer"
                       >
                         <CreditCard className="w-4 h-4" />
-                        <span>Cobrar Sesión Simple</span>
+                        <span>💵 Cobrar Sesión Individual</span>
                       </button>
                     )}
                     <button
@@ -1625,7 +1625,7 @@ export function ClinicalRecordView({
                         className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl shadow-xs border border-slate-200 inline-flex items-center gap-2 cursor-pointer transition-colors"
                       >
                         <CreditCard className="w-4 h-4" />
-                        <span>Cobrar Sesión Simple</span>
+                        <span>💵 Cobrar Sesión Individual</span>
                       </button>
                     )}
                     <button
