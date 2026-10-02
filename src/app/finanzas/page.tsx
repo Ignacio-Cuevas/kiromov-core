@@ -15,13 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogBody, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type PeriodoFiltro = 'este_mes' | 'mes_anterior' | 'este_semestre' | 'este_ano' | 'todo';
-type TabName = 'asistencias' | 'pagados' | 'deben' | 'egresos';
+type TabName = 'deben' | 'pagados' | 'planes' | 'egresos';
 
 function FinanzasContent() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [periodo, setPeriodo] = useState<PeriodoFiltro>('este_mes');
-  const [activeTab, setActiveTab] = useState<TabName>('asistencias');
+  const [activeTab, setActiveTab] = useState<TabName>('deben');
 
   // Datos
   const [citas, setCitas] = useState<any[]>([]);
@@ -251,6 +251,7 @@ function FinanzasContent() {
   // Arrays derivados para las tabs de "Quién Debe"
   const planesPendientesLista = useMemo(() => transaccionesFiltradas.filter(t => t.estado_pago === 'pendiente' || t.estado_pago === 'parcial' || (t.saldo_pendiente && t.saldo_pendiente > 0)), [transaccionesFiltradas]);
   const citasPendientesLista = useMemo(() => asistenciasFiltradas.filter(c => c.estado_pago === 'pendiente_pago'), [asistenciasFiltradas]);
+  const planesActivosLista = useMemo(() => transaccionesFiltradas.filter(t => t.estado === 'activo'), [transaccionesFiltradas]);
 
   const handleCobrarCita = (telefono: string, nombre: string, monto: number, fecha: string) => {
     const cleanPhone = (telefono || '').replace(/\D/g, '').slice(-9);
@@ -333,10 +334,10 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
         {/* TABS Y TABLAS */}
         <div className="bg-paper rounded-cards shadow-calendly border border-hairline overflow-hidden">
           <div className="border-b border-hairline flex overflow-x-auto no-scrollbar bg-cloud">
-            <button onClick={() => setActiveTab('asistencias')} className={`min-h-[48px] px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${activeTab === 'asistencias' ? 'border-signal-blue text-signal-blue bg-paper' : 'border-transparent text-slate-gray hover:text-ink-navy hover:bg-pebble'}`}>🗓️ Quién Asistió</button>
-            <button onClick={() => setActiveTab('pagados')} className={`min-h-[48px] px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${activeTab === 'pagados' ? 'border-emerald-600 text-emerald-700 bg-paper' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>💰 Quién Pagó</button>
             <button onClick={() => setActiveTab('deben')} className={`min-h-[48px] px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${activeTab === 'deben' ? 'border-amber-500 text-amber-600 bg-paper' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>⚠️ Quién Debe {deudoresCount > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">{deudoresCount}</span>}</button>
-            <button onClick={() => setActiveTab('egresos')} className={`min-h-[48px] px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${activeTab === 'egresos' ? 'border-rose-500 text-rose-600 bg-paper' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>📉 Egresos</button>
+            <button onClick={() => setActiveTab('pagados')} className={`min-h-[48px] px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${activeTab === 'pagados' ? 'border-emerald-600 text-emerald-700 bg-paper' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>💰 Quién Pagó</button>
+            <button onClick={() => setActiveTab('planes')} className={`min-h-[48px] px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${activeTab === 'planes' ? 'border-signal-blue text-signal-blue bg-paper' : 'border-transparent text-slate-gray hover:text-ink-navy hover:bg-pebble'}`}>📦 Planes Activos</button>
+            <button onClick={() => setActiveTab('egresos')} className={`min-h-[48px] px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${activeTab === 'egresos' ? 'border-rose-500 text-rose-600 bg-paper' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/50'}`}>📉 Caja Diaria / Egresos</button>
           </div>
 
           <div className="p-0 min-h-[400px]">
@@ -347,32 +348,48 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
               </div>
             ) : (
               <>
-                {/* 1. QUIÉN ASISTIÓ */}
-                {activeTab === 'asistencias' && (
+                {/* 1. PLANES ACTIVOS */}
+                {activeTab === 'planes' && (
                   <div className="overflow-x-auto">
-                    {asistenciasFiltradas.length === 0 ? (
-                      <p className="text-sm text-slate-400 py-12 text-center">No hay asistencias en este período.</p>
+                    {planesActivosLista.length === 0 ? (
+                      <p className="text-sm text-slate-400 py-12 text-center">No hay planes activos en este período.</p>
                     ) : (
                       <table className="w-full text-left text-sm whitespace-nowrap">
-                        <thead className="bg-slate-50/50 text-slate-500 border-b border-slate-200/80 text-xs uppercase tracking-wider font-semibold">
+                        <thead className="bg-signal-blue/10 text-signal-blue border-b border-signal-blue/20 text-xs uppercase tracking-wider font-semibold">
                           <tr>
-                            <th className="py-3 px-4">Fecha / Hora</th>
                             <th className="py-3 px-4">Paciente</th>
-                            <th className="py-3 px-4">RUT</th>
-                            <th className="py-3 px-4">Motivo / Tratamiento</th>
-                            <th className="py-3 px-4">Profesional</th>
+                            <th className="py-3 px-4">Plan / Tratamiento</th>
+                            <th className="py-3 px-4">Progreso (Sesiones)</th>
+                            <th className="py-3 px-4 text-right">Saldo Restante</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {asistenciasFiltradas.map((c) => (
-                            <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="py-3 px-4 font-medium text-slate-700 text-xs">{c.fecha} {c.hora?.slice(0,5)}</td>
-                              <td className="py-3 px-4 font-bold text-slate-900">{c.pacientes?.nombre_completo}</td>
-                              <td className="py-3 px-4 text-xs text-slate-500 font-mono">{formatRut(c.pacientes?.rut)}</td>
-                              <td className="py-3 px-4 text-xs text-slate-600">{c.motivo_consulta}</td>
-                              <td className="py-3 px-4 text-xs text-slate-500">{c.profesional}</td>
-                            </tr>
-                          ))}
+                          {planesActivosLista.map((p) => {
+                            const usadas = p.sesiones_usadas || 0;
+                            const totales = p.sesiones_totales || 0;
+                            const porcentaje = totales > 0 ? (usadas / totales) * 100 : 0;
+                            return (
+                              <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="py-3 px-4 font-bold text-slate-900">{p.pacientes?.nombre_completo}</td>
+                                <td className="py-3 px-4 font-medium text-slate-700 text-xs">{p.nombre_plan || 'Plan Kinésico'}</td>
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-slate-600">{usadas} / {totales}</span>
+                                    <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                      <div className="h-full bg-signal-blue rounded-full" style={{ width: `${porcentaje}%` }} />
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-right font-semibold text-slate-700">
+                                  {p.saldo_pendiente > 0 ? (
+                                    <span className="text-rose-600">Debe {formatCLP(p.saldo_pendiente)}</span>
+                                  ) : (
+                                    <span className="text-emerald-600">Pagado</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     )}
@@ -469,7 +486,7 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
                                     variant="outline" 
                                     className="min-h-[44px] sm:min-h-0 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl text-xs font-bold shadow-2xs h-auto py-2 px-3 cursor-pointer"
                                   >
-                                    💬 Avisar
+                                    💬 WhatsApp Recordatorio
                                   </Button>
                                   <Button 
                                     onClick={() => setSettlingPlan(c)} 
@@ -511,7 +528,7 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
                                     variant="outline" 
                                     className="min-h-[44px] sm:min-h-0 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl text-xs font-bold shadow-2xs h-auto py-2 px-3 cursor-pointer"
                                   >
-                                    💬 Avisar
+                                    💬 WhatsApp Recordatorio
                                   </Button>
                                 </div>
                               </td>

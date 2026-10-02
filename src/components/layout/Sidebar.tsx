@@ -27,22 +27,16 @@ const navItems: NavItem[] = [
     emoji: '👥',
   },
   {
-    name: 'Caja & Finanzas',
+    name: 'Finanzas & Caja',
     href: '/finanzas',
     icon: <CreditCard className="w-4 h-4" />,
-    emoji: '💳',
-  },
-  {
-    name: 'Tarifas & Catálogo',
-    href: '/planes',
-    icon: <ClipboardList className="w-4 h-4" />,
-    emoji: '📋',
-  },
-  {
-    name: 'Finanzas',
-    href: '/finanzas',
-    icon: <ClipboardList className="w-4 h-4" />,
     emoji: '💰',
+  },
+  {
+    name: 'Configuración',
+    href: '/planes', // Temporalmente apunta a planes hasta que haya una vista de configuración general
+    icon: <ClipboardList className="w-4 h-4" />,
+    emoji: '⚙️',
   },
 ];
 
