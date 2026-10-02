@@ -51,6 +51,7 @@ export function EditPatientDialog({
   const [email, setEmail] = useState('');
   const [fechaNacimiento, setFechaNacimiento] = useState('');
   const [prevision, setPrevision] = useState('Particular');
+  const [categoriaTarifa, setCategoriaTarifa] = useState('particular_vigente');
   const [motivoConsulta, setMotivoConsulta] = useState('');
   const [diagnostico, setDiagnostico] = useState('');
   const [antecedentes, setAntecedentes] = useState('');
@@ -135,6 +136,7 @@ export function EditPatientDialog({
       setEmail(patient.email || '');
       setFechaNacimiento(patient.fecha_nacimiento || patient.birth_date || '');
       setPrevision(patient.prevision || patient.prevision_salud || 'Particular');
+      setCategoriaTarifa(patient.categoria_tarifa || 'particular_vigente');
       setMotivoConsulta(patient.motivo_consulta || '');
       setDiagnostico(patient.diagnostico_medico || patient.diagnostico_principal || patient.medical_notes || '');
       setAntecedentes(patient.antecedentes_medicos || patient.antecedentes_morbidos || '');
@@ -170,6 +172,7 @@ export function EditPatientDialog({
       fecha_nacimiento: fechaNacimiento || null,
       prevision: prevision || 'Particular',
       prevision_salud: prevision || 'Particular',
+      categoria_tarifa: categoriaTarifa || 'particular_vigente',
       motivo_consulta: motivoConsulta.trim() || null,
       diagnostico_medico: diagnostico.trim() || null,
       diagnostico_principal: diagnostico.trim() || null,
@@ -300,6 +303,20 @@ export function EditPatientDialog({
                   <option value="Fonasa">Fonasa</option>
                   <option value="Isapre">Isapre</option>
                   <option value="Convenio">Convenio</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">Categoría Tarifa</label>
+                <select
+                  value={categoriaTarifa}
+                  onChange={(e) => setCategoriaTarifa(e.target.value)}
+                  className="flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="particular_vigente">Particular Vigente (Estándar $28.000)</option>
+                  <option value="convenio">Convenio ($25.000)</option>
+                  <option value="tarifa_antigua">Tarifa Histórica ($20.000)</option>
+                  <option value="personalizada">Personalizada</option>
                 </select>
               </div>
 

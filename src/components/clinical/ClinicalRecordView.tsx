@@ -12,6 +12,8 @@ import { ReimbursementCertificate } from '@/components/clinical/ReimbursementCer
 import { CuentaCorrienteTab } from '@/components/clinical/CuentaCorrienteTab';
 import { EditPatientDialog } from '@/components/patients/EditPatientDialog';
 import { ManagePlanModal } from '@/components/patients/ManagePlanModal';
+import { RenewPlanDialog } from '@/components/patients/RenewPlanDialog';
+import { CobrarSesionSimpleModal } from '@/components/sales/CobrarSesionSimpleModal';
 import { PayPlanModal } from '@/components/patients/PayPlanModal';
 import { CancelPlanModal } from '@/components/sales/CancelPlanModal';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/dialog';
@@ -187,6 +189,8 @@ export function ClinicalRecordView({
   const [abrirDischargeModal, setAbrirDischargeModal] = useState(false);
   const [abrirCertificadoModal, setAbrirCertificadoModal] = useState(false);
   const [abrirManagePlanModal, setAbrirManagePlanModal] = useState(false);
+  const [abrirRenewPlanModal, setAbrirRenewPlanModal] = useState(false);
+  const [abrirCobrarSesionModal, setAbrirCobrarSesionModal] = useState(false);
   const [abrirPayPlanModal, setAbrirPayPlanModal] = useState(false);
   const [abrirCancelPlanModal, setAbrirCancelPlanModal] = useState(false);
 
@@ -532,6 +536,11 @@ export function ClinicalRecordView({
   const saldoPendienteMonto = Number(planActivo?.saldo_pendiente ?? (planActivo?.estado_pago?.toLowerCase() === 'pagado' ? 0 : totalPlanMonto));
   const abonosMonto = Math.max(0, totalPlanMonto - saldoPendienteMonto);
   const estaAlDia = (planActivo?.estado_pago || '').toLowerCase() === 'pagado' || saldoPendienteMonto <= 0;
+
+  const citaHoy = citaId ? citasHistoricas.find(c => c.id === citaId) : null;
+  const citaMasReciente = citaHoy || (citasHistoricas.length > 0 ? citasHistoricas[0] : null);
+  const citaHoyPagada = citaHoy?.estado_pago === 'pagado';
+  const pagoReciente = citaMasReciente?.estado_pago === 'pagado' ? { monto: citaMasReciente.monto_cobrado, cita_id: citaMasReciente.id, fecha: citaMasReciente.fecha } : null;
 
   // Banderas rojas o precaución HVLA
   const tieneBanderasRojas = Boolean(
@@ -1439,14 +1448,26 @@ export function ClinicalRecordView({
                     </button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setAbrirManagePlanModal(true)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>+ Asignar / Contratar Nuevo Plan</span>
-                  </button>
+                  <div className="flex gap-2">
+                    {!citaHoyPagada && (
+                      <button
+                        type="button"
+                        onClick={() => setAbrirCobrarSesionModal(true)}
+                        className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl shadow-xs border border-slate-200 flex items-center gap-2 cursor-pointer"
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        <span>Cobrar Sesión Simple</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setAbrirRenewPlanModal(true)}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Activar / Convertir a Plan</span>
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -1589,15 +1610,33 @@ export function ClinicalRecordView({
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
                   El paciente se encuentra bajo la modalidad de pago por sesión individual. Cada atención médica se cobra de manera independiente y no se aplicarán deducciones automáticas ni alertas de "Plan agotado".
                 </p>
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setAbrirManagePlanModal(true)}
-                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs inline-flex items-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Cambiar a Plan de Sesiones (Asignar)</span>
-                  </button>
+                <div className="pt-2 flex flex-col items-center gap-3">
+                  {citaHoyPagada && pagoReciente && (
+                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Sesión Pagada: {formatCLP(pagoReciente.monto)} — Disponible para abono si contrata un plan en la siguiente visita.
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    {!citaHoyPagada && (
+                      <button
+                        type="button"
+                        onClick={() => setAbrirCobrarSesionModal(true)}
+                        className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl shadow-xs border border-slate-200 inline-flex items-center gap-2 cursor-pointer transition-colors"
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        <span>Cobrar Sesión Simple</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setAbrirRenewPlanModal(true)}
+                      className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs inline-flex items-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Activar / Convertir a Plan</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -1802,6 +1841,38 @@ export function ClinicalRecordView({
           onClose={() => setAbrirCancelPlanModal(false)}
           onSuccess={async () => {
             setAbrirCancelPlanModal(false);
+            await cargarDatos();
+            onSuccess?.();
+          }}
+        />
+      )}
+
+      {/* Convertir a Plan Nuevo (Usando RenewPlanDialog modificado) */}
+      {abrirRenewPlanModal && paciente && (
+        <RenewPlanDialog
+          open={abrirRenewPlanModal}
+          onOpenChange={setAbrirRenewPlanModal}
+          pacienteId={paciente.id}
+          pacienteNombre={paciente.nombre_completo}
+          pacienteCategoria={paciente.categoria_tarifa}
+          pagoReciente={citaHoyPagada ? pagoReciente : null}
+          onPlanPurchased={async () => {
+            setAbrirRenewPlanModal(false);
+            await cargarDatos();
+            onSuccess?.();
+          }}
+        />
+      )}
+
+      {/* Cobrar Sesión Simple */}
+      {abrirCobrarSesionModal && paciente && (
+        <CobrarSesionSimpleModal
+          isOpen={abrirCobrarSesionModal}
+          onClose={() => setAbrirCobrarSesionModal(false)}
+          pacienteId={paciente.id}
+          categoriaTarifa={paciente.categoria_tarifa}
+          citaId={citaId}
+          onSuccess={async () => {
             await cargarDatos();
             onSuccess?.();
           }}

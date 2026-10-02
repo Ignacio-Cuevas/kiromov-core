@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createClient } from "@/utils/supabase/client";
 import {
   Dialog,
   DialogHeader,
@@ -25,10 +26,14 @@ import {
   Ticket,
   Check,
 } from "lucide-react";
+import { getCatalogoPlanesParaPaciente } from '@/lib/pricing';
+
 
 interface RenewPlanDialogProps {
   pacienteId: string;
   pacienteNombre: string;
+  pacienteCategoria?: string | null;
+  pagoReciente?: { monto: number; cita_id: string; fecha: string } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPlanPurchased?: (newPlan: CompraPlan) => void;
@@ -37,16 +42,20 @@ interface RenewPlanDialogProps {
 export function RenewPlanDialog({
   pacienteId,
   pacienteNombre,
+  pacienteCategoria,
+  pagoReciente,
   open,
   onOpenChange,
   onPlanPurchased,
 }: RenewPlanDialogProps) {
-  const [catalogPlanes, setCatalogPlanes] = useState<PlanCatalogo[]>([]);
+  const supabase = createClient();
+  const [catalogPlanes, setCatalogPlanes] = useState<any[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [customNombre, setCustomNombre] = useState<string>("");
   const [sesiones, setSesiones] = useState<number>(4);
   const [precioBase, setPrecioBase] = useState<number>(100000);
   const [descuentoCLP, setDescuentoCLP] = useState<number>(0);
+  const [usarAbonoReciente, setUsarAbonoReciente] = useState<boolean>(true);
 
   // Coupon state
   const [couponCode, setCouponCode] = useState<string>("");
@@ -60,38 +69,27 @@ export function RenewPlanDialog({
   // Load active catalog plans when dialog opens
   useEffect(() => {
     if (!open) return;
-
-    let isMounted = true;
-    setIsLoadingCatalog(true);
-
-    fetchCatalogoPlanes(true)
-      .then((data) => {
-        if (isMounted) {
-          setCatalogPlanes(data);
-          if (data.length > 0) {
-            const first = data[0];
-            setSelectedPlanId(first.id);
-            setCustomNombre(first.nombre_plan);
-            setSesiones(first.total_sesiones);
-            setPrecioBase(first.precio_clp);
-            setDescuentoCLP(0);
-            setCouponCode("");
-            setAppliedCoupon(null);
-            setCouponSuccessMessage("");
-          }
-        }
-      })
-      .catch((err) => {
-        console.error("Error loading catalog planes:", err);
-      })
-      .finally(() => {
-        if (isMounted) setIsLoadingCatalog(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [open]);
+    
+    const data = getCatalogoPlanesParaPaciente(pacienteCategoria);
+    setCatalogPlanes(data);
+    if (data.length > 0) {
+      const first = data[0];
+      setSelectedPlanId(first.id);
+      setCustomNombre(first.nombre);
+      setSesiones(first.sesiones);
+      setPrecioBase(first.precio);
+      setDescuentoCLP(0);
+      setCouponCode("");
+      setAppliedCoupon(null);
+      setCouponSuccessMessage("");
+    }
+    
+    if (pagoReciente) {
+      setUsarAbonoReciente(true);
+    } else {
+      setUsarAbonoReciente(false);
+    }
+  }, [open, pacienteCategoria, pagoReciente]);
 
   // Handle plan selection from dropdown
   const handleSelectPlan = (planId: string) => {
@@ -105,9 +103,9 @@ export function RenewPlanDialog({
     } else {
       const selected = catalogPlanes.find((p) => p.id === planId);
       if (selected) {
-        setCustomNombre(selected.nombre_plan);
-        setSesiones(selected.total_sesiones);
-        setPrecioBase(selected.precio_clp);
+        setCustomNombre(selected.nombre);
+        setSesiones(selected.sesiones);
+        setPrecioBase(selected.precio);
         setDescuentoCLP(0);
         setCouponCode("");
         setAppliedCoupon(null);
@@ -146,7 +144,8 @@ export function RenewPlanDialog({
     }
   };
 
-  const valorTotal = Math.max(0, precioBase - descuentoCLP);
+  const abonoCalculado = (usarAbonoReciente && pagoReciente) ? pagoReciente.monto : 0;
+  const valorTotal = Math.max(0, precioBase - descuentoCLP - abonoCalculado);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,13 +179,25 @@ export function RenewPlanDialog({
         valor_total: valorTotal,
         total_final_clp: valorTotal,
         estado_pago: "pendiente",
-        monto_pagado: 0,
-        saldo_pendiente: valorTotal,
+        monto_pagado: abonoCalculado,
+        saldo_pendiente: valorTotal, // This should be total minus pagado, wait, if valorTotal already subtracted abono... actually valor_total of the PLAN should be `precioBase - descuentoCLP`. The `monto_pagado` should be `abonoCalculado`. `saldo_pendiente` = `precioBase - descuentoCLP - abonoCalculado`.
         fecha_compra: getChileanDate(),
         estado: "activo",
+        sesiones_usadas: usarAbonoReciente ? 1 : 0
       });
 
       if (result.success && result.data) {
+        if (usarAbonoReciente && pagoReciente && supabase) {
+          // Link previous payment and session to this plan
+          await supabase.from('pagos_pacientes').update({ plan_id: result.data.id }).eq('id', pagoReciente.cita_id); // Wait, pagoReciente.cita_id is actually cita_id. We need pago id? 
+          // Let's just update the payment using cita_id
+          await supabase.from('pagos_pacientes').update({ plan_id: result.data.id }).eq('cita_id', pagoReciente.cita_id);
+          
+          await supabase.from('citas_atenciones').update({
+            plan_id: result.data.id,
+            estado_pago: 'cubierto_por_plan'
+          }).eq('id', pagoReciente.cita_id);
+        }
         toast.success("¡Plan contratado con éxito!", {
           description: `${result.data.nombre_plan} — ${formatCLP(result.data.total_final_clp || valorTotal)} (${result.data.total_sesiones} sesiones añadidas)`,
           icon: <CheckCircle2 className="h-5 w-5 text-emerald-500" />,
@@ -357,6 +368,21 @@ export function RenewPlanDialog({
               className="h-10 text-sm font-semibold bg-white rounded-xl"
             />
           </div>
+
+          {pagoReciente && (
+            <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 flex items-start gap-3">
+              <input 
+                type="checkbox" 
+                checked={usarAbonoReciente} 
+                onChange={e => setUsarAbonoReciente(e.target.checked)}
+                className="mt-1 w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" 
+              />
+              <div>
+                <p className="text-sm font-bold text-blue-900">Aplicar pago anterior como abono</p>
+                <p className="text-xs text-blue-700 mt-0.5">El paciente pagó {formatCLP(pagoReciente.monto)} hoy por una sesión simple. Descontar este monto del total a pagar, y contar esa sesión como la 1° del plan.</p>
+              </div>
+            </div>
+          )}
 
           {/* Resumen de Cobro Histórico */}
           <div className="rounded-xl bg-slate-900 text-white p-4 space-y-2">

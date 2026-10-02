@@ -52,6 +52,7 @@ export function PatientModal({
   const [email, setEmail] = useState('');
   const [fechaNacimiento, setFechaNacimiento] = useState('');
   const [prevision, setPrevision] = useState<HealthInsurance>('Particular');
+  const [categoriaTarifa, setCategoriaTarifa] = useState('particular_vigente');
   const [motivoConsulta, setMotivoConsulta] = useState('');
   const [diagnosticoPrincipal, setDiagnosticoPrincipal] = useState('');
   const [antecedentesMorbidos, setAntecedentesMorbidos] = useState('');
@@ -76,6 +77,7 @@ export function PatientModal({
             patientToEdit.health_insurance ||
             'Particular'
         );
+        setCategoriaTarifa(patientToEdit.categoria_tarifa || 'particular_vigente');
         setMotivoConsulta(patientToEdit.motivo_consulta || '');
         setDiagnosticoPrincipal(
           patientToEdit.diagnostico_principal ||
@@ -168,6 +170,7 @@ export function PatientModal({
         fecha_nacimiento: fechaNacimiento || null,
         prevision: prevision || 'Particular',
         prevision_salud: prevision || 'Particular',
+        categoria_tarifa: categoriaTarifa || 'particular_vigente',
         motivo_consulta: motivoConsulta?.trim() || null,
         diagnostico_principal: diagnosticoPrincipal?.trim() || null,
         antecedentes_morbidos: antecedentesMorbidos?.trim() || null,
@@ -370,6 +373,31 @@ export function PatientModal({
                       }`}
                     >
                       {prev}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">Categoría de Tarifa (Aranceles)</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'particular_vigente', label: 'Particular ($28.000)' },
+                    { id: 'convenio', label: 'Convenio ($25.000)' },
+                    { id: 'tarifa_antigua', label: 'Histórica ($20.000)' },
+                    { id: 'personalizada', label: 'Personalizada' }
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setCategoriaTarifa(cat.id)}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
+                        categoriaTarifa === cat.id
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {cat.label}
                     </button>
                   ))}
                 </div>

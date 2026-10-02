@@ -125,6 +125,7 @@ export interface Paciente {
   email?: string | null;
   fecha_nacimiento?: string | null;
   prevision_salud?: PrevisionSalud | string | null;
+  categoria_tarifa?: "particular_vigente" | "convenio" | "tarifa_antigua" | "personalizada" | string | null;
   motivo_consulta?: string | null;
   diagnostico_medico?: string | null;
   diagnostico_principal?: string | null;
