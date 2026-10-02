@@ -277,11 +277,11 @@ export function AppointmentPopover({
                 onClick={() => onCambiarEstado(cita, 'asistio')}
                 className={`py-2 px-2 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1 cursor-pointer ${
                   ['asistio', 'asistió', 'atendida', 'atendido'].includes(estado)
-                    ? 'bg-teal-100 text-teal-900 border-teal-300 shadow-xs ring-2 ring-teal-400'
+                    ? 'bg-blue-100 text-blue-900 border-blue-300 shadow-xs ring-2 ring-blue-400'
                     : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                 }`}
               >
-                <span>✓</span> Atendida
+                <span>🩺</span> Atendida
               </button>
 
               <button

@@ -151,23 +151,23 @@ export function AppointmentCardPro({
     };
   } else if (isAtendida) {
     themeStyles = {
-      container: 'bg-teal-50/90 border border-teal-200 border-l-4 border-l-teal-600 text-teal-950 hover:bg-teal-100/70',
-      dot: 'bg-teal-600',
-      badge: 'bg-teal-100 text-teal-900 border-teal-300',
-      label: '✓ Atendida'
+      container: 'bg-blue-50/90 border border-blue-200 border-l-4 border-l-blue-500 text-blue-950 hover:bg-blue-100/70',
+      dot: 'bg-blue-600',
+      badge: 'bg-blue-100 text-blue-900 border-blue-300',
+      label: '🩺 Atendida'
     };
   } else if (isNoAsistio) {
     themeStyles = {
       container: 'bg-rose-50/90 border border-rose-200 border-l-4 border-l-rose-500 text-rose-950 hover:bg-rose-100/70',
       dot: 'bg-rose-500',
       badge: 'bg-rose-100 text-rose-900 border-rose-300',
-      label: '⚠️ No Asistió'
+      label: '✕ Inasistencia'
     };
   } else if (isCancelada) {
     themeStyles = {
-      container: 'bg-slate-100/90 border border-slate-200 border-l-4 border-l-slate-400 text-slate-500 opacity-60 line-through',
-      dot: 'bg-slate-400',
-      badge: 'bg-slate-200 text-slate-600 border-slate-300',
+      container: 'bg-rose-50/90 border border-rose-200 border-l-4 border-l-rose-500 text-rose-950 opacity-60 hover:bg-rose-100/70 line-through',
+      dot: 'bg-rose-500',
+      badge: 'bg-rose-100 text-rose-900 border-rose-300',
       label: '✕ Cancelada'
     };
   }
@@ -214,8 +214,8 @@ export function AppointmentCardPro({
         >
           <option value="pendiente" className="bg-white text-amber-900 font-semibold">⏳ Pendiente</option>
           <option value="confirmada" className="bg-white text-emerald-900 font-semibold">✓ Confirmada</option>
-          <option value="asistio" className="bg-white text-teal-900 font-semibold">✓ Atendida</option>
-          <option value="no_asistio" className="bg-white text-rose-900 font-semibold">⚠️ No Asistió</option>
+          <option value="asistio" className="bg-white text-blue-900 font-semibold">🩺 Atendida</option>
+          <option value="no_asistio" className="bg-white text-rose-900 font-semibold">✕ Inasistencia</option>
           <option value="cancelada" className="bg-white text-slate-600 font-semibold">✕ Cancelada</option>
         </select>
       </div>
