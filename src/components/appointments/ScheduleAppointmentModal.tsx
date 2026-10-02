@@ -102,6 +102,7 @@ export function ScheduleAppointmentModal({
   const [configAgenda, setConfigAgenda] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [modoHoraManual, setModoHoraManual] = useState(false);
+  const [deudaPendiente, setDeudaPendiente] = useState<number>(0);
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -263,6 +264,33 @@ export function ScheduleAppointmentModal({
       setValue('pacienteId', preselectedPatient.id);
     }
   }, [preselectedPatient, setValue]);
+
+  // Calcular deuda pendiente al seleccionar paciente
+  useEffect(() => {
+    if (!selectedPatient?.id || !supabase) {
+      setDeudaPendiente(0);
+      return;
+    }
+
+    const fetchDeuda = async () => {
+      try {
+        const { data: citasDeuda } = await supabase
+          .from('citas_atenciones')
+          .select('monto_cobrado')
+          .eq('paciente_id', selectedPatient.id)
+          .eq('estado_pago', 'pendiente_pago');
+        
+        let total = 0;
+        if (citasDeuda) {
+          total = citasDeuda.reduce((sum, cita) => sum + (Number(cita.monto_cobrado) || 0), 0);
+        }
+        setDeudaPendiente(total);
+      } catch (err) {
+        console.warn('Error fetching deuda:', err);
+      }
+    };
+    fetchDeuda();
+  }, [selectedPatient, supabase]);
 
   // Detección de día de semana inmune a desfaces de zona horaria (UTC vs America/Santiago)
   const diaSemana = useMemo(() => {
@@ -481,33 +509,42 @@ export function ScheduleAppointmentModal({
 
             {/* CASO A: PACIENTE YA SELECCIONADO (VINCULADO) */}
             {selectedPatient && !isNewPatient && (
-              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
-                    {selectedPatient.nombre_completo.charAt(0).toUpperCase()}
+              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl flex flex-col gap-2 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
+                      {selectedPatient.nombre_completo.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-900 leading-tight">
+                        {selectedPatient.nombre_completo}
+                      </p>
+                      <p className="text-xs text-slate-500 font-mono mt-0.5">
+                        {selectedPatient.rut ? formatRut(selectedPatient.rut) : 'Sin RUT'}{' '}
+                        {selectedPatient.telefono ? `• ${selectedPatient.telefono}` : ''}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900 leading-tight">
-                      {selectedPatient.nombre_completo}
-                    </p>
-                    <p className="text-xs text-slate-500 font-mono mt-0.5">
-                      {selectedPatient.rut ? formatRut(selectedPatient.rut) : 'Sin RUT'}{' '}
-                      {selectedPatient.telefono ? `• ${selectedPatient.telefono}` : ''}
-                    </p>
-                  </div>
-                </div>
 
-                {!preselectedPatient && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedPatient(null);
-                      setValue('pacienteId', '');
-                    }}
-                    className="text-xs text-slate-500 hover:text-rose-600 font-semibold px-2 py-1 rounded-lg border border-slate-200 hover:border-rose-200 transition-all cursor-pointer"
-                  >
-                    Cambiar
-                  </button>
+                  {!preselectedPatient && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPatient(null);
+                        setValue('pacienteId', '');
+                        setDeudaPendiente(0);
+                      }}
+                      className="text-xs text-slate-500 hover:text-rose-600 font-semibold px-2 py-1 rounded-lg border border-slate-200 hover:border-rose-200 transition-all cursor-pointer"
+                    >
+                      Cambiar
+                    </button>
+                  )}
+                </div>
+                {deudaPendiente > 0 && (
+                  <div className="mt-2 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg p-2.5 text-xs font-semibold flex gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>⚠️ Paciente mantiene una deuda pendiente de ${deudaPendiente.toLocaleString('es-CL')}. Se sugiere cobrar antes de ingresar a box.</span>
+                  </div>
                 )}
               </div>
             )}

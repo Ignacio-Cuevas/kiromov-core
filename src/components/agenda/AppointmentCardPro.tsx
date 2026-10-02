@@ -190,6 +190,15 @@ export function AppointmentCardPro({
           <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border uppercase tracking-wider shrink-0 ${modality.badgeClass}`}>
             {modality.label}
           </span>
+          {cita?.estado_pago === 'pagado' || cita?.estado_pago === 'cubierto_por_plan' ? (
+            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded border bg-emerald-50 text-emerald-800 border-emerald-200 shrink-0">
+              {cita.estado_pago === 'cubierto_por_plan' ? 'Plan' : 'Pagado'}
+            </span>
+          ) : cita?.estado_pago === 'pendiente_pago' ? (
+            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded border bg-rose-50 text-rose-800 border-rose-200 shrink-0">
+              Debe ${(cita?.monto_cobrado || 0).toLocaleString('es-CL')}
+            </span>
+          ) : null}
         </div>
 
         {/* Dropdown de Estado Rápido en 1 Clic */}

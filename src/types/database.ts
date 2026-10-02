@@ -184,6 +184,8 @@ export interface CitaAtencion {
   hora: string;
   profesional: string;
   estado: EstadoAtencion;
+  estado_pago?: "pagado" | "cubierto_por_plan" | "pendiente_pago" | "cortesia" | string | null;
+  monto_cobrado?: number | null;
   notas?: string | null;
   motivo_consulta?: string | null;
   google_event_id?: string | null;
@@ -244,4 +246,16 @@ export interface EvaluacionInicialTMO {
   plan_tratamiento: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface PagoPaciente {
+  id: string;
+  paciente_id: string;
+  cita_id?: string | null;
+  monto: number;
+  metodo_pago: "transferencia" | "tarjeta" | "efectivo" | string;
+  estado: "completado" | "anulado" | string;
+  fecha: string;
+  notas?: string | null;
+  created_at?: string;
 }

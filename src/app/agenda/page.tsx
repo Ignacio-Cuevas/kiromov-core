@@ -42,6 +42,7 @@ import {
   DIAS_ORDENADOS
 } from '@/lib/availability';
 import { ScheduleAppointmentModal } from '@/components/appointments/ScheduleAppointmentModal';
+import { CheckoutRapidoModal } from '@/components/agenda/CheckoutRapidoModal';
 
 function getFormattedLocalDate(d: Date): string {
   const year = d.getFullYear();
@@ -112,6 +113,7 @@ function AgendaContent() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Bloqueos de Horario y Configuración de Jornada
+  const [checkoutCita, setCheckoutCita] = useState<CitaExtendida | null>(null);
   const [activeTab, setActiveTab] = useState<'agenda' | 'disponibilidad'>('agenda');
   const [semanaConfig, setSemanaConfig] = useState<SemanaHorariosBox>(DEFAULT_SEMANA_HORARIOS);
   const [duracionPredeterminada, setDuracionPredeterminada] = useState<number>(45);
@@ -527,6 +529,11 @@ function AgendaContent() {
     if (!supabase) return;
     const estadoAnterior = cita.estado;
     if (estadoAnterior === nuevoEstado) return;
+
+    if (nuevoEstado === 'asistio' || nuevoEstado === 'atendida') {
+      setCheckoutCita(cita);
+      return;
+    }
 
     try {
       // 1. Actualizar estado de la cita en Supabase
@@ -1366,6 +1373,16 @@ function AgendaContent() {
         <DialogHeader><DialogTitle className="text-red-600">Cancelar Cita</DialogTitle><DialogDescription>¿Estás seguro de que deseas cancelar esta cita? Esta acción no se puede deshacer.</DialogDescription></DialogHeader>
         <DialogFooter className="mt-6"><Button variant="outline" onClick={() => setDeletingCita(null)}>Atrás</Button><Button onClick={handleDeleteCita} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 text-white">{isDeleting ? 'Eliminando...' : 'Sí, cancelar cita'}</Button></DialogFooter>
       </Dialog>
+
+      <CheckoutRapidoModal
+        isOpen={!!checkoutCita}
+        onClose={() => setCheckoutCita(null)}
+        cita={checkoutCita}
+        onSuccess={() => {
+          setCheckoutCita(null);
+          loadAgenda();
+        }}
+      />
 
       <BlockTimeModal
         isOpen={showBlockModal}

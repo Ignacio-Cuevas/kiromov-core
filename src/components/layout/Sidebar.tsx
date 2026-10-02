@@ -38,6 +38,12 @@ const navItems: NavItem[] = [
     icon: <ClipboardList className="w-4 h-4" />,
     emoji: '📋',
   },
+  {
+    name: 'Finanzas',
+    href: '/finanzas',
+    icon: <ClipboardList className="w-4 h-4" />,
+    emoji: '💰',
+  },
 ];
 
 export function Sidebar() {

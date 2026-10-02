@@ -80,7 +80,7 @@ function FinanzasContent() {
     try {
       const [resCitas, resCompras, resEgresos] = await Promise.all([
         supabase.from('citas_atenciones')
-          .select('*, pacientes(nombre_completo, rut)')
+          .select('*, pacientes(nombre_completo, rut, telefono)')
           .eq('estado', 'asistio')
           .order('fecha', { ascending: false }),
         supabase.from('compras_planes')
@@ -217,16 +217,46 @@ function FinanzasContent() {
   }, [ingresosPeriodo, egresosPeriodo]);
   
   const porCobrarPeriodo = useMemo(() => {
-    return transaccionesFiltradas
+    const planesPendientes = transaccionesFiltradas
       .filter((t) => t.estado_pago === 'pendiente')
       .reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.valor_total) || 0), 0);
-  }, [transaccionesFiltradas]);
+    
+    const citasPendientes = asistenciasFiltradas
+      .filter((c) => c.estado_pago === 'pendiente_pago')
+      .reduce((acc, curr) => acc + (Number(curr.monto_cobrado) || 0), 0);
 
-  const deudoresCount = transaccionesFiltradas
-      .filter((t) => t.estado_pago === 'pendiente').length;
+    return planesPendientes + citasPendientes;
+  }, [transaccionesFiltradas, asistenciasFiltradas]);
+
+  const deudoresCount = useMemo(() => {
+    const ids = new Set<string>();
+    transaccionesFiltradas.filter((t) => t.estado_pago === 'pendiente').forEach(t => ids.add(t.paciente_id));
+    asistenciasFiltradas.filter((c) => c.estado_pago === 'pendiente_pago').forEach(c => ids.add(c.paciente_id));
+    return ids.size;
+  }, [transaccionesFiltradas, asistenciasFiltradas]);
 
   // Arrays derivados para las tabs de "Quién Debe"
-  const pendientes = useMemo(() => transaccionesFiltradas.filter(t => t.estado_pago === 'pendiente'), [transaccionesFiltradas]);
+  const planesPendientesLista = useMemo(() => transaccionesFiltradas.filter(t => t.estado_pago === 'pendiente'), [transaccionesFiltradas]);
+  const citasPendientesLista = useMemo(() => asistenciasFiltradas.filter(c => c.estado_pago === 'pendiente_pago'), [asistenciasFiltradas]);
+
+  const handleCobrarCita = (telefono: string, nombre: string, monto: number, fecha: string) => {
+    const cleanPhone = (telefono || '').replace(/\D/g, '').slice(-9);
+    if (!cleanPhone) { toast.error('Paciente sin teléfono'); return; }
+    
+    const texto = `Hola ${nombre.split(' ')[0]}, te saludamos de Kiromov Centro Clínico.
+Esperamos que tu tratamiento vaya muy bien. Te recordamos que mantienes un saldo pendiente de ${formatCLP(monto)} correspondiente a tu atención del día ${fecha}.
+
+Puedes transferir a los datos de la clínica:
+• Banco: Santander
+• Tipo de Cuenta: Corriente
+• N° Cuenta: 7654321
+• Rut: 76.543.210-9
+• Correo: pagos@kiromov.cl
+
+Si ya realizaste la transferencia, por favor envíanos el comprobante por este medio. ¡Muchas gracias!`;
+
+    window.open(`https://wa.me/56${cleanPhone}?text=${encodeURIComponent(texto)}`, '_blank');
+  };
 
 
   return (
@@ -375,7 +405,7 @@ function FinanzasContent() {
                 {/* 3. QUIÉN DEBE */}
                 {activeTab === 'deben' && (
                   <div className="overflow-x-auto">
-                    {pendientes.length === 0 ? (
+                    {planesPendientesLista.length === 0 && citasPendientesLista.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                         <CheckCircle2 className="w-12 h-12 mb-3 text-emerald-400" />
                         <p className="text-base font-bold text-slate-700">¡Todo al día!</p>
@@ -387,38 +417,61 @@ function FinanzasContent() {
                           <tr>
                             <th className="py-3 px-4">Origen</th>
                             <th className="py-3 px-4">Paciente</th>
-                            <th className="py-3 px-4">Plan Adeudado</th>
+                            <th className="py-3 px-4">Adeuda</th>
                             <th className="py-3 px-4 text-right">Monto Deuda</th>
                             <th className="py-3 px-4 text-right">Acción</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {pendientes.map((c) => (
+                          {planesPendientesLista.map((c) => (
                             <tr key={c.id} className="hover:bg-amber-50/30 transition-colors">
                               <td className="py-3 px-4 text-slate-500 text-xs">{c.fecha_compra}</td>
                               <td className="py-3 px-4">
                                 <div className="font-bold text-slate-900">{c.pacientes?.nombre_completo}</div>
                                 <div className="text-[10px] text-slate-400 font-mono">{formatRut(c.pacientes?.rut)}</div>
                               </td>
-                              <td className="py-3 px-4 font-medium text-slate-700 text-xs">{c.nombre_plan}</td>
+                              <td className="py-3 px-4 font-medium text-slate-700 text-xs">Plan: {c.nombre_plan}</td>
                               <td className="py-3 px-4 text-right font-black text-amber-600 text-lg">
                                 {formatCLP(Number(c.monto_clp || c.valor_total) || 0)}
                               </td>
                               <td className="py-3 px-4 text-right">
                                 <div className="flex items-center justify-end gap-2">
                                   <Button 
-                                    onClick={() => setCancelingPlan(c)} 
+                                    onClick={() => handleCobrarCita(c.pacientes?.telefono, c.pacientes?.nombre_completo, Number(c.monto_clp || c.valor_total) || 0, c.fecha_compra)} 
                                     variant="outline" 
-                                    className="min-h-[44px] sm:min-h-0 border-rose-200 text-rose-700 hover:bg-rose-50 rounded-xl text-xs font-bold shadow-2xs h-auto py-2 px-3 cursor-pointer"
-                                    title="Ajustar monto a sesiones realizadas o anular el plan"
+                                    className="min-h-[44px] sm:min-h-0 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl text-xs font-bold shadow-2xs h-auto py-2 px-3 cursor-pointer"
                                   >
-                                    <X className="w-3.5 h-3.5 mr-1 text-rose-600" /> Ajustar / Cancelar
+                                    💬 Cobrar Plan
                                   </Button>
                                   <Button 
                                     onClick={() => setSettlingPlan(c)} 
                                     className="min-h-[44px] sm:min-h-0 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm h-auto py-2 px-3 cursor-pointer"
                                   >
-                                    <CreditCard className="w-3.5 h-3.5 mr-1.5" /> Cobrar Plan
+                                    <CreditCard className="w-3.5 h-3.5 mr-1.5" /> Liquidar
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                          {citasPendientesLista.map((c) => (
+                            <tr key={c.id} className="hover:bg-amber-50/30 transition-colors">
+                              <td className="py-3 px-4 text-slate-500 text-xs">{c.fecha}</td>
+                              <td className="py-3 px-4">
+                                <div className="font-bold text-slate-900">{c.pacientes?.nombre_completo}</div>
+                                <div className="text-[10px] text-slate-400 font-mono">{formatRut(c.pacientes?.rut)}</div>
+                              </td>
+                              <td className="py-3 px-4 font-medium text-slate-700 text-xs">Cita: {c.motivo_consulta}</td>
+                              <td className="py-3 px-4 text-right font-black text-amber-600 text-lg">
+                                {formatCLP(Number(c.monto_cobrado) || 0)}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button 
+                                    onClick={() => handleCobrarCita(c.pacientes?.telefono, c.pacientes?.nombre_completo, Number(c.monto_cobrado) || 0, c.fecha)} 
+                                    variant="outline" 
+                                    className="min-h-[44px] sm:min-h-0 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl text-xs font-bold shadow-2xs h-auto py-2 px-3 cursor-pointer"
+                                  >
+                                    💬 Cobrar Atención
                                   </Button>
                                 </div>
                               </td>

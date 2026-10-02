@@ -9,6 +9,7 @@ import { AppointmentModal } from '@/components/appointments/AppointmentModal';
 import { InitialEvaluationModal } from '@/components/clinical/InitialEvaluationModal';
 import { DischargeReportModal } from '@/components/clinical/DischargeReportModal';
 import { ReimbursementCertificate } from '@/components/clinical/ReimbursementCertificate';
+import { CuentaCorrienteTab } from '@/components/clinical/CuentaCorrienteTab';
 import { EditPatientDialog } from '@/components/patients/EditPatientDialog';
 import { ManagePlanModal } from '@/components/patients/ManagePlanModal';
 import { PayPlanModal } from '@/components/patients/PayPlanModal';
@@ -165,7 +166,7 @@ export function ClinicalRecordView({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Navegación por pestañas Medilink: 'soap' | 'tmo' | 'plan' | 'documentos'
-  const [tabActiva, setTabActiva] = useState<'soap' | 'tmo' | 'plan' | 'documentos'>('soap');
+  const [tabActiva, setTabActiva] = useState<'soap' | 'tmo' | 'plan' | 'documentos' | 'cuenta_corriente'>('soap');
 
   // Modales
   const [abrirAgendarModal, setAbrirAgendarModal] = useState(false);
@@ -692,6 +693,19 @@ export function ClinicalRecordView({
         >
           <FileCheck2 className="w-4 h-4 text-purple-600" />
           <span>Documentos y Certificados</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTabActiva('cuenta_corriente')}
+          className={`h-11 px-3.5 flex items-center gap-2 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            tabActiva === 'cuenta_corriente'
+              ? 'border-blue-600 text-blue-700 bg-blue-50/50'
+              : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <CreditCard className="w-4 h-4 text-amber-600" />
+          <span>Cuenta Corriente</span>
         </button>
       </div>
 
@@ -1648,6 +1662,13 @@ export function ClinicalRecordView({
             </div>
 
           </div>
+        )}
+
+        {/* ================================================================== */}
+        {/* PESTAÑA 5: CUENTA CORRIENTE                                        */}
+        {/* ================================================================== */}
+        {tabActiva === 'cuenta_corriente' && (
+          <CuentaCorrienteTab pacienteId={pacienteId} />
         )}
 
       </div>

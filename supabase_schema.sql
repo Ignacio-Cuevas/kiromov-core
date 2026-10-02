@@ -267,3 +267,22 @@ VALUES
     ('KIRO10', '10% de descuento en planes de 6 a 12 sesiones', 'porcentaje', 10, 50, 8, true, '2026-11-30'),
     ('CONVENIO2026', 'Rebaja especial de $20.000 CLP para convenios', 'monto_fijo', 20000, 30, 5, true, '2026-12-31')
 ON CONFLICT (codigo) DO NOTHING;
+
+-- NUEVAS COLUMNAS FINANCIERAS PARA CITAS
+ALTER TABLE public.citas_atenciones
+ADD COLUMN IF NOT EXISTS estado_pago TEXT,
+ADD COLUMN IF NOT EXISTS monto_cobrado NUMERIC;
+
+-- TABLA DE PAGOS PACIENTES
+CREATE TABLE IF NOT EXISTS public.pagos_pacientes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    paciente_id UUID REFERENCES public.pacientes(id) ON DELETE CASCADE,
+    cita_id UUID REFERENCES public.citas_atenciones(id) ON DELETE SET NULL,
+    monto numeric NOT NULL,
+    metodo_pago TEXT NOT NULL,
+    estado TEXT NOT NULL DEFAULT 'completado',
+    fecha TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    notas TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.pagos_pacientes ENABLE ROW LEVEL SECURITY;
