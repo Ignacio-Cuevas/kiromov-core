@@ -202,12 +202,13 @@ export function PayPlanModal({
                 Monto Recibido / Cobrado (CLP) <span className="text-rose-500">*</span>
               </label>
               <input
-                type="number"
-                step={1000}
-                min={0}
+                type="text"
                 required
-                value={montoCobro}
-                onChange={(e) => setMontoCobro(parseInt(e.target.value, 10) || 0)}
+                value={montoCobro || ""}
+                onChange={(e) => {
+                  const val = Number(String(e.target.value).replace(/[^0-9]/g, "")) || 0;
+                  setMontoCobro(val);
+                }}
                 className="w-full rounded-xl border border-slate-300 p-2.5 text-base font-extrabold text-emerald-700 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>

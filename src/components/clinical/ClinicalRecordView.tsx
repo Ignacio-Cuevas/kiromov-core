@@ -133,6 +133,17 @@ export const calcularPronosticoAltaClinica = (historialSOAP: any[], evaluacionIn
   };
 };
 
+export const formatearFechaLimpia = (fechaStr: string) => {
+  if (!fechaStr) return "-";
+  const fechaLimpia = fechaStr.split("T")[0]; // "YYYY-MM-DD"
+  const partes = fechaLimpia.split("-");
+  if (partes.length === 3) {
+    const [yyyy, mm, dd] = partes;
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  return fechaLimpia;
+};
+
 export function ClinicalRecordView({
   pacienteId,
   citaId,
@@ -1273,7 +1284,7 @@ export function ClinicalRecordView({
                          evaluacionInicialTMO.segmento_evaluado === 'rodilla' ? 'Rodilla' : 
                          evaluacionInicialTMO.segmento_evaluado === 'tobillo_pie' ? 'Tobillo y Pie' : 'Evaluación General'}
                       </h3>
-                      <p className="text-sm font-medium text-slate-500">Evaluación Inicial — {evaluacionInicialTMO.fecha_evaluacion ? evaluacionInicialTMO.fecha_evaluacion.split('T')[0].split('-').reverse().join('/') : '-'}</p>
+                      <p className="text-sm font-medium text-slate-500">Evaluación Inicial — {evaluacionInicialTMO.fecha_evaluacion ? formatearFechaLimpia(evaluacionInicialTMO.fecha_evaluacion) : '-'}</p>
                     </div>
                   </div>
                   <div className="flex gap-4 text-center">
@@ -1453,7 +1464,7 @@ export function ClinicalRecordView({
                       {planActivo.nombre_plan || 'Plan Kinésico'}
                     </p>
                     <span className="text-[11px] text-slate-500">
-                      Fecha: {planActivo.fecha_compra ? planActivo.fecha_compra.split('-').reverse().join('/') : 'Reciente'}
+                      Fecha: {planActivo.fecha_compra ? formatearFechaLimpia(planActivo.fecha_compra) : 'Reciente'}
                     </span>
                   </div>
 
@@ -1528,7 +1539,7 @@ export function ClinicalRecordView({
                           citasHistoricas.map((cita) => (
                             <tr key={cita.id} className="hover:bg-slate-50/80 transition-colors">
                               <td className="px-4 py-2.5 font-mono text-slate-800">
-                                {cita.fecha ? cita.fecha.split('-').reverse().join('/') : '-'}
+                                {cita.fecha ? formatearFechaLimpia(cita.fecha) : '-'}
                               </td>
                               <td className="px-4 py-2.5 font-mono text-slate-600">
                                 {cita.hora ? cita.hora.slice(0, 5) : '-'}
@@ -1566,23 +1577,28 @@ export function ClinicalRecordView({
               </>
             ) : (
               <div className="bg-white p-12 rounded-xl border border-slate-200 text-center space-y-4">
-                <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto">
                   <CreditCard className="w-6 h-6" />
                 </div>
-                <h3 className="text-base font-bold text-slate-900">
-                  Sin Plan de Tratamiento Activo
+                <h3 className="text-base font-bold text-slate-900 flex items-center justify-center gap-2">
+                  <span className="bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-md text-[10px] uppercase tracking-wider border border-indigo-200">
+                    Modalidad: Pago por Sesión
+                  </span>
+                  <span>Sin Paquete / Plan Activo</span>
                 </h3>
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  El paciente no posee ningún plan activo o paquete de sesiones asignado en este momento.
+                  El paciente se encuentra bajo la modalidad de pago por sesión individual. Cada atención médica se cobra de manera independiente y no se aplicarán deducciones automáticas ni alertas de "Plan agotado".
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setAbrirManagePlanModal(true)}
-                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs inline-flex items-center gap-2 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>+ Asignar / Contratar Plan Ahora</span>
-                </button>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setAbrirManagePlanModal(true)}
+                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs inline-flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Cambiar a Plan de Sesiones (Asignar)</span>
+                  </button>
+                </div>
               </div>
             )}
 

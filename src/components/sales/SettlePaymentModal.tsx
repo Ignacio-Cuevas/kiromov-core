@@ -131,12 +131,13 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Monto que Paga Hoy (CLP) *</label>
                 <input
-                  type="number"
+                  type="text"
                   required
-                  min={1}
-                  max={saldoPendienteActual}
-                  value={montoPagaHoy}
-                  onChange={(e) => setMontoPagaHoy(Number(e.target.value))}
+                  value={montoPagaHoy || ""}
+                  onChange={(e) => {
+                    const val = Number(String(e.target.value).replace(/[^0-9]/g, "")) || 0;
+                    setMontoPagaHoy(val > saldoPendienteActual ? saldoPendienteActual : val);
+                  }}
                   className="w-full rounded-xl border border-slate-300 p-2.5 text-lg font-black text-emerald-600 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>

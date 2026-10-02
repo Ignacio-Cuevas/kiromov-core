@@ -121,9 +121,12 @@ export function CheckoutRapidoModal({ isOpen, onClose, cita, onSuccess }: Checko
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
                     <Input 
-                      type="number" 
-                      value={montoSugerido} 
-                      onChange={(e) => setMontoSugerido(Number(e.target.value) || 0)}
+                      type="text" 
+                      value={montoSugerido || ""} 
+                      onChange={(e) => {
+                        const val = Number(String(e.target.value).replace(/[^0-9]/g, "")) || 0;
+                        setMontoSugerido(val);
+                      }}
                       className="pl-8 text-lg font-bold"
                     />
                   </div>

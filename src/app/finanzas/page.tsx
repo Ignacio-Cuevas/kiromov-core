@@ -74,26 +74,32 @@ function FinanzasContent() {
     };
   };
 
+  const [pagos, setPagos] = useState<any[]>([]);
+
   const loadData = async () => {
     if (!supabase) return;
     setLoading(true);
     try {
-      const [resCitas, resCompras, resEgresos] = await Promise.all([
+      const [resCitas, resCompras, resEgresos, resPagos] = await Promise.all([
         supabase.from('citas_atenciones')
           .select('*, pacientes(nombre_completo, rut, telefono)')
           .eq('estado', 'asistio')
           .order('fecha', { ascending: false }),
         supabase.from('compras_planes')
-          .select('*, pacientes(nombre_completo, rut)')
+          .select('*, pacientes(nombre_completo, rut, telefono)')
           .order('fecha_compra', { ascending: false }),
         supabase.from('egresos_caja')
           .select('*')
+          .order('fecha', { ascending: false }),
+        supabase.from('pagos_pacientes')
+          .select('*, pacientes(nombre_completo, rut)')
           .order('fecha', { ascending: false })
       ]);
 
       setCitas(resCitas.data || []);
       setCompras(resCompras.data || []);
       setEgresos(resEgresos.data || []);
+      setPagos(resPagos.data || []);
     } catch (err) {
       console.error(err);
       toast.error('Error cargando finanzas');
@@ -200,12 +206,19 @@ function FinanzasContent() {
     });
   }, [egresos, periodo]);
 
+  const pagosFiltrados = useMemo(() => {
+    const { inicio, fin } = getRangoFechas(periodo);
+    return pagos.filter((p) => {
+      if (!p.fecha) return false;
+      const f = new Date(p.fecha);
+      return f >= inicio && f <= fin;
+    });
+  }, [pagos, periodo]);
+
   // KPIs
   const ingresosPeriodo = useMemo(() => {
-    return transaccionesFiltradas
-      .filter((t) => t.estado_pago === 'pagado')
-      .reduce((acc, curr) => acc + (Number(curr.monto_clp || curr.valor_total) || 0), 0);
-  }, [transaccionesFiltradas]);
+    return pagosFiltrados.reduce((acc, curr) => acc + (Number(curr.monto) || 0), 0);
+  }, [pagosFiltrados]);
 
   const egresosPeriodo = useMemo(() => {
     return egresosFiltrados
@@ -369,7 +382,7 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
                 {/* 2. QUIÉN PAGÓ */}
                 {activeTab === 'pagados' && (
                   <div className="overflow-x-auto">
-                    {transaccionesFiltradas.filter(c => c.estado_pago === 'pagado').length === 0 ? (
+                    {pagosFiltrados.length === 0 ? (
                       <p className="text-sm text-slate-400 py-12 text-center">No hay pagos registrados en este período.</p>
                     ) : (
                       <table className="w-full text-left text-sm whitespace-nowrap">
@@ -377,22 +390,22 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
                           <tr>
                             <th className="py-3 px-4">Fecha Pago</th>
                             <th className="py-3 px-4">Paciente</th>
-                            <th className="py-3 px-4">Plan Adquirido</th>
-                            <th className="py-3 px-4">Medio / Boleta</th>
+                            <th className="py-3 px-4">Plan o Servicio</th>
+                            <th className="py-3 px-4">Medio de Pago</th>
                             <th className="py-3 px-4 text-right">Monto CLP</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {transaccionesFiltradas.filter(c => c.estado_pago === 'pagado').map((c) => (
-                            <tr key={c.id} className="hover:bg-emerald-50/30 transition-colors">
-                              <td className="py-3 px-4 text-slate-500 text-xs">{c.fecha_compra}</td>
-                              <td className="py-3 px-4 font-bold text-slate-900">{c.pacientes?.nombre_completo}</td>
-                              <td className="py-3 px-4 font-medium text-slate-700 text-xs">{c.nombre_plan}</td>
+                          {pagosFiltrados.map((p) => (
+                            <tr key={p.id} className="hover:bg-emerald-50/30 transition-colors">
+                              <td className="py-3 px-4 text-slate-500 text-xs">{p.fecha ? p.fecha.split('T')[0] : ''}</td>
+                              <td className="py-3 px-4 font-bold text-slate-900">{p.pacientes?.nombre_completo}</td>
+                              <td className="py-3 px-4 font-medium text-slate-700 text-xs">{p.notas || 'Sesión Individual Kinésica'}</td>
                               <td className="py-3 px-4 text-xs text-slate-500">
-                                {c.metodo_pago || c.medio_pago || 'N/A'} {c.numero_boleta ? `(Bol: ${c.numero_boleta})` : ''}
+                                {p.metodo_pago || 'N/A'}
                               </td>
                               <td className="py-3 px-4 text-right font-black text-emerald-600">
-                                {formatCLP(Number(c.monto_clp || c.valor_total) || 0)}
+                                ${Number(p.monto || 0).toLocaleString("es-CL")}
                               </td>
                             </tr>
                           ))}
