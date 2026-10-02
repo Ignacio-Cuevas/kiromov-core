@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogBody, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { getArancel } from '@/lib/pricing';
+import { CobrarDeudaModal, type DeudaItem } from '@/components/sales/CobrarDeudaModal';
 
 type PeriodoFiltro = 'este_mes' | 'mes_anterior' | 'este_semestre' | 'este_ano' | 'todo';
 type TabName = 'deben' | 'pagados' | 'planes' | 'egresos';
@@ -33,6 +35,8 @@ function FinanzasContent() {
   const [savingEgreso, setSavingEgreso] = useState(false);
   const [egresoForm, setEgresoForm] = useState({ concepto: '', categoria: 'Insumos Clínicos', monto: '', formaPago: 'Débito', fecha: '' });
   const [editingEgreso, setEditingEgreso] = useState<any | null>(null);
+
+  const [deudaItemToCobrar, setDeudaItemToCobrar] = useState<DeudaItem | null>(null);
 
   // Modal Settle & Cancel
   const [settlingPlan, setSettlingPlan] = useState<any>(null);
@@ -249,8 +253,22 @@ function FinanzasContent() {
   }, [transaccionesFiltradas, asistenciasFiltradas]);
 
   // Arrays derivados para las tabs de "Quién Debe"
-  const planesPendientesLista = useMemo(() => transaccionesFiltradas.filter(t => t.estado_pago === 'pendiente' || t.estado_pago === 'parcial' || (t.saldo_pendiente && t.saldo_pendiente > 0)), [transaccionesFiltradas]);
-  const citasPendientesLista = useMemo(() => asistenciasFiltradas.filter(c => c.estado_pago === 'pendiente_pago'), [asistenciasFiltradas]);
+  const planesPendientesLista = useMemo(() => transaccionesFiltradas.filter(t => {
+    const deuda = t.saldo_pendiente ?? (t.valor_total ?? t.monto_clp ?? 0);
+    return deuda > 0 && (t.estado_pago === 'pendiente' || t.estado_pago === 'parcial');
+  }), [transaccionesFiltradas]);
+  
+  const citasPendientesLista = useMemo(() => asistenciasFiltradas.filter(c => {
+    if (c.estado_pago !== 'pendiente_pago') return false;
+    const arancel = getArancel(c.pacientes?.categoria_tarifa);
+    const valor = Number(c.monto_cobrado) || arancel.sesion_individual;
+    return valor > 0;
+  }).map(c => {
+    const arancel = getArancel(c.pacientes?.categoria_tarifa);
+    const valorTotal = Number(c.monto_cobrado) || arancel.sesion_individual;
+    return { ...c, valorRealCalculado: valorTotal };
+  }), [asistenciasFiltradas]);
+  
   const planesActivosLista = useMemo(() => transaccionesFiltradas.filter(t => t.estado === 'activo'), [transaccionesFiltradas]);
 
   const handleCobrarCita = (telefono: string, nombre: string, monto: number, fecha: string) => {
@@ -486,13 +504,21 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
                                     variant="outline" 
                                     className="min-h-[44px] sm:min-h-0 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl text-xs font-bold shadow-2xs h-auto py-2 px-3 cursor-pointer"
                                   >
-                                    💬 WhatsApp Recordatorio
+                                    💬 WhatsApp
                                   </Button>
                                   <Button 
-                                    onClick={() => setSettlingPlan(c)} 
-                                    className="min-h-[44px] sm:min-h-0 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm h-auto py-2 px-3 cursor-pointer"
+                                    onClick={() => setDeudaItemToCobrar({
+                                      tipo: 'plan',
+                                      id: c.id,
+                                      paciente_id: c.paciente_id,
+                                      paciente_nombre: c.pacientes?.nombre_completo,
+                                      concepto: c.nombre_plan || 'Plan Kinésico',
+                                      deuda: deuda,
+                                      fecha: c.fecha_compra || c.created_at
+                                    })} 
+                                    className="min-h-[44px] sm:min-h-0 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm h-auto py-2 px-3 cursor-pointer"
                                   >
-                                    <CreditCard className="w-3.5 h-3.5 mr-1.5" /> Cobrar
+                                    💵 Registrar Pago
                                   </Button>
                                 </div>
                               </td>
@@ -500,7 +526,7 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
                             );
                           })}
                           {citasPendientesLista.map((c) => {
-                            const valorTotal = Number(c.monto_cobrado) || 0;
+                            const valorTotal = c.valorRealCalculado;
                             return (
                             <tr key={c.id} className="hover:bg-amber-50/30 transition-colors">
                               <td className="py-3 px-4">
@@ -528,7 +554,21 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
                                     variant="outline" 
                                     className="min-h-[44px] sm:min-h-0 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl text-xs font-bold shadow-2xs h-auto py-2 px-3 cursor-pointer"
                                   >
-                                    💬 WhatsApp Recordatorio
+                                    💬 WhatsApp
+                                  </Button>
+                                  <Button 
+                                    onClick={() => setDeudaItemToCobrar({
+                                      tipo: 'cita',
+                                      id: c.id,
+                                      paciente_id: c.paciente_id,
+                                      paciente_nombre: c.pacientes?.nombre_completo,
+                                      concepto: c.motivo_consulta || 'Sesión Kinésica',
+                                      deuda: valorTotal,
+                                      fecha: c.fecha
+                                    })} 
+                                    className="min-h-[44px] sm:min-h-0 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm h-auto py-2 px-3 cursor-pointer"
+                                  >
+                                    💵 Registrar Pago
                                   </Button>
                                 </div>
                               </td>
@@ -661,6 +701,16 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
         onClose={() => setSettlingPlan(null)} 
         planEnUso={settlingPlan}
         onSuccess={() => { setSettlingPlan(null); loadData(); }}
+      />
+      
+      <CobrarDeudaModal 
+        isOpen={!!deudaItemToCobrar}
+        onClose={() => setDeudaItemToCobrar(null)}
+        item={deudaItemToCobrar}
+        onSuccess={() => {
+          setDeudaItemToCobrar(null);
+          loadData();
+        }}
       />
 
       <CancelPlanModal
