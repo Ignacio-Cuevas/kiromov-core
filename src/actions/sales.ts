@@ -222,37 +222,3 @@ export async function settlePendingPlan(data: {
   return { success: true };
 }
 
-export async function getSales(): Promise<Sale[]> {
-  const supabase = await createClient();
-
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('sales')
-        .select(`
-          *,
-          patients:patient_id (
-            id,
-            full_name,
-            rut,
-            phone
-          ),
-          plans:plan_id (
-            id,
-            name,
-            price_clp,
-            sessions_count
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (!error && data && data.length > 0) {
-        return data as Sale[];
-      }
-    } catch (err) {
-      console.warn('Error en getSales server action:', err);
-    }
-  }
-
-  return [];
-}

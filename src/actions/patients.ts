@@ -111,55 +111,8 @@ export async function getPatients(searchQuery?: string): Promise<Patient[]> {
         });
       }
 
-      // 4. Fallback a tabla patients
-      let query = supabase.from('patients').select(`
-        *,
-        patient_plans (
-          total_sessions,
-          used_sessions,
-          status
-        )
-      `);
+      return [];
 
-      if (searchQuery && searchQuery.trim()) {
-        const q = searchQuery.trim().toLowerCase();
-        query = query.or(`full_name.ilike.%${q}%,rut.ilike.%${q}%,phone.ilike.%${q}%`);
-      }
-
-      const { data, error } = await query.order('full_name', { ascending: true });
-
-      if (!error && data && data.length > 0) {
-        return data.map((p: any) => {
-          const realUsed = attendedCountsMap.get(p.id) ?? (p.used_sessions || 0);
-          const planTotal = planTotalsMap.get(p.id) ?? (p.total_sessions || 0);
-          const totalSessions =
-            planTotal > 0 ? planTotal : realUsed > 0 ? realUsed : 0;
-          const remainingSessions = Math.max(0, totalSessions - realUsed);
-
-          return {
-            id: p.id,
-            created_at: p.created_at,
-            updated_at: p.updated_at,
-            full_name: p.full_name,
-            rut: p.rut,
-            phone: p.phone,
-            email: p.email,
-            birth_date: p.birth_date,
-            health_insurance: p.health_insurance,
-            medical_notes: p.medical_notes,
-            status: p.status || 'active',
-            total_sessions: totalSessions,
-            used_sessions: realUsed,
-            remaining_sessions: remainingSessions,
-            has_pending_payment: pendingPaymentMap.get(p.id) || false,
-            nombre_completo: p.full_name,
-            telefono: p.phone,
-            fecha_nacimiento: p.birth_date,
-            prevision_salud: p.health_insurance,
-            diagnostico_principal: p.medical_notes,
-          };
-        });
-      }
     } catch (err) {
       console.warn('Error en getPatients server action:', err);
     }
@@ -244,16 +197,10 @@ export async function createPatient(data: {
 
   if (supabase) {
     try {
-      // 1. Insertar en tabla patients
-      const { data: newPatient, error: errPatients } = await supabase
-        .from('patients')
-        .insert([payloadPatients])
-        .select()
-        .single();
+      // 1. Insertar en tabla pacientes
 
-      // 2. Insertar de forma estricta en tabla pacientes
       const payloadPacientes = {
-        id: newPatient?.id,
+        
         nombre_completo: cleanName,
         rut: cleanRut,
         telefono: data.phone?.trim() || null,
@@ -267,14 +214,14 @@ export async function createPatient(data: {
         estado: data.status || 'active',
       };
 
-      const { error: errPacientes } = await supabase
+      const { data: newPaciente, error: errPacientes } = await supabase
         .from('pacientes')
-        .insert([payloadPacientes]);
+        .insert([payloadPacientes]).select().single();
 
       if (errPacientes) {
         console.warn('Fallback: reintentando insert en pacientes con campos mínimos:', errPacientes.message);
         await supabase.from('pacientes').insert([{
-          id: newPatient?.id,
+          
           codigo_paciente: nextCode,
           nombre_completo: cleanName,
           rut: cleanRut,
@@ -295,7 +242,7 @@ export async function createPatient(data: {
       return {
         success: true,
         data: {
-          id: newPatient?.id || 'pac-' + Date.now(),
+          id: newPaciente?.id || 'pac-' + Date.now(),
           full_name: cleanName,
           rut: cleanRut,
           phone: data.phone || '',
@@ -368,15 +315,6 @@ export async function updatePatient(
 
   if (supabase) {
     try {
-      // 1. Update patients
-      const { data: updated, error: errP } = await supabase
-        .from('patients')
-        .update(payload)
-        .eq('id', id)
-        .select()
-        .single();
-
-      // 2. Update pacientes
       const payloadPacientes: any = {};
       if (data.full_name) payloadPacientes.nombre_completo = data.full_name.trim().toUpperCase();
       if (data.rut) payloadPacientes.rut = formatRut(data.rut);
@@ -392,7 +330,7 @@ export async function updatePatient(
         payloadPacientes.diagnostico_medico = data.medical_notes?.trim() || null;
       }
 
-      await supabase.from('pacientes').update(payloadPacientes).eq('id', id);
+      const { data: updated } = await supabase.from('pacientes').update(payloadPacientes).eq('id', id).select().single();
 
       revalidatePath('/pacientes');
       revalidatePath('/agenda');
@@ -416,7 +354,6 @@ export async function deletePatient(id: string): Promise<{ success: boolean; err
 
   if (supabase) {
     try {
-      await supabase.from('patients').delete().eq('id', id);
       await supabase.from('pacientes').delete().eq('id', id);
       revalidatePath('/pacientes');
       revalidatePath('/agenda');
