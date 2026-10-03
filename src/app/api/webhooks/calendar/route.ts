@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'cancel') {
-      console.log('[WEBHOOK CALENDAR] Cancelando cita:', google_event_id);
+      // Cancel action for event
       await supabase.from('citas_atenciones').update({ estado: 'cancelada' }).eq('google_event_id', google_event_id);
       return NextResponse.json({ success: true, action: 'cancelled' });
     }

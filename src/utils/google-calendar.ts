@@ -74,7 +74,7 @@ export async function crearEventoGoogleCalendar(params: {
       },
     });
 
-    console.log('[Google Calendar] Evento creado con ID:', res.data.id);
+    // Event created successfully
     return res.data.id || null;
   } catch (error: any) {
     lastCalendarError = error?.message || error?.toString() || error;
@@ -92,7 +92,7 @@ export async function eliminarEventoGoogleCalendar(googleEventId: string): Promi
       calendarId: CALENDAR_ID,
       eventId: googleEventId,
     });
-    console.log('[Google Calendar] Evento eliminado:', googleEventId);
+    // Event deleted successfully
     return true;
   } catch (error) {
     console.error('[Google Calendar API] Error eliminando evento:', error);

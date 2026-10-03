@@ -46,7 +46,7 @@ Usa terminología técnica formal de kinesiología TMO.
     let lastError = null;
     for (const modelName of uniqueCandidates) {
       try {
-        console.log(`[Copiloto SOAP] Probando modelo: ${modelName}...`);
+        // Model cascade: trying ${modelName}
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
           {
@@ -71,7 +71,7 @@ Usa terminología técnica formal de kinesiología TMO.
         rawText = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
         const parsed = JSON.parse(rawText);
 
-        console.log(`[Copiloto SOAP] ¡Éxito con el modelo ${modelName}!`);
+        // Model cascade: success with ${modelName}
         return NextResponse.json(parsed);
       } catch (err: any) {
         lastError = err.message;
