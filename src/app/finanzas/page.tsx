@@ -247,19 +247,20 @@ function FinanzasContent() {
 
   const deudoresCount = useMemo(() => {
     const ids = new Set<string>();
-    transaccionesFiltradas.filter((t) => t.estado_pago === 'pendiente' || t.estado_pago === 'parcial' || (t.saldo_pendiente && t.saldo_pendiente > 0)).forEach(t => ids.add(t.paciente_id));
-    asistenciasFiltradas.filter((c) => c.estado_pago === 'pendiente_pago').forEach(c => ids.add(c.paciente_id));
+    compras.filter((t) => t.estado_pago === 'pendiente' || t.estado_pago === 'parcial' || (t.saldo_pendiente && t.saldo_pendiente > 0)).forEach(t => ids.add(t.paciente_id));
+    citas.filter((c) => c.estado_pago === 'pendiente_pago' && !c.plan_id).forEach(c => ids.add(c.paciente_id));
     return ids.size;
-  }, [transaccionesFiltradas, asistenciasFiltradas]);
+  }, [compras, citas]);
 
   // Arrays derivados para las tabs de "Quién Debe"
-  const planesPendientesLista = useMemo(() => transaccionesFiltradas.filter(t => {
+  const planesPendientesLista = useMemo(() => compras.filter(t => {
     const deuda = t.saldo_pendiente ?? (t.valor_total ?? t.monto_clp ?? 0);
     return deuda > 0 && (t.estado_pago === 'pendiente' || t.estado_pago === 'parcial');
-  }), [transaccionesFiltradas]);
+  }), [compras]);
   
-  const citasPendientesLista = useMemo(() => asistenciasFiltradas.filter(c => {
+  const citasPendientesLista = useMemo(() => citas.filter(c => {
     if (c.estado_pago !== 'pendiente_pago') return false;
+    if (c.plan_id) return false;
     const arancel = getArancel(c.pacientes?.categoria_tarifa);
     const valor = Number(c.monto_cobrado) || arancel.sesion_individual;
     return valor > 0;
@@ -267,7 +268,7 @@ function FinanzasContent() {
     const arancel = getArancel(c.pacientes?.categoria_tarifa);
     const valorTotal = Number(c.monto_cobrado) || arancel.sesion_individual;
     return { ...c, valorRealCalculado: valorTotal };
-  }), [asistenciasFiltradas]);
+  }), [citas]);
   
   const planesActivosLista = useMemo(() => {
     return compras.filter(t => t.estado === 'activo' && (t.sesiones_totales > t.sesiones_usadas));

@@ -275,6 +275,8 @@ export function ClinicalRecordView({
         .from('compras_planes')
         .select('*')
         .eq('paciente_id', pacienteId)
+        .eq('estado', 'activo')
+        .filter('sesiones_totales', 'gt', 'sesiones_usadas')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -697,7 +699,7 @@ export function ClinicalRecordView({
             <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
               estaAlDia ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
             }`}>
-              {sesionesUsadas}/{sesionesTotales}
+              Plan: {sesionesUsadas}/{sesionesTotales} ses.
             </span>
           )}
         </button>

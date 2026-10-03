@@ -27,9 +27,9 @@ export function CuentaCorrienteTab({ pacienteId }: CuentaCorrienteTabProps) {
         // 1. Citas con estado pendiente_pago
         const { data: citasData } = await supabase
           .from('citas_atenciones')
-          .select('id, fecha, monto_cobrado, notas, estado_pago')
+          .select('id, fecha, monto_cobrado, notas, estado_pago, plan_id')
           .eq('paciente_id', pacienteId)
-          .in('estado_pago', ['pendiente_pago', 'pagado'])
+          .in('estado_pago', ['pendiente_pago', 'pagado', 'pendiente']) // we fetch them all to filter
           .order('fecha', { ascending: false });
 
         // 2. Pagos realizados
@@ -42,8 +42,9 @@ export function CuentaCorrienteTab({ pacienteId }: CuentaCorrienteTabProps) {
         // 3. Planes contratados
         const { data: planesData } = await supabase
           .from('compras_planes')
-          .select('id, fecha_compra, total_final_clp, nombre_plan')
+          .select('id, fecha_compra, total_final_clp, valor_total, nombre_plan, estado')
           .eq('paciente_id', pacienteId)
+          .neq('estado', 'cancelado')
           .order('fecha_compra', { ascending: false });
 
         const citas = citasData || [];
@@ -54,11 +55,12 @@ export function CuentaCorrienteTab({ pacienteId }: CuentaCorrienteTabProps) {
         let tPagado = 0;
         
         citas.forEach(c => {
-          if (c.monto_cobrado) tCobrado += Number(c.monto_cobrado);
+          if (!c.plan_id && c.monto_cobrado) tCobrado += Number(c.monto_cobrado);
         });
 
         planes.forEach(p => {
-          if (p.total_final_clp) tCobrado += Number(p.total_final_clp);
+          const val = p.valor_total !== null && p.valor_total !== undefined ? p.valor_total : p.total_final_clp;
+          if (val) tCobrado += Number(val);
         });
         
         pagos.forEach(p => {
@@ -71,7 +73,15 @@ export function CuentaCorrienteTab({ pacienteId }: CuentaCorrienteTabProps) {
         setTotalPagado(tPagado);
         setSaldoPendiente(debe);
         
-        setCitasPendientes(citas.filter(c => c.estado_pago === 'pendiente_pago'));
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        const citasPendientesArr = citas.filter(c => {
+           if (c.plan_id) return false;
+           if (c.estado_pago !== 'pendiente_pago') return false;
+           const fechaCita = new Date(c.fecha);
+           return fechaCita <= hoy;
+        });
+        setCitasPendientes(citasPendientesArr);
         setPagosRealizados(pagos);
       } catch (err) {
         console.error('Error fetching cuenta corriente', err);

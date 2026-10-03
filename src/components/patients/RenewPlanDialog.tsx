@@ -36,7 +36,7 @@ interface RenewPlanDialogProps {
   pagoReciente?: { monto: number; cita_id: string; fecha: string } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onPlanPurchased?: (newPlan: CompraPlan) => void;
+  onPlanPurchased?: (newPlan?: any) => void;
 }
 
 export function RenewPlanDialog({
@@ -172,71 +172,31 @@ export function RenewPlanDialog({
     setIsSaving(true);
 
     try {
-      const result = await registrarCompraPlan({
-        paciente_id: pacienteId,
-        catalogo_plan_id: selectedPlanId !== "custom" ? selectedPlanId : null,
-        nombre_plan: customNombre.trim(),
-        total_sesiones: sesiones,
-        precio_base: precioBase,
-        descuento_clp: descuentoCLP,
-        codigo_cupon: appliedCoupon?.codigo || null,
-        valor_total: valorTotal,
-        total_final_clp: valorTotal,
-        estado_pago: saldoPendiente <= 0 ? 'pagado' : (montoPagadoHoy + abonoCalculado > 0 ? 'parcial' : 'pendiente'),
-        monto_pagado: abonoCalculado + montoPagadoHoy,
-        saldo_pendiente: saldoPendiente, // This should be total minus pagado, wait, if valorTotal already subtracted abono... actually valor_total of the PLAN should be `precioBase - descuentoCLP`. The `monto_pagado` should be `abonoCalculado`. `saldo_pendiente` = `precioBase - descuentoCLP - abonoCalculado`.
-        fecha_compra: getChileanDate(),
-        estado: "activo",
-        sesiones_usadas: usarAbonoReciente ? 1 : 0,
-        numero_boleta: numeroBoleta,
-        metodo_pago: medioPago,
-        medio_pago: medioPago as any
+      const citaHoyId = usarAbonoReciente && pagoReciente ? pagoReciente.cita_id : null;
+      if (!supabase) throw new Error("No database client");
+      const { data, error } = await supabase.rpc("contratar_plan_transaccional", {
+        p_paciente_id: pacienteId,
+        p_nombre_plan: customNombre.trim(),
+        p_sesiones_totales: Number(sesiones),
+        p_valor_total: Number(precioBase - descuentoCLP),
+        p_abono_hoy: Number(montoPagadoHoy + abonoCalculado),
+        p_metodo_pago: medioPago,
+        p_numero_boleta: numeroBoleta ? String(numeroBoleta).trim() : null,
+        p_cita_hoy_id: citaHoyId || null
       });
 
-      if (result.success && result.data) {
-        if (usarAbonoReciente && pagoReciente && supabase) {
-          // Link previous payment and session to this plan
-          await supabase.from('pagos_pacientes').update({ plan_id: result.data.id }).eq('id', pagoReciente.cita_id); // Wait, pagoReciente.cita_id is actually cita_id. We need pago id? 
-          // Let's just update the payment using cita_id
-          await supabase.from('pagos_pacientes').update({ plan_id: result.data.id }).eq('cita_id', pagoReciente.cita_id);
-          
-          await supabase.from('citas_atenciones').update({
-            plan_id: result.data.id,
-            estado_pago: 'cubierto_por_plan'
-          }).eq('id', pagoReciente.cita_id);
-        }
-        toast.success("¡Plan contratado con éxito!", {
-          description: `${result.data.nombre_plan} — ${formatCLP(result.data.total_final_clp || valorTotal)} (${result.data.total_sesiones} sesiones añadidas)`,
-          icon: <CheckCircle2 className="h-5 w-5 text-emerald-500" />,
-        });
-
-
-        if (montoPagadoHoy > 0 && supabase) {
-          const pagoPayload = {
-            paciente_id: pacienteId,
-            monto: montoPagadoHoy,
-            metodo_pago: medioPago,
-            fecha: new Date().toISOString(),
-            notas: "Compra de " + result.data.nombre_plan,
-            tipo_concepto: 'compra_plan',
-            numero_boleta: numeroBoleta,
-            comprobante: numeroBoleta
-          };
-          const { error: errPago1 } = await supabase.from('pagos_pacientes').insert([pagoPayload]);
-          if (errPago1) {
-             delete (pagoPayload as any).tipo_concepto;
-             await supabase.from('pagos_pacientes').insert([pagoPayload]);
-          }
-        }
-        
-        if (onPlanPurchased) {
-          onPlanPurchased(result.data);
-        }
-
-        onOpenChange(false);
-      } else {
-        toast.error("Error al renovar plan: " + (result.error || ""));
+      if (error) {
+        console.error("[AsignarPlan RPC Error]:", error);
+        toast.error("Error al contratar plan: " + error.message);
+        return;
       }
+
+      toast.success("Plan contratado y registrado exitosamente");
+      if (onPlanPurchased) {
+        onPlanPurchased();
+      }
+
+      onOpenChange(false);
     } catch {
       toast.error("Error de conexión al registrar la compra.");
     } finally {
