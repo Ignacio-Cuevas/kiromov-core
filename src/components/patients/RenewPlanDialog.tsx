@@ -267,11 +267,17 @@ export function RenewPlanDialog({
               disabled={isSaving || isLoadingCatalog}
               className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-medium"
             >
-              {catalogPlanes.map((plan) => (
-                <option key={plan.id} value={plan.id}>
-                  {plan.nombre_plan} ({plan.total_sesiones} ses.) — {formatCLP(plan.precio_clp)}
-                </option>
-              ))}
+              {catalogPlanes.map((plan) => {
+                const nombre = plan.nombre_plan || plan.plan_nombre || plan.nombre || "Plan";
+                const sesiones = plan.sesiones_totales || plan.total_sesiones || plan.sesiones || 0;
+                const precio = Number(plan.precio_base || plan.valor_total || plan.valor_plan_clp || plan.precio || plan.precio_clp || 0);
+
+                return (
+                  <option key={plan.id || nombre} value={plan.id}>
+                    {nombre} ({sesiones} ses.) — ${precio.toLocaleString("es-CL")}
+                  </option>
+                );
+              })}
               <option value="custom">✨ Plan Personalizado / A Medida</option>
             </select>
           </div>

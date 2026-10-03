@@ -161,11 +161,17 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
                   className="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
                 >
                   <option value="" disabled>Seleccione un plan o servicio...</option>
-                  {planesDisponibles.map((plan) => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.nombre} — ${plan.precio?.toLocaleString('es-CL')} ({plan.sesiones} ses.)
-                    </option>
-                  ))}
+                  {planesDisponibles.map((plan) => {
+                    const nombre = plan.nombre_plan || plan.plan_nombre || plan.nombre || "Plan";
+                    const sesiones = plan.sesiones_totales || plan.total_sesiones || plan.sesiones || 0;
+                    const precio = Number(plan.precio_base || plan.valor_total || plan.valor_plan_clp || plan.precio || plan.precio_clp || 0);
+
+                    return (
+                      <option key={plan.id || nombre} value={plan.id}>
+                        {nombre} — ${precio.toLocaleString('es-CL')} ({sesiones} ses.)
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div className="space-y-1.5">
