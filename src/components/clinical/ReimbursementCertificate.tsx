@@ -83,7 +83,7 @@ export function ReimbursementCertificate({
         // 2. Plan y Boleta
         const { data: planData } = await supabase
           .from('compras_planes')
-          .select('nombre_plan, numero_boleta, monto_clp, metodo_pago, created_at')
+          .select('nombre_plan, numero_boleta, valor_total, metodo_pago, created_at')
           .eq('paciente_id', patient.id)
           .order('id', { ascending: false })
           .limit(1)
@@ -340,7 +340,7 @@ export function ReimbursementCertificate({
                     />
                   </div>
 
-                  <p><strong>Monto Total Referencial del Tratamiento:</strong> ${(planInfo?.monto_clp || 0).toLocaleString('es-CL')} CLP</p>
+                  <p><strong>Monto Total Referencial del Tratamiento:</strong> ${(planInfo?.valor_total || 0).toLocaleString('es-CL')} CLP</p>
                 </div>
 
                 <p>
