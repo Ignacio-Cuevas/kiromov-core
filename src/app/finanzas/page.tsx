@@ -233,42 +233,49 @@ function FinanzasContent() {
     return ingresosPeriodo - egresosPeriodo;
   }, [ingresosPeriodo, egresosPeriodo]);
   
+  const hoyStr = new Date().toISOString().split('T')[0];
+
   const porCobrarPeriodo = useMemo(() => {
     const planesPendientes = transaccionesFiltradas
-      .filter((t) => t.estado_pago === 'pendiente' || t.estado_pago === 'parcial' || (t.saldo_pendiente && t.saldo_pendiente > 0))
-      .reduce((acc, curr) => acc + (Number(curr.saldo_pendiente ?? curr.monto_clp ?? curr.valor_total) || 0), 0);
+      .filter((t) => t.estado === 'activo' && (t.estado_pago === 'pendiente' || (t.saldo_pendiente && t.saldo_pendiente > 0)))
+      .reduce((acc, curr) => acc + (Number(curr.saldo_pendiente ?? curr.valor_total ?? curr.monto_clp) || 0), 0);
     
     const citasPendientes = asistenciasFiltradas
-      .filter((c) => c.estado_pago === 'pendiente_pago')
-      .reduce((acc, curr) => acc + (Number(curr.monto_cobrado) || 0), 0);
+      .filter((c) => c.estado_pago === 'pendiente_pago' && !c.plan_id && c.fecha && c.fecha <= hoyStr)
+      .reduce((acc, curr) => acc + (Number(curr.monto_cobrado) || getArancel(curr.pacientes?.categoria_tarifa).sesion_individual), 0);
 
     return planesPendientes + citasPendientes;
-  }, [transaccionesFiltradas, asistenciasFiltradas]);
+  }, [transaccionesFiltradas, asistenciasFiltradas, hoyStr]);
 
   const deudoresCount = useMemo(() => {
     const ids = new Set<string>();
-    compras.filter((t) => t.estado_pago === 'pendiente' || t.estado_pago === 'parcial' || (t.saldo_pendiente && t.saldo_pendiente > 0)).forEach(t => ids.add(t.paciente_id));
-    citas.filter((c) => c.estado_pago === 'pendiente_pago' && !c.plan_id).forEach(c => ids.add(c.paciente_id));
+    compras
+      .filter((t) => t.estado === 'activo' && (t.estado_pago === 'pendiente' || (t.saldo_pendiente && t.saldo_pendiente > 0)))
+      .filter((t) => (Number(t.saldo_pendiente ?? t.valor_total ?? t.monto_clp) || 0) > 0)
+      .forEach(t => ids.add(t.paciente_id));
+    citas
+      .filter((c) => c.estado_pago === 'pendiente_pago' && !c.plan_id && c.fecha && c.fecha <= hoyStr)
+      .forEach(c => ids.add(c.paciente_id));
     return ids.size;
-  }, [compras, citas]);
+  }, [compras, citas, hoyStr]);
 
   // Arrays derivados para las tabs de "Quién Debe"
   const planesPendientesLista = useMemo(() => compras.filter(t => {
+    if (t.estado !== 'activo') return false;
     const deuda = t.saldo_pendiente ?? (t.valor_total ?? t.monto_clp ?? 0);
-    return deuda > 0 && (t.estado_pago === 'pendiente' || t.estado_pago === 'parcial');
+    return deuda > 0 && (t.estado_pago === 'pendiente' || t.saldo_pendiente > 0);
   }), [compras]);
   
   const citasPendientesLista = useMemo(() => citas.filter(c => {
     if (c.estado_pago !== 'pendiente_pago') return false;
     if (c.plan_id) return false;
-    const arancel = getArancel(c.pacientes?.categoria_tarifa);
-    const valor = Number(c.monto_cobrado) || arancel.sesion_individual;
-    return valor > 0;
+    if (!c.fecha || c.fecha > hoyStr) return false;
+    return true;
   }).map(c => {
     const arancel = getArancel(c.pacientes?.categoria_tarifa);
     const valorTotal = Number(c.monto_cobrado) || arancel.sesion_individual;
     return { ...c, valorRealCalculado: valorTotal };
-  }), [citas]);
+  }), [citas, hoyStr]);
   
   const planesActivosLista = useMemo(() => {
     return compras.filter(t => t.estado === 'activo' && (t.sesiones_totales > t.sesiones_usadas));
