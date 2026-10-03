@@ -19,7 +19,7 @@ export function CheckoutRapidoModal({ isOpen, onClose, cita, onSuccess }: Checko
   const tienePlanActivo = paciente?.plan_id && (paciente?.sesiones_restantes || 0) > 0;
   const nombrePlan = paciente?.nombre_plan || 'Plan';
   const usadas = paciente?.sesiones_usadas || 0;
-  const totales = paciente?.sesiones_totales || 0;
+  const totales = paciente?.total_sesiones || 0;
 
   // Tarifa por defecto para la vista de sesión individual
   const [monto, setMonto] = useState<number>(paciente?.categoria_tarifa === 'tarifa_antigua' ? 20000 : 28000);

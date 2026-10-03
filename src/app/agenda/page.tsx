@@ -247,7 +247,7 @@ function AgendaContent() {
 
               let enriched = { ...(c.pacientes as any), ...vistaP };
               if (planElegido) {
-                const tot = planElegido.sesiones_totales ?? planElegido.total_sesiones ?? 1;
+                const tot = planElegido.total_sesiones ?? planElegido.total_sesiones ?? 1;
                 const us = planElegido.sesiones_usadas ?? 0;
                 const rest = Math.max(0, tot - us);
                 const estPlan = (planElegido.estado === 'completado' || planElegido.estado === 'finalizado' || us >= tot)
@@ -257,13 +257,13 @@ function AgendaContent() {
                 enriched = {
                   ...enriched,
                   plan_id: planElegido.id,
-                  nombre_plan: planElegido.nombre_plan || planElegido.plan_nombre || vistaP.nombre_plan || 'Plan Kinésico',
-                  sesiones_totales: tot,
+                  nombre_plan: planElegido.nombre_plan || planElegido.nombre_plan || vistaP.nombre_plan || 'Plan Kinésico',
+                  total_sesiones: tot,
                   sesiones_usadas: us,
                   sesiones_restantes: rest,
                   estado_plan: estPlan,
                   estado_pago: planElegido.estado_pago || vistaP.estado_pago || 'pendiente',
-                  monto_clp: planElegido.monto_clp ?? planElegido.total_final_clp ?? vistaP.monto_clp ?? 0,
+                  monto_clp: planElegido.valor_total ?? vistaP.monto_clp ?? 0,
                   numero_boleta: planElegido.numero_boleta || null
                 };
               }
@@ -501,7 +501,7 @@ function AgendaContent() {
       // Si consume la última sesión (quedanSesiones <= 0), marcar estado = 'completado'.
       if (resumen?.plan_id && (resumen?.sesiones_restantes || 0) > 0) {
         const nuevasUsadas = (resumen.sesiones_usadas || 0) + 1;
-        const finalizaPlan = nuevasUsadas >= (resumen.sesiones_totales || 1) || quedanSesiones <= 0;
+        const finalizaPlan = nuevasUsadas >= (resumen.total_sesiones || 1) || quedanSesiones <= 0;
 
         const updatePayload: Record<string, any> = {
           sesiones_usadas: nuevasUsadas
@@ -726,7 +726,7 @@ function AgendaContent() {
       antecedentes_morbidos: '',
       estado_plan: 'sin_plan',
       sesiones_usadas: 0,
-      sesiones_totales: 0,
+      total_sesiones: 0,
       estado_pago: 'al_dia',
       monto_clp: 0,
     };
@@ -804,10 +804,10 @@ function AgendaContent() {
         );
     }
 
-    const tienePlan = p.estado_plan !== 'sin_plan' && (p.sesiones_totales || 0) > 0;
-    const pct = tienePlan ? Math.min(100, Math.round(((p.sesiones_usadas || 0) / (p.sesiones_totales || 1)) * 100)) : 0;
+    const tienePlan = p.estado_plan !== 'sin_plan' && (p.total_sesiones || 0) > 0;
+    const pct = tienePlan ? Math.min(100, Math.round(((p.sesiones_usadas || 0) / (p.total_sesiones || 1)) * 100)) : 0;
     const debePago = p.estado_pago === 'pendiente';
-    const montoPendiente = formatCLP(p.monto_clp || 0);
+    const montoPendiente = formatCLP(p.valor_total || 0);
 
     return (
       <div key={cita.id} className={`rounded-cards border p-4 sm:p-5 space-y-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg mb-3 shadow-calendly ${tokens.cardBg}`}>
@@ -888,10 +888,10 @@ function AgendaContent() {
               </p>
             </div>
 
-            {tienePlan && (p.sesiones_totales || 0) > 0 ? (
+            {tienePlan && (p.total_sesiones || 0) > 0 ? (
               <div className="text-right">
                 <span className="font-mono font-bold text-slate-800 text-xs">
-                  {p.sesiones_usadas}/{p.sesiones_totales} ses.
+                  {p.sesiones_usadas}/{p.total_sesiones} ses.
                 </span>
                 <span className="text-[11px] text-slate-500 ml-1">
                   ({p.sesiones_restantes} rest.)
@@ -933,7 +933,7 @@ function AgendaContent() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.monto_clp, paciente_id: p.id }); }}
+                    onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.valor_total, paciente_id: p.id }); }}
                     className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold shadow-xs transition-colors cursor-pointer whitespace-nowrap"
                   >
                     💳 Cobrar
@@ -944,9 +944,9 @@ function AgendaContent() {
                       setCancelingPlan({
                         id: p.plan_id,
                         nombre_plan: p.nombre_plan,
-                        sesiones_totales: p.sesiones_totales,
+                        total_sesiones: p.total_sesiones,
                         sesiones_usadas: p.sesiones_usadas,
-                        monto_clp: p.monto_clp,
+                        monto_clp: p.valor_total,
                         paciente_id: p.id,
                         pacientes: p
                       });
@@ -968,7 +968,7 @@ function AgendaContent() {
                   {p.estado_pago === 'pendiente' ? (
                     <button
                       type="button"
-                      onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.monto_clp, paciente_id: p.id }); }}
+                      onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.valor_total, paciente_id: p.id }); }}
                       className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold shadow-xs transition-colors cursor-pointer whitespace-nowrap"
                     >
                       💳 Cobrar ({montoPendiente})

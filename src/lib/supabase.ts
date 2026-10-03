@@ -408,11 +408,11 @@ export async function fetchHistorialVentas(): Promise<VentaPlanDetallada[]> {
 
   return planesList.map((plan) => {
     const paciente = pacientesList.find((p) => p.id === plan.paciente_id);
-    const finalPrice = plan.total_final_clp ?? plan.valor_total ?? 0;
+    const finalPrice = plan.valor_total ?? 0;
 
     return {
       ...plan,
-      total_final_clp: finalPrice,
+      valor_total: finalPrice || 0,
       paciente_nombre: paciente?.nombre_completo || "Paciente Registrado",
       paciente_rut: paciente?.rut || "Sin RUT",
     };
@@ -430,7 +430,7 @@ export async function fetchResumenFinanciero(): Promise<ResumenFinanciero> {
     (v) => (v.fecha_compra || "").startsWith(currentMonthStr)
   );
   const ingresosMesCLP = ventasMes.reduce(
-    (sum, v) => sum + (v.total_final_clp ?? v.valor_total ?? 0),
+    (sum, v) => sum + (v.valor_total ?? v.valor_total ?? 0),
     0
   );
 
@@ -761,7 +761,7 @@ export async function fetchPlanesByPaciente(pacienteId: string): Promise<CompraP
 export async function registrarCompraPlan(
   compra: Omit<CompraPlan, "id" | "created_at">
 ): Promise<{ success: boolean; data?: CompraPlan; error?: string }> {
-  const finalPrice = compra.total_final_clp ?? compra.valor_total;
+  const finalPrice = compra.valor_total;
 
   if (supabase) {
     try {
@@ -770,7 +770,7 @@ export async function registrarCompraPlan(
         .insert([
           {
             ...compra,
-            total_final_clp: finalPrice,
+            valor_total: finalPrice || 0,
           },
         ])
         .select()
@@ -797,7 +797,7 @@ export async function registrarCompraPlan(
   // Local fallback
   const newCompra: CompraPlan = {
     ...compra,
-    total_final_clp: finalPrice,
+    valor_total: finalPrice || 0,
     id: "plan-" + Date.now(),
     created_at: new Date().toISOString(),
   };

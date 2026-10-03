@@ -24,7 +24,7 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
   // Initialize montoPagaHoy when modal opens
   React.useEffect(() => {
     if (planEnUso && isOpen) {
-      const valorTotal = planEnUso.valor_total ?? planEnUso.monto_clp ?? 0;
+      const valorTotal = planEnUso.valor_total ?? 0;
       setMontoPagaHoy(planEnUso.saldo_pendiente ?? valorTotal);
     }
   }, [planEnUso, isOpen]);
@@ -46,7 +46,7 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
     try {
       const boletaClean = boletaNumber.trim();
 
-      const valorTotal = planEnUso.valor_total ?? planEnUso.monto_clp ?? 0;
+      const valorTotal = planEnUso.valor_total ?? 0;
       const montoPagadoAnterior = planEnUso.monto_pagado ?? 0;
       const saldoPendienteAnterior = planEnUso.saldo_pendiente ?? valorTotal;
       
@@ -99,7 +99,7 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
     }
   };
 
-  const valorTotalPlan = planEnUso.valor_total ?? planEnUso.monto_clp ?? 0;
+  const valorTotalPlan = planEnUso.valor_total ?? 0;
   const saldoPendienteActual = planEnUso.saldo_pendiente ?? valorTotalPlan;
 
   return (

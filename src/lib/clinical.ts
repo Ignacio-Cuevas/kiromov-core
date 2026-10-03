@@ -91,8 +91,8 @@ export const requiereReevaluacion = (p: any): boolean => {
 };
 
 export const getResumenPlan = (p: any) => {
-  const tienePlan = p.estado_plan !== 'sin_plan' && (p.sesiones_totales || 0) > 0;
-  const sesionesTotales = Number(p.sesiones_totales) || 0;
+  const tienePlan = p.estado_plan !== 'sin_plan' && (p.total_sesiones || 0) > 0;
+  const sesionesTotales = Number(p.total_sesiones) || 0;
   const sesionesUsadas = Number(p.sesiones_usadas || p.sesiones_consumidas) || 0;
   const sesionesRestantes = Math.max(0, sesionesTotales - sesionesUsadas);
   

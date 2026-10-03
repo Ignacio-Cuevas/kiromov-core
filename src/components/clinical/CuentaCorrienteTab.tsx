@@ -42,7 +42,7 @@ export function CuentaCorrienteTab({ pacienteId }: CuentaCorrienteTabProps) {
         // 3. Planes contratados
         const { data: planesData } = await supabase
           .from('compras_planes')
-          .select('id, fecha_compra, total_final_clp, valor_total, nombre_plan, estado')
+          .select('id, fecha_compra, valor_total, valor_total, nombre_plan, estado')
           .eq('paciente_id', pacienteId)
           .neq('estado', 'cancelado')
           .order('fecha_compra', { ascending: false });
@@ -59,7 +59,7 @@ export function CuentaCorrienteTab({ pacienteId }: CuentaCorrienteTabProps) {
         });
 
         planes.forEach(p => {
-          const val = p.valor_total !== null && p.valor_total !== undefined ? p.valor_total : p.total_final_clp;
+          const val = p.valor_total !== null && p.valor_total !== undefined ? p.valor_total : p.valor_total;
           if (val) tCobrado += Number(val);
         });
         

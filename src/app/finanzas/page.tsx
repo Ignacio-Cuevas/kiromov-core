@@ -127,7 +127,6 @@ function FinanzasContent() {
       concepto: egresoForm.concepto.trim(),
       categoria: egresoForm.categoria || 'Otros',
       medio_pago: egresoForm.formaPago || 'Débito / Transbank',
-      metodo_pago: egresoForm.formaPago || 'Débito / Transbank',
       monto_clp: parseInt(String(egresoForm.monto).replace(/\D/g, ''), 10) || 0,
       fecha: egresoForm.fecha || getChileanDate(),
       responsable: 'Clínica'
@@ -251,7 +250,7 @@ function FinanzasContent() {
     const ids = new Set<string>();
     compras
       .filter((t) => t.estado === 'activo' && (t.estado_pago === 'pendiente' || (t.saldo_pendiente && t.saldo_pendiente > 0)))
-      .filter((t) => (Number(t.saldo_pendiente ?? t.valor_total ?? t.monto_clp) || 0) > 0)
+      .filter((t) => (Number(t.saldo_pendiente ?? t.valor_total) || 0) > 0)
       .forEach(t => ids.add(t.paciente_id));
     citas
       .filter((c) => c.estado_pago === 'pendiente_pago' && !c.plan_id && c.fecha && c.fecha <= hoyStr)
@@ -262,7 +261,7 @@ function FinanzasContent() {
   // Arrays derivados para las tabs de "Quién Debe"
   const planesPendientesLista = useMemo(() => compras.filter(t => {
     if (t.estado !== 'activo') return false;
-    const deuda = t.saldo_pendiente ?? (t.valor_total ?? t.monto_clp ?? 0);
+    const deuda = t.saldo_pendiente ?? (t.valor_total ?? 0);
     return deuda > 0 && (t.estado_pago === 'pendiente' || t.saldo_pendiente > 0);
   }), [compras]);
   
@@ -278,7 +277,7 @@ function FinanzasContent() {
   }), [citas, hoyStr]);
   
   const planesActivosLista = useMemo(() => {
-    return compras.filter(t => t.estado === 'activo' && (t.sesiones_totales > t.sesiones_usadas));
+    return compras.filter(t => t.estado === 'activo' && (t.total_sesiones > t.sesiones_usadas));
   }, [compras]);
 
   const handleCobrarCita = (telefono: string, nombre: string, monto: number, fecha: string) => {
@@ -394,7 +393,7 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
                         <tbody className="divide-y divide-slate-100">
                           {planesActivosLista.map((p) => {
                             const usadas = p.sesiones_usadas || 0;
-                            const totales = p.sesiones_totales || 0;
+                            const totales = p.total_sesiones || 0;
                             const porcentaje = totales > 0 ? (usadas / totales) * 100 : 0;
                             return (
                               <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
@@ -484,7 +483,7 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {planesPendientesLista.map((c) => {
-                            const valorTotal = c.valor_total ?? c.monto_clp ?? 0;
+                            const valorTotal = c.valor_total ?? 0;
                             const pagado = c.monto_pagado ?? 0;
                             const deuda = c.saldo_pendiente ?? valorTotal;
                             return (

@@ -530,11 +530,11 @@ export function ClinicalRecordView({
   // Métricas del plan e información financiera
   const nombrePlanCintillo = planActivo?.nombre_plan || 'Sin plan activo';
   const sesionesUsadas = Number(planActivo?.sesiones_usadas ?? planActivo?.sesiones_consumidas ?? 0);
-  const sesionesTotales = Number(planActivo?.sesiones_totales ?? planActivo?.total_sesiones ?? 0);
+  const sesionesTotales = Number(planActivo?.total_sesiones ?? planActivo?.total_sesiones ?? 0);
   const sesionesRestantes = Math.max(0, sesionesTotales - sesionesUsadas);
   const pctSesiones = sesionesTotales > 0 ? Math.min(100, Math.round((sesionesUsadas / sesionesTotales) * 100)) : 0;
 
-  const totalPlanMonto = Number(planActivo?.total_final_clp ?? planActivo?.valor_total ?? planActivo?.monto_clp ?? 0);
+  const totalPlanMonto = Number(planActivo?.valor_total ?? planActivo?.valor_total ?? planActivo?.monto_clp ?? 0);
   const saldoPendienteMonto = Number(planActivo?.saldo_pendiente ?? (planActivo?.estado_pago?.toLowerCase() === 'pagado' ? 0 : totalPlanMonto));
   const abonosMonto = Math.max(0, totalPlanMonto - saldoPendienteMonto);
   const estaAlDia = (planActivo?.estado_pago || '').toLowerCase() === 'pagado' || saldoPendienteMonto <= 0;
@@ -609,7 +609,7 @@ export function ClinicalRecordView({
               className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 shrink-0 transition-colors cursor-pointer flex items-center gap-1"
               title="Ajustar sesiones del plan"
             >
-              <span>Plan: {planActivo.sesiones_usadas}/{planActivo.sesiones_totales} ses.</span>
+              <span>Plan: {planActivo.sesiones_usadas}/{planActivo.total_sesiones} ses.</span>
               <Settings className="w-3 h-3 text-blue-500" />
             </button>
           ) : (

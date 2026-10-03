@@ -66,14 +66,9 @@ export async function createSale(data: {
             catalogo_plan_id: data.plan_id || null,
             nombre_plan: conceptName,
             total_sesiones: sessionsQty,
-            sesiones_totales: sessionsQty,
             sesiones_usadas: data.sesiones_usadas ?? 0,
-            precio_base: totalAmount,
             valor_total: totalAmount,
-            total_final_clp: totalAmount,
-            monto_clp: totalAmount,
             numero_boleta: boletaClean,
-            medio_pago: medioPagoMap[data.payment_method] || 'Transferencia',
             metodo_pago: medioPagoMap[data.payment_method] || 'Transferencia',
             estado_pago: estadoPagoMap[data.payment_status] || 'Pagado',
             fecha_compra: todayStr,
@@ -190,7 +185,7 @@ export async function settlePendingPlan(data: {
   plan_id: string;
   payment_method: string;
   numero_boleta?: string | null;
-  monto_clp?: number;
+  valor_total?: number;
   notes?: string | null;
 }): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
@@ -213,16 +208,15 @@ export async function settlePendingPlan(data: {
     try {
       const updatePayload: any = {
         estado_pago: 'Pagado',
-        metodo_pago: data.payment_method,
-        medio_pago: labelMedio,
+        metodo_pago: labelMedio,
         numero_boleta: cleanBoleta,
         updated_at: new Date().toISOString(),
       };
 
-      if (data.monto_clp && data.monto_clp > 0) {
-        updatePayload.monto_clp = data.monto_clp;
-        updatePayload.valor_total = data.monto_clp;
-        updatePayload.total_final_clp = data.monto_clp;
+      if (data.valor_total && data.valor_total > 0) {
+        updatePayload.valor_total = data.valor_total;
+        updatePayload.valor_total = data.valor_total;
+        updatePayload.valor_total = data.valor_total;
       }
 
       if (data.notes) {

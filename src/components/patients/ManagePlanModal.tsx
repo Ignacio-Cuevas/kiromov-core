@@ -32,9 +32,10 @@ export interface ManagePlanPatient {
   prevision?: string | null;
   plan_id?: string | null;
   nombre_plan?: string | null;
-  sesiones_totales?: number | null;
   sesiones_usadas?: number | null;
   sesiones_restantes?: number | null;
+  total_sesiones?: number | null;
+
   estado_plan?: string | null;
   estado_pago?: string | null;
 }
@@ -47,9 +48,9 @@ export interface ManagePlanModalProps {
   planActual?: {
     id?: string | null;
     nombre_plan?: string | null;
-    sesiones_totales?: number | null;
     sesiones_usadas?: number | null;
     total_sesiones?: number | null;
+
     estado?: string | null;
     estado_pago?: string | null;
   } | null;
@@ -128,7 +129,7 @@ export function ManagePlanModal({
 
     let activePlanId = planActual?.id || paciente.plan_id || null;
     let initialNombre = planActual?.nombre_plan || paciente.nombre_plan || '';
-    let initialTotales = Number(planActual?.sesiones_totales ?? planActual?.total_sesiones ?? paciente.sesiones_totales ?? 10);
+    let initialTotales = Number(planActual?.total_sesiones ?? planActual?.total_sesiones ?? paciente.total_sesiones ?? 10);
     let initialUsadas = Number(planActual?.sesiones_usadas ?? paciente.sesiones_usadas ?? 0);
     
     // Normalizar estado del plan
@@ -168,10 +169,10 @@ export function ManagePlanModal({
 
           if (!error && data) {
             setPlanId(data.id);
-            if (data.nombre_plan || data.plan_nombre) {
-              setNombrePlan(data.nombre_plan || data.plan_nombre);
+            if (data.nombre_plan || data.nombre_plan) {
+              setNombrePlan(data.nombre_plan || data.nombre_plan);
             }
-            const t = Number(data.sesiones_totales ?? data.total_sesiones ?? 10);
+            const t = Number(data.total_sesiones ?? data.total_sesiones ?? 10);
             const u = Number(data.sesiones_usadas ?? 0);
             setSesionesTotales(t > 0 ? t : 10);
             setSesionesUsadas(u >= 0 ? u : 0);
@@ -252,9 +253,7 @@ export function ManagePlanModal({
     try {
       const payload: Record<string, any> = {
         nombre_plan: nombrePlan.trim() || 'Plan Kinésico',
-        plan_nombre: nombrePlan.trim() || 'Plan Kinésico',
         total_sesiones: Number(sesionesTotales),
-        sesiones_totales: Number(sesionesTotales),
         sesiones_usadas: Number(sesionesUsadas),
         estado: estadoPlan, // 'activo', 'completado', 'cancelado'
         estado_pago: estadoPago, // 'pagado', 'pendiente'
@@ -272,7 +271,6 @@ export function ManagePlanModal({
           const fallbackPayload = {
             nombre_plan: nombrePlan.trim() || 'Plan Kinésico',
             total_sesiones: Number(sesionesTotales),
-            sesiones_totales: Number(sesionesTotales),
             sesiones_usadas: Number(sesionesUsadas),
             estado: estadoPlan,
             estado_pago: estadoPago,

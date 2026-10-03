@@ -14,7 +14,7 @@ interface PacienteResumen {
   estado: string;
   plan_id: string | null;
   nombre_plan: string | null;
-  sesiones_totales: number;
+  total_sesiones: number;
   sesiones_usadas: number;
   sesiones_restantes: number;
   estado_plan: 'vigente' | 'por_renovar' | 'finalizado' | 'sin_plan';
@@ -231,8 +231,8 @@ export default function PacientesPage() {
                   </tr>
                 ) : (
                   pacientesFiltrados.map((p) => {
-                    const tienePlan = p.estado_plan !== 'sin_plan' && p.sesiones_totales > 0;
-                    const pct = tienePlan ? Math.min(100, Math.round((p.sesiones_usadas / p.sesiones_totales) * 100)) : 0;
+                    const tienePlan = p.estado_plan !== 'sin_plan' && p.total_sesiones > 0;
+                    const pct = tienePlan ? Math.min(100, Math.round((p.sesiones_usadas / p.total_sesiones) * 100)) : 0;
 
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/80 transition-colors group">
@@ -279,7 +279,7 @@ export default function PacientesPage() {
                           {tienePlan ? (
                             <div className="space-y-1">
                               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900">
-                                <span>{p.sesiones_usadas}/{p.sesiones_totales} ses.</span>
+                                <span>{p.sesiones_usadas}/{p.total_sesiones} ses.</span>
                                 <span className="text-slate-400 font-normal">({p.sesiones_restantes} rest.)</span>
                               </div>
                               <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">

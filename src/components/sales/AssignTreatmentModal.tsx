@@ -114,15 +114,9 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
         plan_id_ref: planElegido.id || null,
         catalogo_plan_id: planElegido.id || null,
         nombre_plan: planElegido.id === 'personalizado' ? 'Plan Personalizado / Especial' : (planElegido.nombre || 'Plan Kinésico'),
-        plan_nombre: planElegido.id === 'personalizado' ? 'Plan Personalizado / Especial' : (planElegido.nombre || 'Plan Kinésico'),
-        sesiones_totales: Number(sesionesCustom) || 1,
         total_sesiones: Number(sesionesCustom) || 1,
         sesiones_usadas: 0,
-        monto_clp: montoClp,
-        monto_total: montoClp,
         valor_total: montoClp,
-        precio_base: montoClp,
-        total_final_clp: montoClp,
         metodo_pago: null,
         estado_pago: 'pendiente',
         fecha_compra: getChileanDate(),
@@ -134,9 +128,6 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
       let { error } = await supabase.from('compras_planes').insert([payload]);
       if (error) {
         delete payload.valor_total;
-        delete payload.monto_total;
-        delete payload.precio_base;
-        delete payload.total_final_clp;
         const retry = await supabase.from('compras_planes').insert([payload]);
         if (retry.error) {
           toast.error('Error al asignar plan: ' + retry.error.message);
@@ -177,9 +168,9 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
               >
                 <option value="" disabled>Seleccione un plan...</option>
                 {planesDisponibles.map((plan) => {
-                  const nombre = plan.nombre_plan || plan.plan_nombre || plan.nombre || "Plan";
-                  const sesiones = plan.sesiones_totales || plan.total_sesiones || plan.sesiones || 0;
-                  const precio = Number(plan.precio_base || plan.valor_total || plan.valor_plan_clp || plan.precio || plan.precio_clp || 0);
+                  const nombre = plan.nombre_plan || plan.nombre_plan || plan.nombre || "Plan";
+                  const sesiones = plan.total_sesiones || plan.total_sesiones || plan.sesiones || 0;
+                  const precio = Number(plan.valor_total || plan.valor_total || plan.valor_total || plan.precio || plan.precio_clp || 0);
 
                   return (
                     <option key={plan.id || nombre} value={plan.id}>

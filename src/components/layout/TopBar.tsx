@@ -14,7 +14,7 @@ interface PacienteResultado {
   nombre_plan?: string | null;
   estado_pago?: string | null;
   sesiones_usadas?: number | null;
-  sesiones_totales?: number | null;
+  total_sesiones?: number | null;
 }
 
 export function TopBar() {
@@ -84,7 +84,7 @@ export function TopBar() {
         // Intentar primero vista_resumen_pacientes
         const { data: vistaData, error: vistaError } = await supabase
           .from('vista_resumen_pacientes')
-          .select('id, nombre_completo, rut, prevision, nombre_plan, estado_pago, sesiones_usadas, sesiones_totales')
+          .select('id, nombre_completo, rut, prevision, nombre_plan, estado_pago, sesiones_usadas, total_sesiones')
           .or(`nombre_completo.ilike.%${cleanQ}%,rut.ilike.%${cleanQ}%`)
           .limit(8);
 
@@ -213,7 +213,7 @@ export function TopBar() {
                             <>
                               <span>•</span>
                               <span className="font-medium text-slate-700 truncate">
-                                {p.nombre_plan} {p.sesiones_totales ? `(${p.sesiones_usadas || 0}/${p.sesiones_totales})` : ''}
+                                {p.nombre_plan} {p.total_sesiones ? `(${p.sesiones_usadas || 0}/${p.total_sesiones})` : ''}
                               </span>
                             </>
                           )}

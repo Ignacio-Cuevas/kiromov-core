@@ -14,7 +14,7 @@ export interface PacienteBasico {
   estado_plan?: string | null;
   sesiones_usadas?: number | null;
   sesiones_consumidas?: number | null;
-  sesiones_totales?: number | null;
+  total_sesiones?: number | null;
   sesiones_restantes?: number | null;
   [key: string]: any;
 }

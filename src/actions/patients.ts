@@ -39,14 +39,14 @@ export async function getPatients(searchQuery?: string): Promise<Patient[]> {
       // 2. Obtener compras_planes para total de sesiones compradas y estado de pago
       const { data: planesData } = await supabase
         .from('compras_planes')
-        .select('paciente_id, total_sesiones, sesiones_totales, estado_pago, estado');
+        .select('paciente_id, total_sesiones, total_sesiones, estado_pago, estado');
 
       const planTotalsMap = new Map<string, number>();
       const pendingPaymentMap = new Map<string, boolean>();
 
       if (planesData) {
         planesData.forEach((p: any) => {
-          const sessions = p.total_sesiones || p.sesiones_totales || 0;
+          const sessions = p.total_sesiones || p.total_sesiones || 0;
           planTotalsMap.set(
             p.paciente_id,
             (planTotalsMap.get(p.paciente_id) || 0) + sessions

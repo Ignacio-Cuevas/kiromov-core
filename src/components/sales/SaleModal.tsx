@@ -208,7 +208,7 @@ export function SaleModal({
           plan_id: pendingPlan.id,
           payment_method: paymentMethod,
           numero_boleta: cleanBoleta,
-          monto_clp: finalAmount,
+          valor_total: finalAmount,
           notes: notes.trim() || pendingPlan.notas || null,
         });
 
@@ -397,7 +397,7 @@ export function SaleModal({
                         ⚠️ Cobro Pendiente Detectado:
                       </strong>
                       <span className="text-amber-800">
-                        {pendingPlan.nombre_plan} ({formatCLP(pendingPlan.total_final_clp ?? pendingPlan.valor_total ?? pendingPlan.monto_clp ?? 0)})
+                        {pendingPlan.nombre_plan} ({formatCLP(pendingPlan.valor_total ?? 0)})
                       </span>
                     </div>
                   </div>
@@ -409,8 +409,8 @@ export function SaleModal({
                       } else {
                         setModalMode('settle_pending');
                         setConcept(pendingPlan.nombre_plan);
-                        setSessionsQuantity(pendingPlan.total_sesiones || pendingPlan.sesiones_totales || 4);
-                        setTotalAmountCLP(pendingPlan.total_final_clp ?? pendingPlan.valor_total ?? pendingPlan.monto_clp ?? 0);
+                        setSessionsQuantity(pendingPlan.total_sesiones || pendingPlan.total_sesiones || 4);
+                        setTotalAmountCLP(pendingPlan.valor_total ?? 0);
                         setBoletaNumber(pendingPlan.numero_boleta || '');
                       }
                     }}

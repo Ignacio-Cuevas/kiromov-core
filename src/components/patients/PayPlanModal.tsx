@@ -51,16 +51,16 @@ export function PayPlanModal({
   useEffect(() => {
     if (plan && isModalOpen) {
       const initialAmount =
-        plan.total_final_clp ??
         plan.valor_total ??
-        plan.monto_clp ??
-        plan.precio_base ??
+        plan.valor_total ??
+        plan.valor_total ??
+        plan.valor_total ??
         0;
       setMontoCobro(plan.saldo_pendiente ?? initialAmount);
       setBoletaNumber(plan.numero_boleta || '');
       setNotes(plan.notas || '');
 
-      const currentMethod = (plan.metodo_pago || plan.medio_pago || '').toLowerCase();
+      const currentMethod = (plan.metodo_pago || plan.metodo_pago || '').toLowerCase();
       if (currentMethod.includes('tarjeta') || currentMethod.includes('débito') || currentMethod.includes('card')) {
         setSelectedMethod('tarjeta');
       } else if (currentMethod.includes('efectivo') || currentMethod.includes('cash')) {
@@ -92,7 +92,7 @@ export function PayPlanModal({
 
     try {
       if (supabase) {
-        const valorTotal = plan.valor_total ?? plan.monto_clp ?? 0;
+        const valorTotal = plan.valor_total ?? 0;
         const montoPagadoAnterior = plan.monto_pagado ?? 0;
         const saldoPendienteAnterior = plan.saldo_pendiente ?? valorTotal;
         

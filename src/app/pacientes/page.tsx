@@ -69,7 +69,7 @@ interface PacienteResumen {
   estado: string;
   plan_id: string | null;
   nombre_plan: string | null;
-  sesiones_totales: number;
+  total_sesiones: number;
   sesiones_usadas: number;
   sesiones_restantes: number;
   estado_plan: 'vigente' | 'por_renovar' | 'finalizado' | 'sin_plan' | string;
@@ -226,7 +226,7 @@ export default function PacientesPage() {
           const latestPlan = patientPlans[0];
           const planElegido = activePlan || latestPlan;
 
-          let sesionesTotales = Number(p.sesiones_totales ?? (p as any).total_sesiones ?? 0);
+          let sesionesTotales = Number(p.total_sesiones ?? (p as any).total_sesiones ?? 0);
           let sesionesUsadas = Number(p.sesiones_usadas ?? (p as any).sesiones_consumidas ?? 0);
           let planId = p.plan_id || null;
           let nombrePlan = p.nombre_plan || null;
@@ -235,8 +235,8 @@ export default function PacientesPage() {
 
           if (planElegido) {
             planId = planElegido.id;
-            nombrePlan = planElegido.nombre_plan || planElegido.plan_nombre || nombrePlan;
-            sesionesTotales = Number(planElegido.sesiones_totales ?? planElegido.total_sesiones ?? sesionesTotales);
+            nombrePlan = planElegido.nombre_plan || planElegido.nombre_plan || nombrePlan;
+            sesionesTotales = Number(planElegido.total_sesiones ?? planElegido.total_sesiones ?? sesionesTotales);
             sesionesUsadas = Number(planElegido.sesiones_usadas ?? sesionesUsadas);
             if (planElegido.estado_pago) {
               estadoPago = planElegido.estado_pago.toLowerCase().includes('pend') ? 'pendiente' : 'pagado';
@@ -281,7 +281,7 @@ export default function PacientesPage() {
             alertas_seguridad: raw.alertas_seguridad || raw.banderas_rojas || p.alertas_seguridad || null,
             plan_id: planId,
             nombre_plan: nombrePlan,
-            sesiones_totales: sesionesTotales,
+            total_sesiones: sesionesTotales,
             sesiones_usadas: sesionesUsadas,
             sesiones_restantes: sesionesRestantes,
             estado_plan: estadoPlanFinal,
@@ -310,7 +310,7 @@ export default function PacientesPage() {
       return alerta.nivel !== null;
     }).length;
     const finalizados = pacientes.filter(p => p.estado_plan === 'finalizado').length;
-    const sinPlan = pacientes.filter(p => p.estado_plan === 'sin_plan' || p.sesiones_totales === 0).length;
+    const sinPlan = pacientes.filter(p => p.estado_plan === 'sin_plan' || p.total_sesiones === 0).length;
     return { vigentes, porRenovar, enRiesgo, finalizados, sinPlan, total: pacientes.length };
   }, [pacientes]);
 
@@ -335,7 +335,7 @@ export default function PacientesPage() {
         if (alerta.nivel === null) return false;
       }
       if (filtroTab === 'finalizados' && p.estado_plan !== 'finalizado') return false;
-      if (filtroTab === 'sin_plan' && p.estado_plan !== 'sin_plan' && p.sesiones_totales > 0) return false;
+      if (filtroTab === 'sin_plan' && p.estado_plan !== 'sin_plan' && p.total_sesiones > 0) return false;
 
       // Filtro Anatómico / Segmentario TMO
       if (filtroSegmento !== 'todos') {
@@ -352,8 +352,8 @@ export default function PacientesPage() {
     // Columna 1: Evaluación / Nuevos (sin plan o 1 sesión realizada pendientes de definir plan)
     const evaluacionNuevos = pacientesFiltrados.filter(p => {
       const { tienePlan, sesionesUsadas } = getResumenPlan(p);
-      const isSinPlan = !tienePlan || p.estado_plan === 'sin_plan' || (p.sesiones_totales || 0) === 0;
-      const isUnaSesionPendiente = (p.sesiones_totales === 1 && sesionesUsadas >= 1) || (sesionesUsadas === 1 && isSinPlan);
+      const isSinPlan = !tienePlan || p.estado_plan === 'sin_plan' || (p.total_sesiones || 0) === 0;
+      const isUnaSesionPendiente = (p.total_sesiones === 1 && sesionesUsadas >= 1) || (sesionesUsadas === 1 && isSinPlan);
       return isSinPlan || isUnaSesionPendiente;
     });
 
@@ -901,7 +901,7 @@ export default function PacientesPage() {
                 {pacientesFiltrados.map((p) => {
                   const riesgo = evaluarRiesgoDesercion({ ...p, sesiones_consumidas: p.sesiones_usadas } as any);
                   const esRiesgo = riesgo.nivel !== null;
-                  const tienePlan = p.sesiones_totales > 0;
+                  const tienePlan = p.total_sesiones > 0;
 
                   return (
                     <div
@@ -959,7 +959,7 @@ export default function PacientesPage() {
                                 {p.nombre_plan || 'Plan Kinésico'}
                               </span>
                               <span className="font-mono font-bold text-slate-900">
-                                {p.sesiones_usadas}/{p.sesiones_totales} ses.
+                                {p.sesiones_usadas}/{p.total_sesiones} ses.
                               </span>
                             </div>
                             <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1">
@@ -972,7 +972,7 @@ export default function PacientesPage() {
                                     : 'bg-emerald-500'
                                 }`}
                                 style={{
-                                  width: `${Math.min(100, (p.sesiones_usadas / p.sesiones_totales) * 100)}%`
+                                  width: `${Math.min(100, (p.sesiones_usadas / p.total_sesiones) * 100)}%`
                                 }}
                               />
                             </div>
@@ -1139,7 +1139,7 @@ export default function PacientesPage() {
             planActual={{
               id: pacienteParaAjustarPlan.plan_id,
               nombre_plan: pacienteParaAjustarPlan.nombre_plan,
-              sesiones_totales: pacienteParaAjustarPlan.sesiones_totales,
+              total_sesiones: pacienteParaAjustarPlan.total_sesiones,
               sesiones_usadas: pacienteParaAjustarPlan.sesiones_usadas,
               estado: pacienteParaAjustarPlan.estado_plan,
               estado_pago: pacienteParaAjustarPlan.estado_pago,

@@ -107,8 +107,7 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
         plan_id_ref: planElegido.id || null,
         catalogo_plan_id: planElegido.id || null,
         nombre_plan: planElegido.nombre || 'Plan Kinésico',
-        plan_nombre: planElegido.nombre || 'Plan Kinésico',
-        sesiones_totales: Number(planElegido.sesiones) || 1,
+        total_sesiones: Number(planElegido.sesiones) || 1,
         sesiones_usadas: sesionesUsadasIniciales,
         monto_clp: montoClp,
         metodo_pago: decision === 'pagar_ahora' ? metodoPago : null,
@@ -162,9 +161,9 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
                 >
                   <option value="" disabled>Seleccione un plan o servicio...</option>
                   {planesDisponibles.map((plan) => {
-                    const nombre = plan.nombre_plan || plan.plan_nombre || plan.nombre || "Plan";
-                    const sesiones = plan.sesiones_totales || plan.total_sesiones || plan.sesiones || 0;
-                    const precio = Number(plan.precio_base || plan.valor_total || plan.valor_plan_clp || plan.precio || plan.precio_clp || 0);
+                    const nombre = plan.nombre_plan || plan.nombre_plan || plan.nombre || "Plan";
+                    const sesiones = plan.total_sesiones || plan.total_sesiones || plan.sesiones || 0;
+                    const precio = Number(plan.valor_total || plan.valor_total || plan.valor_total || plan.precio || plan.precio_clp || 0);
 
                     return (
                       <option key={plan.id || nombre} value={plan.id}>
