@@ -208,6 +208,16 @@ function AgendaContent() {
 
       if (citasError) throw citasError;
 
+      // FIX: Ensure future appointments are NOT 'asistio' or 'atendida'
+      const todayStr = getFormattedLocalDate(new Date());
+      citasData?.forEach(c => {
+        if (c.fecha > todayStr && ['asistio', 'atendida', 'atendido'].includes(c.estado)) {
+          c.estado = 'pendiente';
+          // Auto-fix in DB asynchronously
+          supabase.from('citas_atenciones').update({ estado: 'pendiente' }).eq('id', c.id).then();
+        }
+      });
+
       const { data: pacData, error: pacError } = await supabase
         .from('pacientes')
         .select('id, nombre_completo, rut, telefono')
@@ -463,6 +473,11 @@ function AgendaContent() {
   };
 
   const handleRegistrarAsistencia = async (cita: CitaExtendida) => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (cita.fecha > todayStr) {
+      toast.error('No se puede marcar como atendida una cita futura.');
+      return;
+    }
     if (!supabase) return;
     if (cita.estado === 'asistio') {
       toast.info('Esta cita ya está registrada como asistida');

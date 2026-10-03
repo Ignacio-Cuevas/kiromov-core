@@ -133,6 +133,7 @@ export function AppointmentCardPro({
   const isConfirmada = estado === 'confirmada';
   const isAtendida = ['asistio', 'asistió', 'atendida', 'atendido'].includes(estado);
   const isNoAsistio = ['no_asistio', 'no asistió'].includes(estado);
+  const todayStr = new Date().toISOString().slice(0,10); const isFuture = cita?.fecha && cita.fecha > todayStr;
   const isPendiente = !isCancelada && !isConfirmada && !isAtendida && !isNoAsistio;
 
   let themeStyles = {
@@ -214,7 +215,7 @@ export function AppointmentCardPro({
         >
           <option value="pendiente" className="bg-white text-amber-900 font-semibold">⏳ Pendiente</option>
           <option value="confirmada" className="bg-white text-emerald-900 font-semibold">✓ Confirmada</option>
-          <option value="asistio" className="bg-white text-blue-900 font-semibold">🩺 Atendida</option>
+          {!isFuture && <option value="asistio" className="bg-white text-blue-900 font-semibold">🩺 Atendida</option>}
           <option value="no_asistio" className="bg-white text-rose-900 font-semibold">✕ Inasistencia</option>
           <option value="cancelada" className="bg-white text-slate-600 font-semibold">✕ Cancelada</option>
         </select>

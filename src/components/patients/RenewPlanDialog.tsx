@@ -55,6 +55,8 @@ export function RenewPlanDialog({
   const [sesiones, setSesiones] = useState<number>(4);
   const [precioBase, setPrecioBase] = useState<number>(100000);
   const [descuentoCLP, setDescuentoCLP] = useState<number>(0);
+  const [montoPagadoHoy, setMontoPagadoHoy] = useState<number>(0);
+  const [medioPago, setMedioPago] = useState<string>('transferencia');
   const [usarAbonoReciente, setUsarAbonoReciente] = useState<boolean>(true);
 
   // Coupon state
@@ -145,7 +147,8 @@ export function RenewPlanDialog({
   };
 
   const abonoCalculado = (usarAbonoReciente && pagoReciente) ? pagoReciente.monto : 0;
-  const valorTotal = Math.max(0, precioBase - descuentoCLP - abonoCalculado);
+  const valorTotal = Math.max(0, precioBase - descuentoCLP);
+  const saldoPendiente = Math.max(0, valorTotal - abonoCalculado - montoPagadoHoy);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,9 +181,9 @@ export function RenewPlanDialog({
         codigo_cupon: appliedCoupon?.codigo || null,
         valor_total: valorTotal,
         total_final_clp: valorTotal,
-        estado_pago: "pendiente",
-        monto_pagado: abonoCalculado,
-        saldo_pendiente: valorTotal, // This should be total minus pagado, wait, if valorTotal already subtracted abono... actually valor_total of the PLAN should be `precioBase - descuentoCLP`. The `monto_pagado` should be `abonoCalculado`. `saldo_pendiente` = `precioBase - descuentoCLP - abonoCalculado`.
+        estado_pago: saldoPendiente <= 0 ? 'pagado' : (montoPagadoHoy + abonoCalculado > 0 ? 'parcial' : 'pendiente'),
+        monto_pagado: abonoCalculado + montoPagadoHoy,
+        saldo_pendiente: saldoPendiente, // This should be total minus pagado, wait, if valorTotal already subtracted abono... actually valor_total of the PLAN should be `precioBase - descuentoCLP`. The `monto_pagado` should be `abonoCalculado`. `saldo_pendiente` = `precioBase - descuentoCLP - abonoCalculado`.
         fecha_compra: getChileanDate(),
         estado: "activo",
         sesiones_usadas: usarAbonoReciente ? 1 : 0
@@ -203,6 +206,23 @@ export function RenewPlanDialog({
           icon: <CheckCircle2 className="h-5 w-5 text-emerald-500" />,
         });
 
+
+        if (montoPagadoHoy > 0 && supabase) {
+          const pagoPayload = {
+            paciente_id: pacienteId,
+            monto: montoPagadoHoy,
+            metodo_pago: medioPago,
+            fecha: new Date().toISOString(),
+            notas: "Compra de " + result.data.nombre_plan,
+            tipo_concepto: 'compra_plan'
+          };
+          const { error: errPago1 } = await supabase.from('pagos_pacientes').insert([pagoPayload]);
+          if (errPago1) {
+             delete (pagoPayload as any).tipo_concepto;
+             await supabase.from('pagos_pacientes').insert([pagoPayload]);
+          }
+        }
+        
         if (onPlanPurchased) {
           onPlanPurchased(result.data);
         }
@@ -385,6 +405,39 @@ export function RenewPlanDialog({
               </div>
             </div>
           )}
+
+          {/* Cobro Hoy */}
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Abono Hoy (CLP)
+              </label>
+              <Input
+                type="number"
+                min={0}
+                step={1000}
+                value={montoPagadoHoy}
+                onChange={(e) => setMontoPagadoHoy(parseInt(e.target.value, 10) || 0)}
+                disabled={isSaving}
+                className="h-10 text-sm font-semibold bg-white rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Medio de Pago
+              </label>
+              <select
+                value={medioPago}
+                onChange={(e) => setMedioPago(e.target.value)}
+                disabled={isSaving || montoPagadoHoy === 0}
+                className="w-full h-10 text-sm p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+              >
+                <option value="transferencia">Transferencia Bancaria</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="tarjeta_debito">Tarjeta Débito / Crédito</option>
+              </select>
+            </div>
+          </div>
 
           {/* Resumen de Cobro Histórico */}
           <div className="rounded-xl bg-slate-900 text-white p-4 space-y-2">

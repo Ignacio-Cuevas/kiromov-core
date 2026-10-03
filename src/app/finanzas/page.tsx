@@ -269,7 +269,9 @@ function FinanzasContent() {
     return { ...c, valorRealCalculado: valorTotal };
   }), [asistenciasFiltradas]);
   
-  const planesActivosLista = useMemo(() => transaccionesFiltradas.filter(t => t.estado === 'activo'), [transaccionesFiltradas]);
+  const planesActivosLista = useMemo(() => {
+    return compras.filter(t => t.estado === 'activo' && (t.sesiones_totales > t.sesiones_usadas));
+  }, [compras]);
 
   const handleCobrarCita = (telefono: string, nombre: string, monto: number, fecha: string) => {
     const cleanPhone = (telefono || '').replace(/\D/g, '').slice(-9);
