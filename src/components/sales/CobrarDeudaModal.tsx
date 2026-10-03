@@ -43,6 +43,12 @@ export function CobrarDeudaModal({ isOpen, onClose, item, onSuccess }: CobrarDeu
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase || !item) return;
+    
+    if (!boleta.trim()) {
+      toast.error('El N° de Boleta es obligatorio.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const finalMonto = Number(String(monto).replace(/[^0-9]/g, '')) || 0;
@@ -169,13 +175,14 @@ export function CobrarDeudaModal({ isOpen, onClose, item, onSuccess }: CobrarDeu
             </div>
             
             <div>
-              <label className="block text-sm font-semibold mb-1">N° Comprobante / Boleta</label>
+              <label className="text-xs font-semibold text-slate-700">N° de Boleta Electrónica *</label>
               <input 
                 type="text" 
-                placeholder="Opcional"
+                placeholder="Ej: 18037"
                 value={boleta}
                 onChange={e => setBoleta(e.target.value)}
-                className="w-full border rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full mt-1 p-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                required
               />
             </div>
 

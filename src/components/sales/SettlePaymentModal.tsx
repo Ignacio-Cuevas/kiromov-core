@@ -35,10 +35,16 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
     if (!supabase) return;
 
     e.preventDefault();
+    
+    if (!boletaNumber.trim()) {
+      toast.error('El N° de Boleta es obligatorio.');
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
-      const boletaClean = boletaNumber.trim() ? boletaNumber.trim() : null;
+      const boletaClean = boletaNumber.trim();
 
       const valorTotal = planEnUso.valor_total ?? planEnUso.monto_clp ?? 0;
       const montoPagadoAnterior = planEnUso.monto_pagado ?? 0;
@@ -178,15 +184,16 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
                   <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
                     <span className="flex items-center gap-1">
                       <FileText className="h-3.5 w-3.5 text-blue-600" />
-                      N° de Boleta
+                      N° de Boleta Electrónica *
                     </span>
                   </label>
                   <input
                     type="text"
-                    placeholder="Opcional"
+                    placeholder="Ej: 18037"
                     value={boletaNumber}
                     onChange={(e) => setBoletaNumber(e.target.value)}
                     className="w-full rounded-xl border border-slate-300 p-2.5 text-sm font-mono font-bold bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                    required
                   />
                 </div>
               </div>

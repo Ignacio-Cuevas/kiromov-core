@@ -39,6 +39,7 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [montoCustom, setMontoCustom] = useState<string>('');
   const [sesionesCustom, setSesionesCustom] = useState<number>(1);
+  const [numeroBoleta, setNumeroBoleta] = useState<string>('');
 
   useEffect(() => {
     if (isOpen) {
@@ -94,6 +95,11 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
     const planElegido = planesDisponibles.find((x) => x.id === selectedPlanId);
     if (!planElegido) return;
 
+    if (!numeroBoleta.trim()) {
+      toast.error('El N° de Boleta es obligatorio.');
+      return;
+    }
+
     const montoClp = parseInt(String(montoCustom).replace(/\D/g, ''), 10) || 0;
     if (montoClp <= 0) {
       toast.error('Por favor ingresa un monto final acordado válido (mayor a $0).');
@@ -120,7 +126,7 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
         metodo_pago: null,
         estado_pago: 'pendiente',
         fecha_compra: getChileanDate(),
-        numero_boleta: null,
+        numero_boleta: numeroBoleta.trim(),
         estado: 'activo',
         created_at: new Date().toISOString()
       };
@@ -219,6 +225,18 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
                   <p className="text-[11px] text-amber-600 font-medium">Ingresa el valor pactado con el paciente (no puede ser $0).</p>
                 )}
               </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-700">N° de Boleta Electrónica *</label>
+              <input 
+                type="text" 
+                value={numeroBoleta} 
+                onChange={(e) => setNumeroBoleta(e.target.value)} 
+                placeholder="Ej: 18037" 
+                className="w-full mt-1 p-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500" 
+                required
+              />
             </div>
           </div>
         )}

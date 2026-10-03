@@ -276,11 +276,11 @@ export function ClinicalRecordView({
         .select('*')
         .eq('paciente_id', pacienteId)
         .eq('estado', 'activo')
-        .filter('sesiones_totales', 'gt', 'sesiones_usadas')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (plan) setPlanActivo(plan);
+      
+      setPlanActivo(plan || null);
 
       // Historial SOAP
       const { data: soaps } = await supabase
@@ -602,15 +602,21 @@ export function ClinicalRecordView({
               Sin teléfono
             </span>
           )}
-          <button
-            type="button"
-            onClick={() => setAbrirManagePlanModal(true)}
-            className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 shrink-0 transition-colors cursor-pointer flex items-center gap-1"
-            title="Ajustar sesiones del plan"
-          >
-            <span>Plan: {planActivo?.sesiones_usadas || 0}/{planActivo?.sesiones_totales || 0} ses.</span>
-            <Settings className="w-3 h-3 text-blue-500" />
-          </button>
+          {planActivo ? (
+            <button
+              type="button"
+              onClick={() => setAbrirManagePlanModal(true)}
+              className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 shrink-0 transition-colors cursor-pointer flex items-center gap-1"
+              title="Ajustar sesiones del plan"
+            >
+              <span>Plan: {planActivo.sesiones_usadas}/{planActivo.sesiones_totales} ses.</span>
+              <Settings className="w-3 h-3 text-blue-500" />
+            </button>
+          ) : (
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
+              Pago Sesión a Sesión
+            </span>
+          )}
           <span className={`text-xs font-bold px-2 py-0.5 rounded-md shrink-0 ${
             estaAlDia ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
           }`}>
@@ -1477,64 +1483,44 @@ export function ClinicalRecordView({
             {/* Tarjetas de Resumen Financiero y Sesiones */}
             {planActivo ? (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Tarjeta 1: Plan Contratado */}
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Plan Vigente
-                    </span>
-                    <p className="text-sm font-bold text-slate-900 truncate">
-                      {planActivo.nombre_plan || 'Plan Kinésico'}
-                    </p>
-                    <span className="text-[11px] text-slate-500">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-blue-600" />
+                      {planActivo.nombre_plan || 'Plan Kinésico'} ({sesionesTotales} Sesiones)
+                    </h3>
+                    <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
                       Fecha: {planActivo.fecha_compra ? formatearFechaLimpia(planActivo.fecha_compra) : 'Reciente'}
                     </span>
                   </div>
 
-                  {/* Tarjeta 2: Sesiones */}
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-1.5">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        Sesiones
-                      </span>
+                      <span className="text-xs font-semibold text-slate-700">Progreso</span>
                       <span className="text-xs font-mono font-bold text-blue-600">
-                        {sesionesUsadas} / {sesionesTotales} ({pctSesiones}%)
+                        {sesionesUsadas} / {sesionesTotales} ({pctSesiones}%) <span className="text-slate-400 font-sans font-normal ml-1">| {sesionesRestantes} sesiones disponibles</span>
                       </span>
                     </div>
-                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
                       <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${pctSesiones}%` }} />
                     </div>
-                    <span className="text-[11px] font-medium text-slate-600 block">
-                      {sesionesRestantes} sesiones disponibles
-                    </span>
                   </div>
 
-                  {/* Tarjeta 3: Monto y Cobrado */}
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Valor Contratado / Abonos
-                    </span>
-                    <p className="text-sm font-bold text-slate-900 font-mono">
-                      {formatCLP(totalPlanMonto)}
-                    </p>
-                    <span className="text-[11px] font-medium text-emerald-700">
-                      Abonado: {formatCLP(abonosMonto)}
-                    </span>
-                  </div>
-
-                  {/* Tarjeta 4: Saldo Pendiente */}
-                  <div className={`p-4 rounded-xl border shadow-xs space-y-1 ${
-                    estaAlDia ? 'bg-emerald-50/50 border-emerald-200' : 'bg-rose-50/50 border-rose-200'
-                  }`}>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Saldo Adeudado
-                    </span>
-                    <p className={`text-sm font-black font-mono ${estaAlDia ? 'text-emerald-700' : 'text-rose-700'}`}>
-                      {estaAlDia ? '✓ Totalmente Pagado' : formatCLP(saldoPendienteMonto)}
-                    </p>
-                    <span className="text-[11px] text-slate-600">
-                      Medio: {planActivo.medio_pago || planActivo.metodo_pago || 'No especificado'}
-                    </span>
+                  <div className="bg-slate-50 rounded-xl p-3 flex flex-wrap gap-x-6 gap-y-2 text-xs">
+                    <div>
+                      <span className="text-slate-500">Valor Contratado:</span>
+                      <span className="font-bold text-slate-900 font-mono ml-1">{formatCLP(totalPlanMonto)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Abonado:</span>
+                      <span className="font-bold text-emerald-700 font-mono ml-1">{formatCLP(abonosMonto)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Saldo:</span>
+                      <span className={`font-bold font-mono ml-1 ${estaAlDia ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        {estaAlDia ? `${formatCLP(saldoPendienteMonto)} Totalmente Pagado` : formatCLP(saldoPendienteMonto)}
+                      </span>
+                    </div>
                   </div>
                 </div>
 

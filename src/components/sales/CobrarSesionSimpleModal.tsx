@@ -35,12 +35,17 @@ export function CobrarSesionSimpleModal({ isOpen, onClose, pacienteId, categoria
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase) return;
+
+    if (!boleta.trim()) {
+      toast.error('El N° de Boleta es obligatorio.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const finalMonto = Number(String(monto).replace(/[^0-9]/g, '')) || 0;
       
       let finalNotas = 'Sesión Individual Kinésica';
-      if (boleta.trim()) finalNotas += ` | Boleta: ${boleta.trim()}`;
       if (observaciones.trim()) finalNotas += ` | Notas: ${observaciones.trim()}`;
       
       const payload: any = {
@@ -49,7 +54,8 @@ export function CobrarSesionSimpleModal({ isOpen, onClose, pacienteId, categoria
         monto: finalMonto,
         metodo_pago: metodo,
         fecha: new Date().toISOString(),
-        notas: finalNotas
+        notas: finalNotas,
+        numero_boleta: boleta.trim()
       };
 
       // Intentamos insertar con tipo_concepto si existe, si falla caemos a payload base
@@ -114,13 +120,14 @@ export function CobrarSesionSimpleModal({ isOpen, onClose, pacienteId, categoria
             </div>
             
             <div>
-              <label className="block text-sm font-semibold mb-1">N° Boleta (Opcional)</label>
+              <label className="text-xs font-semibold text-slate-700">N° de Boleta Electrónica *</label>
               <input 
                 type="text" 
                 placeholder="Ej: 12345"
                 value={boleta}
                 onChange={e => setBoleta(e.target.value)}
-                className="w-full border rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full mt-1 p-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500" 
+                required
               />
             </div>
 
