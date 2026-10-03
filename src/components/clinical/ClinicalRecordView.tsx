@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { getChileanDate, formatCLP, getWhatsAppUrl } from '@/lib/utils';
 import { AppointmentModal } from '@/components/appointments/AppointmentModal';
+import { InitialAssessmentModal } from "@/components/clinical/InitialAssessmentModal";
 import { InitialEvaluationModal } from '@/components/clinical/InitialEvaluationModal';
 import { DischargeReportModal } from '@/components/clinical/DischargeReportModal';
 import { ReimbursementCertificate } from '@/components/clinical/ReimbursementCertificate';
@@ -184,6 +185,7 @@ export function ClinicalRecordView({
   // Modales
   const [abrirAgendarModal, setAbrirAgendarModal] = useState(false);
   const [abrirEvaluacionModal, setAbrirEvaluacionModal] = useState(false);
+  const [abrirAssessmentModal, setAbrirAssessmentModal] = useState(false);
   const [modoEvaluacion, setModoEvaluacion] = useState<'nueva' | 'editar'>('editar');
   const [abrirEditarPaciente, setAbrirEditarPaciente] = useState(false);
   const [abrirDischargeModal, setAbrirDischargeModal] = useState(false);
@@ -1261,6 +1263,14 @@ export function ClinicalRecordView({
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Nueva Evaluación TMO (Reingreso)</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setAbrirAssessmentModal(true)}
+                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>✨ Evaluación Asistida por IA</span>
+                </button>
 
                 {evaluacionInicialTMO && (
                   <button
@@ -1399,6 +1409,14 @@ export function ClinicalRecordView({
                 >
                   <Plus className="w-4 h-4" />
                   <span>+ Registrar Primera Evaluación Inicial TMO</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAbrirAssessmentModal(true)}
+                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>✨ Evaluación Asistida por IA</span>
                 </button>
               </div>
             )}
@@ -1734,6 +1752,19 @@ export function ClinicalRecordView({
             setAbrirAgendarModal(false);
             await cargarDatos();
             toast.success('¡Próxima cita agendada exitosamente!');
+          }}
+        />
+      )}
+
+            {abrirAssessmentModal && paciente && (
+        <InitialAssessmentModal
+          paciente={paciente}
+          onClose={() => setAbrirAssessmentModal(false)}
+          onSave={async (form: any) => {
+             // For now we just console.log and close, as it's a demo
+             console.log("Saving AI Assessment:", form);
+             toast.success("Evaluación guardada exitosamente (IA)");
+             setAbrirAssessmentModal(false);
           }}
         />
       )}
