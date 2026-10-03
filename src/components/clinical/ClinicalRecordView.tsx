@@ -886,9 +886,36 @@ export function ClinicalRecordView({
                           {pctMejoria > 0 ? `-${pctMejoria}% dolor` : pctMejoria === 0 ? 'Estable' : `+${Math.abs(pctMejoria)}%`}
                         </span>
                       )}
+                      
+                {/* 4. Codificación AI Internacional */}
+                {(evaluacionInicialTMO.cie10_codigo || evaluacionInicialTMO.cie11_codigo || evaluacionInicialTMO.diagnostico_cif) && (
+                  <div className="col-span-1 md:col-span-2 bg-gradient-to-r from-emerald-50 to-teal-50 p-5 rounded-xl border border-emerald-100 shadow-xs space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800 border-b border-emerald-200 pb-2 flex items-center gap-2">
+                      <Activity className="w-4 h-4" />
+                      4. Codificación Clínica y Diagnóstico IA
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      <div className="bg-white p-3 rounded shadow-sm border border-emerald-100">
+                        <span className="font-extrabold text-emerald-700 block mb-1">CIE-10 (Fonasa)</span>
+                        <p className="font-mono text-slate-800">{evaluacionInicialTMO.cie10_codigo || '-'}</p>
+                        <p className="text-slate-600 mt-1">{evaluacionInicialTMO.cie10_glosa || '-'}</p>
+                      </div>
+                      <div className="bg-white p-3 rounded shadow-sm border border-emerald-100">
+                        <span className="font-extrabold text-emerald-700 block mb-1">CIE-11 (OMS)</span>
+                        <p className="font-mono text-slate-800">{evaluacionInicialTMO.cie11_codigo || '-'}</p>
+                        <p className="text-slate-600 mt-1">{evaluacionInicialTMO.cie11_glosa || '-'}</p>
+                      </div>
+                      <div className="md:col-span-2 bg-white p-3 rounded shadow-sm border border-emerald-100">
+                        <span className="font-extrabold text-emerald-700 block mb-1">Diagnóstico Funcional CIF</span>
+                        <p className="text-slate-700">{evaluacionInicialTMO.diagnostico_cif || '-'}</p>
+                      </div>
                     </div>
                   </div>
-                ) : (
+                )}
+
+                </div>
+              </div>
+            ) : (
                   <p className="text-xs text-slate-400 italic text-center py-6">
                     Sin registros de dolor aún en las evoluciones.
                   </p>
@@ -1761,10 +1788,32 @@ export function ClinicalRecordView({
           paciente={paciente}
           onClose={() => setAbrirAssessmentModal(false)}
           onSave={async (form: any) => {
-             // For now we just console.log and close, as it's a demo
-             console.log("Saving AI Assessment:", form);
-             toast.success("Evaluación guardada exitosamente (IA)");
-             setAbrirAssessmentModal(false);
+            const supabaseClient = createClient();
+            if (!supabaseClient) return;
+            try {
+              const payload = {
+                paciente_id: paciente.id,
+                segmento_evaluado: 'Columna / General',
+                diagnostico_tmo: form.diagnostico_tmo_biomecanico,
+                plan_tratamiento: form.objetivos_terapeuticos + '\n\n' + form.pronostico_sesiones,
+                ...form
+              };
+              
+              if (evaluacionInicialTMO?.id) {
+                const { error } = await supabaseClient.from('evaluaciones_iniciales_tmo').update(payload).eq('id', evaluacionInicialTMO.id);
+                if (error) throw error;
+              } else {
+                const { error } = await supabaseClient.from('evaluaciones_iniciales_tmo').insert([payload]);
+                if (error) throw error;
+              }
+              
+              toast.success('Evaluación AI guardada correctamente');
+              setAbrirAssessmentModal(false);
+              await cargarDatos();
+            } catch (error: any) {
+              console.error(error);
+              toast.error('Error al guardar: ' + error.message);
+            }
           }}
         />
       )}
