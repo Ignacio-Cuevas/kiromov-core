@@ -101,16 +101,17 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
 
       const sesionesUsadasIniciales = abonarEvaluacion ? 2 : 1;
 
+      
       const payload = {
         paciente_id: paciente.id,
-        plan_id: planElegido.id || null,
-        plan_id_ref: planElegido.id || null,
         catalogo_plan_id: planElegido.id || null,
         nombre_plan: planElegido.nombre || 'Plan Kinésico',
         total_sesiones: Number(planElegido.sesiones) || 1,
         sesiones_usadas: sesionesUsadasIniciales,
-        monto_clp: montoClp,
-        metodo_pago: decision === 'pagar_ahora' ? metodoPago : null,
+        valor_total: montoClp,
+        monto_pagado: decision === 'pagar_ahora' ? montoClp : 0,
+        saldo_pendiente: decision === 'pagar_ahora' ? 0 : montoClp,
+        metodo_pago: decision === 'pagar_ahora' ? metodoPago : 'Transferencia',
         estado_pago: decision === 'pagar_ahora' ? 'pagado' : 'pendiente',
         fecha_compra: getChileanDate(),
         numero_boleta: numeroBoleta || null,
@@ -119,11 +120,26 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
         created_at: new Date().toISOString()
       };
 
-      const { error } = await supabase.from('compras_planes').insert([payload]);
+      const { data: newPlan, error } = await supabase.from('compras_planes').insert([payload]).select().single();
       if (error) {
         toast.error('Error al registrar plan: ' + error.message);
         return;
       }
+      
+      // Si paga de inmediato, registrar en pagos_pacientes
+      if (decision === 'pagar_ahora' && montoClp > 0) {
+         const { error: pagoErr } = await supabase.from('pagos_pacientes').insert([{
+            paciente_id: paciente.id,
+            plan_id: newPlan.id,
+            monto: montoClp,
+            metodo_pago: metodoPago || 'Transferencia',
+            numero_boleta: numeroBoleta || null,
+            fecha: new Date().toISOString(),
+            notas: 'Pago inicial post-sesión'
+         }]);
+         if (pagoErr) console.error("Error al registrar pago post-sesión", pagoErr);
+      }
+
 
       toast.success(decision === 'pagar_ahora' ? 'Cobro y plan registrados exitosamente' : 'Plan registrado y dejado pendiente de pago');
       onSuccess();

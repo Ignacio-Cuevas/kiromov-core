@@ -54,7 +54,11 @@ export async function createSale(data: {
   const todayStr = `${year}-${month}-${day}`;
 
   if (supabase) {
+    
     try {
+      const montoPagado = data.payment_status === 'paid' ? totalAmount : 0;
+      const saldoPendiente = data.payment_status === 'paid' ? 0 : totalAmount;
+
       // 1. Inserción Primaria en compras_planes (Persistencia Oficial)
       let insertedPlanId: string | null = null;
       const { data: newPlan, error: planError } = await supabase
@@ -62,7 +66,6 @@ export async function createSale(data: {
         .insert([
           {
             paciente_id: data.patient_id,
-            plan_id: data.plan_id || null,
             catalogo_plan_id: data.plan_id || null,
             nombre_plan: conceptName,
             total_sesiones: sessionsQty,
@@ -71,6 +74,8 @@ export async function createSale(data: {
             numero_boleta: boletaClean,
             metodo_pago: medioPagoMap[data.payment_method] || 'Transferencia',
             estado_pago: estadoPagoMap[data.payment_status] || 'Pagado',
+            monto_pagado: montoPagado,
+            saldo_pendiente: saldoPendiente,
             fecha_compra: todayStr,
             estado: 'activo',
             notas: data.notes?.trim() || null,
@@ -79,57 +84,29 @@ export async function createSale(data: {
         .select()
         .single();
 
-      if (!planError && newPlan) {
-        insertedPlanId = newPlan.id;
-      } else if (planError) {
-        console.warn('Advertencia en compras_planes insert:', planError.message);
+      if (planError) {
+        console.error('Error en compras_planes insert:', planError.message);
+        return { success: false, error: planError.message };
       }
+      
+      insertedPlanId = newPlan.id;
 
-      // 2. Sincronizar en tabla sales si existe
-      try {
-        const { data: newSale, error: saleError } = await supabase
-          .from('sales')
-          .insert([
-            {
-              patient_id: data.patient_id,
-              plan_id: data.plan_id || null,
-              concept: conceptName,
-              sessions_quantity: sessionsQty,
-              total_amount_clp: totalAmount,
-              payment_method: data.payment_method || 'transfer',
-              payment_status: data.payment_status || 'paid',
-              receipt_number: boletaClean,
-              notes: data.notes?.trim() || null,
-            },
-          ])
-          .select()
-          .single();
-          
-        if (saleError) {
-          console.error('Error insertando sale:', saleError);
-          throw new Error(saleError.message);
+      // 2. Insertar en pagos_pacientes SI se pagó inmediatamente
+      if (data.payment_status === 'paid' && totalAmount > 0) {
+        const { error: pagoError } = await supabase.from('pagos_pacientes').insert([{
+          paciente_id: data.patient_id,
+          plan_id: insertedPlanId,
+          monto: totalAmount,
+          metodo_pago: medioPagoMap[data.payment_method] || 'Transferencia',
+          fecha: new Date().toISOString(),
+          numero_boleta: boletaClean,
+          notas: `Pago inicial plan: ${conceptName}`
+        }]);
+        
+        if (pagoError) {
+           console.error("Error insertando pago en pagos_pacientes:", pagoError.message);
+           // We don't rollback plan, but we log the error
         }
-
-        // 3. Sincronizar en patient_plans si aplica
-        if (newSale?.id && sessionsQty > 0) {
-          const { error: ppError } = await supabase.from('patient_plans').insert([
-            {
-              patient_id: data.patient_id,
-              sale_id: newSale.id,
-              plan_name: conceptName,
-              total_sessions: sessionsQty,
-              used_sessions: 0,
-              receipt_number: boletaClean,
-              status: 'active',
-            },
-          ]);
-          if (ppError) {
-            console.error('Error insertando patient_plans:', ppError);
-            throw new Error(ppError.message);
-          }
-        }
-      } catch (salesErr) {
-        console.warn('Tabla sales no disponible o error secundario:', salesErr);
       }
 
       revalidatePath('/finanzas');

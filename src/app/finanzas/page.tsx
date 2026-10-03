@@ -235,16 +235,16 @@ function FinanzasContent() {
   const hoyStr = new Date().toISOString().split('T')[0];
 
   const porCobrarPeriodo = useMemo(() => {
-    const planesPendientes = transaccionesFiltradas
+    const planesPendientes = compras
       .filter((t) => t.estado === 'activo' && (t.estado_pago === 'pendiente' || (t.saldo_pendiente && t.saldo_pendiente > 0)))
-      .reduce((acc, curr) => acc + (Number(curr.saldo_pendiente ?? curr.valor_total ?? curr.monto_clp) || 0), 0);
+      .reduce((acc, curr) => acc + (Number(curr.saldo_pendiente ?? curr.valor_total) || 0), 0);
     
-    const citasPendientes = asistenciasFiltradas
+    const citasPendientes = citas
       .filter((c) => c.estado_pago === 'pendiente_pago' && !c.plan_id && c.fecha && c.fecha <= hoyStr)
       .reduce((acc, curr) => acc + (Number(curr.monto_cobrado) || getArancel(curr.pacientes?.categoria_tarifa).sesion_individual), 0);
 
     return planesPendientes + citasPendientes;
-  }, [transaccionesFiltradas, asistenciasFiltradas, hoyStr]);
+  }, [compras, citas, hoyStr]);
 
   const deudoresCount = useMemo(() => {
     const ids = new Set<string>();

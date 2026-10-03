@@ -79,6 +79,8 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
         .from('pagos_pacientes')
         .insert([{
           paciente_id: planEnUso.paciente_id,
+          plan_id: planEnUso.id,
+
           monto: Number(montoPagaHoy),
           metodo_pago: paymentMethod,
           fecha: new Date().toISOString(),
