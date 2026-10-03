@@ -35,7 +35,7 @@ export function CuentaCorrienteTab({ pacienteId }: CuentaCorrienteTabProps) {
         // 2. Pagos realizados
         const { data: pagosData } = await supabase
           .from('pagos_pacientes')
-          .select('id, fecha, monto, metodo_pago, notas')
+          .select('id, fecha, monto, metodo_pago, notas, numero_boleta')
           .eq('paciente_id', pacienteId)
           .order('fecha', { ascending: false });
 
@@ -152,7 +152,7 @@ export function CuentaCorrienteTab({ pacienteId }: CuentaCorrienteTabProps) {
               {pagosRealizados.map(pago => (
                 <li key={pago.id} className="p-4 flex justify-between items-center hover:bg-slate-50">
                   <div>
-                    <p className="font-semibold text-sm text-slate-800 capitalize">{pago.metodo_pago}</p>
+                    <p className="font-semibold text-sm text-slate-800 capitalize">{pago.metodo_pago} {pago.numero_boleta && <span className="font-normal text-slate-500 text-xs ml-1">• Boleta {pago.numero_boleta}</span>}</p>
                     <p className="text-xs text-slate-500">{format(new Date(pago.fecha), 'PPP', { locale: es })}</p>
                   </div>
                   <div className="text-right">

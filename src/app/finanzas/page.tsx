@@ -439,7 +439,7 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
                               <td className="py-3 px-4 font-bold text-slate-900">{p.pacientes?.nombre_completo}</td>
                               <td className="py-3 px-4 font-medium text-slate-700 text-xs">{p.notas || 'Sesión Individual Kinésica'}</td>
                               <td className="py-3 px-4 text-xs text-slate-500">
-                                {p.metodo_pago || 'N/A'}
+                                {p.metodo_pago || 'N/A'} {(p.numero_boleta || p.comprobante) && <span className="block text-[10px] text-slate-400 font-medium">Boleta {p.numero_boleta || p.comprobante}</span>}
                               </td>
                               <td className="py-3 px-4 text-right font-black text-emerald-600">
                                 ${Number(p.monto || 0).toLocaleString("es-CL")}

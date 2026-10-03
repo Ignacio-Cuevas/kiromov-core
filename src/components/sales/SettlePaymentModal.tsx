@@ -77,6 +77,8 @@ export function SettlePaymentModal({ isOpen, onClose, planEnUso, onSuccess }: Se
           metodo_pago: paymentMethod,
           fecha: new Date().toISOString(),
           notas: notes.trim() ? notes.trim() : null,
+          numero_boleta: boletaClean,
+          comprobante: boletaClean
         }]);
 
       if (ppError) console.warn('Error insertando en pagos_pacientes', ppError);

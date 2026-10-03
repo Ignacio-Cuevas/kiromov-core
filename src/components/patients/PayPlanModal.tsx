@@ -126,6 +126,8 @@ export function PayPlanModal({
           metodo_pago: selectedMethod,
           fecha: new Date().toISOString(),
           notas: notes.trim() || null,
+          numero_boleta: cleanBoleta || null,
+          comprobante: cleanBoleta || null
         }]);
       }
 

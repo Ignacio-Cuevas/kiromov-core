@@ -56,7 +56,9 @@ export function CobrarDeudaModal({ isOpen, onClose, item, onSuccess }: CobrarDeu
         monto: finalMonto,
         metodo_pago: metodo,
         fecha: new Date().toISOString(),
-        notas: finalNotas
+        notas: finalNotas,
+        numero_boleta: boleta.trim(),
+        comprobante: boleta.trim()
       };
 
       if (item.tipo === 'cita') payload.cita_id = item.id;

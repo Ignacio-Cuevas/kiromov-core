@@ -57,6 +57,7 @@ export function RenewPlanDialog({
   const [descuentoCLP, setDescuentoCLP] = useState<number>(0);
   const [montoPagadoHoy, setMontoPagadoHoy] = useState<number>(0);
   const [medioPago, setMedioPago] = useState<string>('transferencia');
+  const [numeroBoleta, setNumeroBoleta] = useState<string>('');
   const [usarAbonoReciente, setUsarAbonoReciente] = useState<boolean>(true);
 
   // Coupon state
@@ -186,7 +187,10 @@ export function RenewPlanDialog({
         saldo_pendiente: saldoPendiente, // This should be total minus pagado, wait, if valorTotal already subtracted abono... actually valor_total of the PLAN should be `precioBase - descuentoCLP`. The `monto_pagado` should be `abonoCalculado`. `saldo_pendiente` = `precioBase - descuentoCLP - abonoCalculado`.
         fecha_compra: getChileanDate(),
         estado: "activo",
-        sesiones_usadas: usarAbonoReciente ? 1 : 0
+        sesiones_usadas: usarAbonoReciente ? 1 : 0,
+        numero_boleta: numeroBoleta,
+        metodo_pago: medioPago,
+        medio_pago: medioPago as any
       });
 
       if (result.success && result.data) {
@@ -214,7 +218,9 @@ export function RenewPlanDialog({
             metodo_pago: medioPago,
             fecha: new Date().toISOString(),
             notas: "Compra de " + result.data.nombre_plan,
-            tipo_concepto: 'compra_plan'
+            tipo_concepto: 'compra_plan',
+            numero_boleta: numeroBoleta,
+            comprobante: numeroBoleta
           };
           const { error: errPago1 } = await supabase.from('pagos_pacientes').insert([pagoPayload]);
           if (errPago1) {
@@ -435,12 +441,13 @@ export function RenewPlanDialog({
               <select
                 value={medioPago}
                 onChange={(e) => setMedioPago(e.target.value)}
-                disabled={isSaving || montoPagadoHoy === 0}
+                disabled={isSaving}
                 className="w-full h-10 text-sm p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium"
               >
                 <option value="transferencia">Transferencia Bancaria</option>
                 <option value="efectivo">Efectivo</option>
-                <option value="tarjeta_debito">Tarjeta Débito / Crédito</option>
+                <option value="debito">Tarjeta Débito</option>
+                <option value="credito">Tarjeta Crédito</option>
               </select>
             </div>
           </div>

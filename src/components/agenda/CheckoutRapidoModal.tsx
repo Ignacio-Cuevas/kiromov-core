@@ -24,6 +24,7 @@ export function CheckoutRapidoModal({ isOpen, onClose, cita, onSuccess }: Checko
   // Tarifa por defecto para la vista de sesión individual
   const [monto, setMonto] = useState<number>(paciente?.categoria_tarifa === 'tarifa_antigua' ? 20000 : 28000);
   const [medioPago, setMedioPago] = useState<string>('transferencia');
+  const [numeroBoleta, setNumeroBoleta] = useState<string>('');
 
   const handleCheckoutPlan = async () => {
     if (!supabase) return;
@@ -79,7 +80,9 @@ export function CheckoutRapidoModal({ isOpen, onClose, cita, onSuccess }: Checko
           metodo_pago: medioPago,
           fecha: new Date().toISOString(),
           notas: 'Sesión Individual Kinésica',
-          tipo_concepto: 'sesion_individual'
+          tipo_concepto: 'sesion_individual',
+          numero_boleta: numeroBoleta,
+          comprobante: numeroBoleta
         });
         // Permitimos que pase si falla el tipo_concepto pero intentamos sin él (retrocompatibilidad)
         if (errPago) {
@@ -89,7 +92,9 @@ export function CheckoutRapidoModal({ isOpen, onClose, cita, onSuccess }: Checko
              monto: finalMonto,
              metodo_pago: medioPago,
              fecha: new Date().toISOString(),
-             notas: 'Sesión Individual Kinésica'
+             notas: 'Sesión Individual Kinésica',
+             numero_boleta: numeroBoleta,
+             comprobante: numeroBoleta
            });
         }
       }
@@ -165,8 +170,20 @@ export function CheckoutRapidoModal({ isOpen, onClose, cita, onSuccess }: Checko
                 >
                   <option value="transferencia">Transferencia Bancaria</option>
                   <option value="efectivo">Efectivo</option>
-                  <option value="tarjeta_debito">Tarjeta Débito / Crédito</option>
+                  <option value="debito">Tarjeta Débito</option>
+                  <option value="credito">Tarjeta Crédito</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-700 block mb-1">N° de Boleta Electrónica (Opcional)</label>
+                <input 
+                  type="text" 
+                  value={numeroBoleta} 
+                  onChange={(e) => setNumeroBoleta(e.target.value)}
+                  placeholder="Ej: 18037"
+                  className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800"
+                />
               </div>
             </div>
           </div>
