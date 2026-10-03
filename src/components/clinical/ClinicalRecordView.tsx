@@ -14,7 +14,7 @@ import { EditPatientDialog } from '@/components/patients/EditPatientDialog';
 import { ManagePlanModal } from '@/components/patients/ManagePlanModal';
 import { RenewPlanDialog } from '@/components/patients/RenewPlanDialog';
 import { CobrarSesionSimpleModal } from '@/components/sales/CobrarSesionSimpleModal';
-import { PayPlanModal } from '@/components/patients/PayPlanModal';
+import { SettlePaymentModal } from '@/components/sales/SettlePaymentModal';
 import { CancelPlanModal } from '@/components/sales/CancelPlanModal';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -191,7 +191,7 @@ export function ClinicalRecordView({
   const [abrirManagePlanModal, setAbrirManagePlanModal] = useState(false);
   const [abrirRenewPlanModal, setAbrirRenewPlanModal] = useState(false);
   const [abrirCobrarSesionModal, setAbrirCobrarSesionModal] = useState(false);
-  const [abrirPayPlanModal, setAbrirPayPlanModal] = useState(false);
+  const [abrirSettlePaymentModal, setAbrirSettlePaymentModal] = useState(false);
   const [abrirCancelPlanModal, setAbrirCancelPlanModal] = useState(false);
 
   // Formulario SOAP
@@ -1430,7 +1430,7 @@ export function ClinicalRecordView({
                   <>
                     <button
                       type="button"
-                      onClick={() => setAbrirPayPlanModal(true)}
+                      onClick={() => setAbrirSettlePaymentModal(true)}
                       className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <CreditCard className="w-3.5 h-3.5" />
@@ -1806,14 +1806,13 @@ export function ClinicalRecordView({
       )}
 
       {/* Registrar Pago / Cobro del Plan */}
-      {abrirPayPlanModal && planActivo && (
-        <PayPlanModal
-          isOpen={abrirPayPlanModal}
-          onClose={() => setAbrirPayPlanModal(false)}
-          plan={planActivo}
-          patientName={paciente?.nombre_completo}
+      {abrirSettlePaymentModal && planActivo && (
+        <SettlePaymentModal
+          isOpen={abrirSettlePaymentModal}
+          onClose={() => setAbrirSettlePaymentModal(false)}
+          planEnUso={planActivo}
           onSuccess={async () => {
-            setAbrirPayPlanModal(false);
+            setAbrirSettlePaymentModal(false);
             await cargarDatos();
             onSuccess?.();
           }}
@@ -1825,7 +1824,6 @@ export function ClinicalRecordView({
         <CancelPlanModal
           isOpen={abrirCancelPlanModal}
           plan={planActivo}
-          patientName={paciente?.nombre_completo}
           onClose={() => setAbrirCancelPlanModal(false)}
           onSuccess={async () => {
             setAbrirCancelPlanModal(false);
