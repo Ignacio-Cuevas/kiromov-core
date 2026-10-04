@@ -1823,6 +1823,7 @@ export function ClinicalRecordView({
                 diagnostico_cif: form.diagnostico_cif || null,
                 diagnostico_apta: form.diagnostico_apta || null,
                 diagnostico_tmo_biomecanico: form.diagnostico_tmo_biomecanico || null,
+                hipotesis_diagnostica_tmo: form.diagnostico_tmo_biomecanico || null,
                 objetivos_terapeuticos: form.objetivos_terapeuticos || null,
                 pronostico_sesiones: form.pronostico_sesiones || null,
                 
