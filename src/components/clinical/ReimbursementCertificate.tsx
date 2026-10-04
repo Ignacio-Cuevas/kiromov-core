@@ -34,6 +34,8 @@ export function ReimbursementCertificate({
   const [sesionesCertificado, setSesionesCertificado] = useState<SesionImprimible[]>([]);
   const [boleta1, setBoleta1] = useState('');
   const [boleta2, setBoleta2] = useState('');
+  const [montoTotal, setMontoTotal] = useState('');
+  const [medicoDerivador, setMedicoDerivador] = useState('');
   const [diagnosticoEditable, setDiagnosticoEditable] = useState('');
   const [planNombreEditable, setPlanNombreEditable] = useState('');
 
@@ -49,6 +51,24 @@ export function ReimbursementCertificate({
       if (!supabase) return;
       setLoading(true);
       try {
+        const { data: evalData } = await supabase
+          .from('evaluaciones_iniciales_tmo')
+          .select('cie10_codigo, cie10_glosa, diagnostico_tmo')
+          .eq('paciente_id', patient.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        let diagStr = patient.diagnostico_principal || patient.motivo_consulta || 'Rehabilitación Musculoesquelética y TMO';
+        let codigoStr = '';
+        if (evalData) {
+           diagStr = evalData.cie10_glosa || evalData.diagnostico_tmo || diagStr;
+           codigoStr = evalData.cie10_codigo ? `(${evalData.cie10_codigo})` : '';
+           setDiagnosticoEditable(`${diagStr} ${codigoStr}`.trim());
+        } else {
+           setDiagnosticoEditable(diagStr);
+        }
+
         // 1. Asistencias
         const { data: citasData } = await supabase
           .from('citas_atenciones')
@@ -64,9 +84,7 @@ export function ReimbursementCertificate({
               numero: idx + 1,
               fecha: a.fecha,
               hora: a.hora?.slice(0, 5) || '16:00',
-              prestacion: idx === 0 
-                ? 'Evaluación Kinésica Integral + TMO' 
-                : 'Tratamiento Kinésico y Terapia Manual Ortopédica'
+              prestacion: 'Atención Kinesiológica Integral Ambulatoria (Código Fonasa 06-01-105)'
             }))
           );
         } else {
@@ -76,7 +94,7 @@ export function ReimbursementCertificate({
             numero: 1,
             fecha: getChileanDate(),
             hora: '16:00',
-            prestacion: 'Evaluación Kinésica Integral + TMO'
+            prestacion: 'Atención Kinesiológica Integral Ambulatoria (Código Fonasa 06-01-105)'
           }]);
         }
 
@@ -93,11 +111,12 @@ export function ReimbursementCertificate({
           setPlanInfo(planData);
           setPlanNombreEditable(planData.nombre_plan || 'Tratamiento Kinésico Integral');
           setBoleta2(planData.numero_boleta || '');
+          setMontoTotal(`${planData.valor_total ? planData.valor_total.toLocaleString('es-CL') : '0'} CLP`);
         } else {
           setPlanNombreEditable('Tratamiento Kinésico Integral');
         }
 
-        setDiagnosticoEditable(patient.diagnostico_principal || patient.motivo_consulta || 'Rehabilitación Musculoesquelética y TMO');
+        // Eliminado para usar el autocompletado CIE-10
 
       } catch (err) {
         console.error("Error cargando datos para certificado", err);
@@ -434,7 +453,7 @@ export function ReimbursementCertificate({
                 
                 <div className="flex flex-col sm:flex-row gap-4 mb-2">
                   <div className="flex-1 flex gap-2 items-center">
-                    <span className="font-medium text-slate-600">Boleta Evaluación: N°</span>
+                    <span className="font-medium text-slate-600">Boleta(s) de Honorarios: N°</span>
                     <input
                       type="text"
                       placeholder="Ej: 1459"
@@ -444,7 +463,7 @@ export function ReimbursementCertificate({
                     />
                   </div>
                   <div className="flex-1 flex gap-2 items-center">
-                    <span className="font-medium text-slate-600">Boleta Tratamiento: N°</span>
+                    <span className="font-medium text-slate-600">N° Adicional: N°</span>
                     <input
                       type="text"
                       placeholder="Ej: 1460"
