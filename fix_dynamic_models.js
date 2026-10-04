@@ -1,4 +1,6 @@
-import { NextResponse } from 'next/server';
+const fs = require('fs');
+
+const code = `import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,13 +14,13 @@ export async function POST(req: Request) {
     const payload = await req.json();
 
     // 1. CONSULTAR A GOOGLE QUÉ MODELOS TIENE ACTIVOS ESTA API KEY (ListModels)
-    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    const listRes = await fetch(\`https://generativelanguage.googleapis.com/v1beta/models?key=\${apiKey}\`);
     const listData = await listRes.json();
 
     if (!listRes.ok || !listData.models) {
       console.error('Error listando modelos:', listData);
       return NextResponse.json(
-        { error: `Google AI no pudo listar modelos: ${listData.error?.message || 'Error de clave'}` },
+        { error: \`Google AI no pudo listar modelos: \${listData.error?.message || 'Error de clave'}\` },
         { status: 400 }
       );
     }
@@ -41,10 +43,10 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log(`Modelo seleccionado dinámicamente de tu cuenta: ${selected.name}`);
+    console.log(\`Modelo seleccionado dinámicamente de tu cuenta: \${selected.name}\`);
 
     // 2. CONSTRUIR PROMPTS
-    const systemPrompt = `
+    const systemPrompt = \`
 Eres un Kinesiólogo Especialista en Terapia Manual Ortopédica (TMO) y miembro de IFOMPT.
 Analiza la evaluación clínica y responde EXCLUSIVAMENTE con un JSON válido sin texto adicional:
 {
@@ -58,31 +60,31 @@ Analiza la evaluación clínica y responde EXCLUSIVAMENTE con un JSON válido si
   "objetivos_terapeuticos": "Objetivos SMART",
   "pronostico_sesiones": "Plan sugerido (ej. Pro Care 6 sesiones)"
 }
-`;
+\`;
 
-    const userPrompt = `
-Paciente: ${payload.nombre_completo || 'Paciente'}
-Edad: ${payload.edad || 'No especificada'}
-Motivo: ${payload.motivo_consulta || 'No especificado'}
-Trabajo/Ergonomía: ${payload.puesto_trabajo_ergonomia || 'No especificado'}
-Cirugías/Antecedentes: ${payload.cirugias_traumatismos || 'Sin antecedentes'}
-Fármacos: ${payload.farmacos_actuales || 'Sin fármacos'}
-Síntoma/Cronología: ${payload.inicio_sintoma_cronologia || 'No especificado'}
-Irritabilidad: ${payload.irritabilidad_tisular || 'Moderada'}
-Dolor ENA: ${payload.dolor_inicial_ena ?? 5}
-Hallazgos y Pruebas Ortopédicas: ${payload.pruebas_especiales_ortopedicas || 'No especificadas'}
-Pruebas Funcionales: ${payload.pruebas_funcionales_control_motor || 'No especificadas'}
-`;
+    const userPrompt = \`
+Paciente: \${payload.nombre_completo || 'Paciente'}
+Edad: \${payload.edad || 'No especificada'}
+Motivo: \${payload.motivo_consulta || 'No especificado'}
+Trabajo/Ergonomía: \${payload.puesto_trabajo_ergonomia || 'No especificado'}
+Cirugías/Antecedentes: \${payload.cirugias_traumatismos || 'Sin antecedentes'}
+Fármacos: \${payload.farmacos_actuales || 'Sin fármacos'}
+Síntoma/Cronología: \${payload.inicio_sintoma_cronologia || 'No especificado'}
+Irritabilidad: \${payload.irritabilidad_tisular || 'Moderada'}
+Dolor ENA: \${payload.dolor_inicial_ena ?? 5}
+Hallazgos y Pruebas Ortopédicas: \${payload.pruebas_especiales_ortopedicas || 'No especificadas'}
+Pruebas Funcionales: \${payload.pruebas_funcionales_control_motor || 'No especificadas'}
+\`;
 
     // 3. EJECUTAR LLAMADA CON EL NOMBRE EXACTO DEL MODELO DE TU CUENTA
     // selected.name ya viene en formato "models/nombre-del-modelo"
-    const generateUrl = `https://generativelanguage.googleapis.com/v1beta/${selected.name}:generateContent?key=${apiKey}`;
+    const generateUrl = \`https://generativelanguage.googleapis.com/v1beta/\${selected.name}:generateContent?key=\${apiKey}\`;
 
     const response = await fetch(generateUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+        contents: [{ parts: [{ text: \`\${systemPrompt}\\n\\n\${userPrompt}\` }] }],
         generationConfig: {
           responseMimeType: 'application/json',
           temperature: 0.2,
@@ -94,7 +96,7 @@ Pruebas Funcionales: ${payload.pruebas_funcionales_control_motor || 'No especifi
 
     if (!response.ok || data.error) {
       return NextResponse.json(
-        { error: `Google AI: ${data.error?.message || response.statusText}` },
+        { error: \`Google AI: \${data.error?.message || response.statusText}\` },
         { status: response.status || 400 }
       );
     }
@@ -104,7 +106,7 @@ Pruebas Funcionales: ${payload.pruebas_funcionales_control_motor || 'No especifi
       return NextResponse.json({ error: 'Google AI no devolvió texto.' }, { status: 500 });
     }
 
-    const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const cleanJson = rawText.replace(/\`\`\`json\\n?/g, '').replace(/\`\`\`\\n?/g, '').trim();
     const parsed = JSON.parse(cleanJson);
 
     return NextResponse.json(parsed);
@@ -113,3 +115,6 @@ Pruebas Funcionales: ${payload.pruebas_funcionales_control_motor || 'No especifi
     return NextResponse.json({ error: error?.message || 'Error interno del servidor' }, { status: 500 });
   }
 }
+`;
+
+fs.writeFileSync('src/app/api/ai/diagnose/route.ts', code);
