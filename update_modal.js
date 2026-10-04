@@ -1,4 +1,6 @@
-'use client';
+const fs = require('fs');
+
+const code = `'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Activity } from 'lucide-react';
@@ -16,7 +18,7 @@ interface InitialEvaluationModalProps {
 const ORTHOPEDIC_TESTS = {
   'Cervical/Dorsal': ['Spurling', 'Distracción Cervical', 'ULNT1', 'Sharp-Purser', 'Test de Flexión-Rotación'],
   'Lumbar/Pelvis': ['Slump Test', 'Lasègue (SLR)', 'Thigh Thrust', 'Distracción SI', 'Compresión SI', 'Gaenslen', 'FABER', 'Prone Instability Test'],
-  'Hombro': ['Hawkins-Kennedy', 'Neer', 'Jobe (Empty Can)', 'Speed', 'Yergason', 'Apprehension', 'Relocation', 'O\'Brien'],
+  'Hombro': ['Hawkins-Kennedy', 'Neer', 'Jobe (Empty Can)', 'Speed', 'Yergason', 'Apprehension', 'Relocation', 'O\\'Brien'],
   'Rodilla/Cadera': ['Lachman', 'Cajón Anterior', 'Cajón Posterior', 'McMurray', 'Apley', 'Thessaly', 'FADIR', 'Thomas'],
   'Tobillo/Pie': ['Cajón Anterior (Tobillo)', 'Talar Tilt', 'Thompson', 'Navicular Drop'],
   'Codo/Muñeca': ['Cozen', 'Mill', 'Finkelstein', 'Phalen', 'Tinel'],
@@ -84,7 +86,7 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
   const updatePruebasText = (pruebas: Record<string, { result: string, note: string }>) => {
     const lines = Object.entries(pruebas)
       .filter(([_, data]) => data.result !== 'NE')
-      .map(([name, data]) => `${name} (${data.result})${data.note ? ` - ${data.note}` : ''}`);
+      .map(([name, data]) => \`\${name} (\${data.result})\${data.note ? \` - \${data.note}\` : ''}\`);
     
     // Solo actualizar el textarea con los hallazgos estructurados para que el terapeuta los vea
     // o mantener la concatenación en un string limpio. Para evitar sobreescribir el texto libre:
@@ -95,11 +97,11 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
   const getPruebasConcatenadas = () => {
     const lines = Object.entries(pruebasEstructuradas)
       .filter(([_, data]) => data.result !== 'NE')
-      .map(([name, data]) => `${name} (${data.result})${data.note ? ` - ${data.note}` : ''}`);
+      .map(([name, data]) => \`\${name} (\${data.result})\${data.note ? \` - \${data.note}\` : ''}\`);
     
     let combined = form.pruebas_especiales_ortopedicas;
     if (lines.length > 0) {
-       combined = lines.join(', ') + (combined ? '\nOtras: ' + combined : '');
+       combined = lines.join(', ') + (combined ? '\\nOtras: ' + combined : '');
     }
     return combined;
   };
@@ -180,11 +182,11 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
             <button
               key={t.id}
               onClick={() => setTab(t.id as any)}
-              className={`py-3 px-4 text-xs font-semibold border-b-2 transition-all ${
+              className={\`py-3 px-4 text-xs font-semibold border-b-2 transition-all \${
                 tab === t.id
                   ? 'border-blue-600 text-blue-700 bg-white shadow-sm'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
+              }\`}
             >
               {t.label}
             </button>
@@ -320,7 +322,7 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
                       key={seg}
                       type="button"
                       onClick={() => setSegmentoActivo(segmentoActivo === seg ? null : seg)}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all ${segmentoActivo === seg ? 'bg-blue-600 text-white shadow-md' : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'}`}
+                      className={\`px-3 py-1.5 text-xs font-bold rounded-full transition-all \${segmentoActivo === seg ? 'bg-blue-600 text-white shadow-md' : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'}\`}
                     >
                       {seg.includes('Cervical') ? '💆 ' : seg.includes('Lumbar') ? '🦴 ' : seg.includes('Hombro') ? '💪 ' : seg.includes('Rodilla') ? '🦵 ' : seg.includes('Tobillo') ? '🦶 ' : seg.includes('Codo') ? '🖐️ ' : '🦷 '}{seg}
                     </button>
@@ -336,9 +338,9 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-slate-700">{testName}</span>
                             <div className="flex rounded-lg overflow-hidden border border-slate-300 bg-white shadow-sm">
-                              <button onClick={() => handleTestChange(testName, 'NE', data.note)} className={`px-2 py-1 text-[10px] font-bold ${data.result === 'NE' ? 'bg-slate-200 text-slate-600' : 'text-slate-400 hover:bg-slate-100'}`}>NE</button>
-                              <button onClick={() => handleTestChange(testName, '+', data.note)} className={`px-2 py-1 text-[10px] font-bold border-l border-slate-300 ${data.result === '+' ? 'bg-rose-100 text-rose-700' : 'text-slate-400 hover:bg-slate-100'}`}>+</button>
-                              <button onClick={() => handleTestChange(testName, '-', data.note)} className={`px-2 py-1 text-[10px] font-bold border-l border-slate-300 ${data.result === '-' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400 hover:bg-slate-100'}`}>-</button>
+                              <button onClick={() => handleTestChange(testName, 'NE', data.note)} className={\`px-2 py-1 text-[10px] font-bold \${data.result === 'NE' ? 'bg-slate-200 text-slate-600' : 'text-slate-400 hover:bg-slate-100'}\`}>NE</button>
+                              <button onClick={() => handleTestChange(testName, '+', data.note)} className={\`px-2 py-1 text-[10px] font-bold border-l border-slate-300 \${data.result === '+' ? 'bg-rose-100 text-rose-700' : 'text-slate-400 hover:bg-slate-100'}\`}>+</button>
+                              <button onClick={() => handleTestChange(testName, '-', data.note)} className={\`px-2 py-1 text-[10px] font-bold border-l border-slate-300 \${data.result === '-' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400 hover:bg-slate-100'}\`}>-</button>
                             </div>
                           </div>
                           {data.result === '+' && (
@@ -536,3 +538,5 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
     </div>
   );
 }
+`;
+fs.writeFileSync('src/components/clinical/InitialEvaluationModal.tsx', code);
