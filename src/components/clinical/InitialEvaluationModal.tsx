@@ -1,20 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
-import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Activity } from 'lucide-react';
 import { toast } from 'sonner';
-import { getChileanDate } from '@/lib/utils';
-import { ShieldAlert, Activity, UserCog, Stethoscope, AlertTriangle, User, ChevronRight, ChevronLeft } from 'lucide-react';
-import { FormularioLumbar } from './evaluacion/FormularioLumbar';
-import { FormularioCervical } from './evaluacion/FormularioCervical';
-import { FormularioHombro } from './evaluacion/FormularioHombro';
-import { FormularioCadera } from './evaluacion/FormularioCadera';
-import { FormularioRodilla } from './evaluacion/FormularioRodilla';
-import { FormularioTobillo } from './evaluacion/FormularioTobillo';
 
 interface InitialEvaluationModalProps {
   isOpen: boolean;
@@ -22,419 +10,422 @@ interface InitialEvaluationModalProps {
   evaluacionExistente?: any | null;
   modo?: 'nueva' | 'editar';
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (form: any) => void;
 }
 
 export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, modo = 'nueva', onClose, onSuccess }: InitialEvaluationModalProps) {
-  const supabase = createClient();
-  const [loading, setLoading] = useState(false);
-  const [paso, setPaso] = useState(1);
+  const [tab, setTab] = useState<'anamnesis' | 'sintoma' | 'examen' | 'diagnostico'>('anamnesis');
+  const [loadingAI, setLoadingAI] = useState(false);
 
-  const [fechaEvaluacion, setFechaEvaluacion] = useState<string>(
-    evaluacionExistente?.fecha_evaluacion || getChileanDate()
-  );
+  const [form, setForm] = useState({
+    // Anamnesis remota y laboral
+    ocupacion_laboral: evaluacionExistente?.ocupacion_laboral ?? paciente?.ocupacion ?? '',
+    puesto_trabajo_ergonomia: evaluacionExistente?.puesto_trabajo_ergonomia ?? '',
+    habitos_actividad_fisica: evaluacionExistente?.habitos_actividad_fisica ?? '',
+    cirugias_traumatismos: evaluacionExistente?.cirugias_traumatismos ?? '',
+    farmacos_actuales: evaluacionExistente?.farmacos_actuales ?? '',
+    banderas_rojas_alerta: evaluacionExistente?.banderas_rojas_alerta ?? '',
+    apto_hvla: evaluacionExistente?.apto_hvla ?? true,
 
-  // Paso 1: Anamnesis y Dolor
-  const [anamnesis, setAnamnesis] = useState({
-    motivo_consulta: '',
-    tiempo_evolucion: 'agudo',
-    eva: 5,
-    dolor_nocturno: false,
-    aumenta_con: '',
-    disminuye_con: '',
-    banderas_rojas: [] as string[]
+    // Síntoma
+    motivo_consulta: evaluacionExistente?.motivo_consulta ?? paciente?.motivo_consulta ?? '',
+    inicio_sintoma_cronologia: evaluacionExistente?.inicio_sintoma_cronologia ?? '',
+    tiempo_evolucion: evaluacionExistente?.tiempo_evolucion ?? 'Subagudo 6-12 sem',
+    comportamiento_24h: evaluacionExistente?.comportamiento_24h ?? '',
+    factores_agravantes_aliviantes: evaluacionExistente?.factores_agravantes_aliviantes ?? '',
+    irritabilidad_tisular: evaluacionExistente?.irritabilidad_tisular ?? 'Moderada',
+    dolor_inicial_ena: evaluacionExistente?.dolor_inicial_ena ?? 5,
+
+    // Examen Físico
+    inspeccion_postura: evaluacionExistente?.inspeccion_postura ?? '',
+    movilidad_activa_rom: evaluacionExistente?.movilidad_activa_rom ?? '',
+    juego_articular_joint_play: evaluacionExistente?.juego_articular_joint_play ?? 'Normal',
+    neurodinamia_basal: evaluacionExistente?.neurodinamia_basal ?? '',
+    pruebas_especiales_ortopedicas: evaluacionExistente?.pruebas_especiales_ortopedicas ?? '',
+    pruebas_funcionales_control_motor: evaluacionExistente?.pruebas_funcionales_control_motor ?? '',
+    hallazgos_relevantes: evaluacionExistente?.hallazgos_relevantes ?? '',
+
+    // Diagnósticos Internacionales
+    cie10_codigo: evaluacionExistente?.cie10_codigo ?? '',
+    cie10_glosa: evaluacionExistente?.cie10_glosa ?? '',
+    cie11_codigo: evaluacionExistente?.cie11_codigo ?? '',
+    cie11_glosa: evaluacionExistente?.cie11_glosa ?? '',
+    diagnostico_cif: evaluacionExistente?.diagnostico_cif ?? '',
+    diagnostico_tmo_biomecanico: evaluacionExistente?.diagnostico_tmo_biomecanico ?? typeof evaluacionExistente?.diagnostico_tmo === 'string' ? evaluacionExistente?.diagnostico_tmo : '',
+    objetivos_terapeuticos: evaluacionExistente?.objetivos_terapeuticos ?? '',
+    pronostico_sesiones: evaluacionExistente?.pronostico_sesiones ?? 'Plan Pro Care (6 sesiones)',
   });
 
-  // Paso 2: Segmento
-  const [segmento, setSegmento] = useState<string>('lumbar'); // lumbar, cervical, hombro, otro
+  const handleChange = (field: string, value: any) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
 
-  // Paso 3: Datos de segmento dinámico
-  const [datosSegmento, setDatosSegmento] = useState<any>({});
-
-  // Paso 4: Conclusión y Plan
-  const [diagnostico, setDiagnostico] = useState('');
-  const [planTratamiento, setPlanTratamiento] = useState('Plan Integral - 10 ses');
-  const [frecuencia, setFrecuencia] = useState('');
-  const [objetivosCortoPlazo, setObjetivosCortoPlazo] = useState('');
-  
-  const [cargandoIADiagnostico, setCargandoIADiagnostico] = useState(false);
-
-  const handleGenerarDiagnosticoConIA = async () => {
-    setCargandoIADiagnostico(true);
+  const handleGenerateAI = async () => {
+    setLoadingAI(true);
     try {
-      const res = await fetch('/api/ai/evaluacion', {
+      const res = await fetch('/api/ai/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          anamnesis,
-          segmento_evaluado: segmento,
-          datos_segmento: datosSegmento
-        })
+          ...form,
+          edad: paciente?.edad,
+          sexo: paciente?.sexo,
+        }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        toast.error(typeof data.error === 'string' ? data.error : (data.error?.message || "Error al analizar evaluación"));
-        return;
-      }
-
-      if (data.diagnostico_tmo) {
-        setDiagnostico(typeof data.diagnostico_tmo === 'string' ? data.diagnostico_tmo : (data.diagnostico_tmo.diagnostico || JSON.stringify(data.diagnostico_tmo)));
-      }
-      if (data.objetivos_corto_plazo) {
-        setObjetivosCortoPlazo(
-          Array.isArray(data.objetivos_corto_plazo) 
-            ? data.objetivos_corto_plazo.join(', ') 
-            : (typeof data.objetivos_corto_plazo === 'string' ? data.objetivos_corto_plazo : JSON.stringify(data.objetivos_corto_plazo))
-        );
-      }
-      if (data.plan_recomendado) {
-        setPlanTratamiento(typeof data.plan_recomendado === 'string' ? data.plan_recomendado : (data.plan_recomendado.plan_recomendado || data.plan_recomendado.nombre || JSON.stringify(data.plan_recomendado)));
-      }
-      if (data.frecuencia_semanal) {
-        setFrecuencia(typeof data.frecuencia_semanal === 'string' ? data.frecuencia_semanal : (data.frecuencia_semanal.frecuencia || JSON.stringify(data.frecuencia_semanal)));
-      }
-      
-      toast.success("Razonamiento clínico generado exitosamente");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err instanceof Error ? err.message : "Hubo un error con el Copiloto IA");
-    } finally {
-      setCargandoIADiagnostico(false);
-    }
-  };
-
-  useEffect(() => {
-    if (modo === 'editar' && evaluacionExistente) {
-      const planSanitizado = typeof evaluacionExistente?.plan_tratamiento === "object" && evaluacionExistente?.plan_tratamiento !== null
-        ? evaluacionExistente?.plan_tratamiento?.plan_recomendado || evaluacionExistente?.plan_tratamiento?.nombre || ""
-        : evaluacionExistente?.plan_tratamiento || "";
-
-      const diagSanitizado = typeof evaluacionExistente?.diagnostico_tmo === "object" && evaluacionExistente?.diagnostico_tmo !== null
-        ? evaluacionExistente?.diagnostico_tmo?.diagnostico_tmo || evaluacionExistente?.diagnostico_tmo?.diagnostico || ""
-        : evaluacionExistente?.diagnostico_tmo || evaluacionExistente?.diagnostico_funcional || "";
-
-      const segmentoValido = ["lumbar", "cervical", "hombro", "cadera", "rodilla", "tobillo_pie", "otro"].includes(evaluacionExistente?.segmento_evaluado)
-        ? evaluacionExistente.segmento_evaluado
-        : "lumbar"; // fallback seguro
-
-      setFechaEvaluacion(evaluacionExistente.fecha_evaluacion || getChileanDate());
-      setSegmento(segmentoValido);
-      setAnamnesis(evaluacionExistente.anamnesis || anamnesis);
-      setDatosSegmento(evaluacionExistente.datos_segmento || {});
-      setDiagnostico(diagSanitizado);
-      setPlanTratamiento(planSanitizado);
-    }
-  }, [evaluacionExistente, modo]);
-
-  const handleGuardar = async () => {
-    if (!supabase) return;
-    try {
-      setLoading(true);
-
-      const payload = {
-        paciente_id: paciente.id,
-        fecha_evaluacion: fechaEvaluacion 
-          ? new Date(fechaEvaluacion + 'T12:00:00Z').toISOString() 
-          : new Date().toISOString(),
-        segmento_evaluado: segmento,
-        anamnesis,
-        datos_segmento: datosSegmento,
-        diagnostico_tmo: diagnostico,
-        plan_tratamiento: planTratamiento,
-      };
-
-      if (modo === 'nueva' || !evaluacionExistente?.id) {
-        const { error } = await supabase.from('evaluaciones_iniciales_tmo').insert([payload]);
-        if (error) throw error;
-        toast.success('Evaluación Inicial guardada correctamente');
+      if (!data.error) {
+        setForm((prev) => ({
+          ...prev,
+          cie10_codigo: data.cie10_codigo,
+          cie10_glosa: data.cie10_glosa,
+          cie11_codigo: data.cie11_codigo,
+          cie11_glosa: data.cie11_glosa,
+          diagnostico_cif: data.diagnostico_cif,
+          diagnostico_tmo_biomecanico: data.diagnostico_tmo_biomecanico,
+          objetivos_terapeuticos: data.objetivos_terapeuticos,
+          pronostico_sesiones: data.pronostico_sesiones,
+        }));
+        setTab('diagnostico');
+        toast.success('Análisis IA completado.');
       } else {
-        const { error } = await supabase
-          .from('evaluaciones_iniciales_tmo')
-          .update(payload)
-          .eq('id', evaluacionExistente.id);
-        if (error) throw error;
-        toast.success('Evaluación Inicial actualizada correctamente');
+        toast.error('Error al generar diagnóstico IA.');
       }
-
-      onSuccess();
-      onClose();
-    } catch (err: any) {
-      console.error('Error guardando evaluación:', err);
-      toast.error('Error al guardar: ' + err.message);
+    } catch (e) {
+      console.error(e);
+      toast.error('Error de red al generar diagnóstico IA.');
     } finally {
-      setLoading(false);
+      setLoadingAI(false);
     }
   };
 
-  const renderPaso1 = () => (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-1 w-full md:w-1/2 mb-4">
-        <label className="text-sm font-semibold text-slate-700">Fecha de Evaluación <span className="text-rose-500">*</span></label>
-        <Input 
-          type="date"
-          value={fechaEvaluacion}
-          onChange={(e) => setFechaEvaluacion(e.target.value)}
-          required
-        />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-semibold text-slate-700">Motivo de consulta</label>
-          <Textarea 
-            placeholder="Ej: Dolor en zona baja de la espalda..."
-            value={anamnesis.motivo_consulta}
-            onChange={(e) => setAnamnesis({ ...anamnesis, motivo_consulta: e.target.value })}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-semibold text-slate-700">Tiempo de evolución</label>
-          <select 
-            className="px-3 py-2 text-sm border border-slate-200 rounded-md"
-            value={anamnesis.tiempo_evolucion}
-            onChange={(e) => setAnamnesis({ ...anamnesis, tiempo_evolucion: e.target.value })}
-          >
-            <option value="agudo">Agudo (&lt; 4 semanas)</option>
-            <option value="subagudo">Subagudo (4 - 12 semanas)</option>
-            <option value="cronico">Crónico (&gt; 12 semanas)</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-semibold text-slate-700">Escala EVA del Dolor ({anamnesis.eva}/10)</label>
-        <input 
-          type="range" min="0" max="10" 
-          value={anamnesis.eva} 
-          onChange={(e) => setAnamnesis({ ...anamnesis, eva: parseInt(e.target.value) })}
-          className="w-full accent-blue-600"
-        />
-        <div className="flex justify-between text-xs text-slate-500">
-          <span>0 (Sin dolor)</span>
-          <span>5 (Moderado)</span>
-          <span>10 (Máximo)</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-semibold text-slate-700">El dolor aumenta con:</label>
-          <Input 
-            placeholder="Ej: Estar sentado, agacharse..."
-            value={anamnesis.aumenta_con}
-            onChange={(e) => setAnamnesis({ ...anamnesis, aumenta_con: e.target.value })}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-semibold text-slate-700">El dolor disminuye con:</label>
-          <Input 
-            placeholder="Ej: Calor, reposo, analgésicos..."
-            value={anamnesis.disminuye_con}
-            onChange={(e) => setAnamnesis({ ...anamnesis, disminuye_con: e.target.value })}
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <input 
-          type="checkbox" 
-          id="dolor_nocturno"
-          checked={anamnesis.dolor_nocturno}
-          onChange={(e) => setAnamnesis({ ...anamnesis, dolor_nocturno: e.target.checked })}
-        />
-        <label htmlFor="dolor_nocturno" className="text-sm text-slate-700">Presenta dolor nocturno (despierta por la noche)</label>
-      </div>
-
-      <div className="p-3 bg-red-50 rounded-lg border border-red-100 flex flex-col gap-2">
-        <label className="text-sm font-bold text-red-800 flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4" /> Descarte de Banderas Rojas
-        </label>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-red-700">
-          {['Pérdida de fuerza súbita', 'Compromiso esfinteriano', 'Fiebre/baja peso inexplicable'].map((bandera) => (
-            <div key={bandera} className="flex items-center gap-2">
-              <input 
-                type="checkbox" 
-                checked={(anamnesis.banderas_rojas || []).includes(bandera)}
-                onChange={(e) => {
-                  if (e.target.checked) setAnamnesis({ ...anamnesis, banderas_rojas: [...anamnesis.banderas_rojas, bandera] });
-                  else setAnamnesis({ ...anamnesis, banderas_rojas: anamnesis.banderas_rojas.filter(b => b !== bandera) });
-                }}
-              />
-              <span>{bandera}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderPaso2 = () => (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4">
-      {[
-        { id: 'lumbar', icon: '🦴', label: 'Columna Lumbar' },
-        { id: 'cervical', icon: '🧠', label: 'Columna Cervical' },
-        { id: 'hombro', icon: '💪', label: 'Hombro y Escápula' },
-        { id: 'cadera', icon: '🦵', label: 'Cadera y Pelvis' },
-        { id: 'rodilla', icon: '🦵', label: 'Rodilla' },
-        { id: 'tobillo_pie', icon: '🦶', label: 'Tobillo y Pie' },
-        { id: 'otro', icon: '➕', label: 'Otro' },
-      ].map((seg) => (
-        <button
-          key={seg.id}
-          type="button"
-          onClick={() => setSegmento(seg.id)}
-          className={`p-6 flex flex-col items-center justify-center gap-2 rounded-xl border-2 transition-all ${
-            segmento === seg.id ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white hover:border-blue-300'
-          }`}
-        >
-          <span className="text-3xl">{seg.icon}</span>
-          <span className="font-semibold">{seg.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-
-  const renderPaso3 = () => {
-    if (segmento === 'lumbar') return <FormularioLumbar datos={datosSegmento} setDatos={setDatosSegmento} />;
-    if (segmento === 'cervical') return <FormularioCervical datos={datosSegmento} setDatos={setDatosSegmento} />;
-    if (segmento === 'hombro') return <FormularioHombro datos={datosSegmento} setDatos={setDatosSegmento} />;
-    if (segmento === 'cadera') return <FormularioCadera datos={datosSegmento} setDatos={setDatosSegmento} />;
-    if (segmento === 'rodilla') return <FormularioRodilla datos={datosSegmento} setDatos={setDatosSegmento} />;
-    if (segmento === 'tobillo_pie') return <FormularioTobillo datos={datosSegmento} setDatos={setDatosSegmento} />;
-    
-    return (
-      <div className="p-8 text-center text-slate-500">
-        Sección genérica. (Formulario en desarrollo).
-      </div>
-    );
-  };
-
-  const renderPaso4 = () => (
-    <div className="space-y-4">
-      <div className="mb-4 flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/60 p-3.5">
-        <div>
-          <p className="text-xs font-semibold text-indigo-900 flex items-center gap-1.5">
-            ✨ Copiloto TMO: Razonamiento Diagnóstico
-          </p>
-          <p className="text-[11px] text-indigo-600">
-            Sintetiza los test ortopédicos, ROM y síntomas registrados en los pasos anteriores.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleGenerarDiagnosticoConIA}
-          disabled={cargandoIADiagnostico}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition-colors shadow-sm"
-        >
-          {cargandoIADiagnostico ? "✨ Analizando hallazgos..." : "✨ Generar Diagnóstico y Objetivos"}
-        </button>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-semibold text-slate-700">Diagnóstico Kinésico Funcional</label>
-        <Textarea 
-          placeholder='Ej: "Síndrome de dolor subacromial derecho asociado a discinesia escapular..."'
-          value={diagnostico}
-          onChange={(e) => setDiagnostico(e.target.value)}
-          className="h-24"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-semibold text-slate-700">Plan Recomendado</label>
-          <select 
-            className="px-3 py-2 text-sm border border-slate-200 rounded-md bg-white"
-            value={planTratamiento}
-            onChange={(e) => setPlanTratamiento(e.target.value)}
-          >
-            <option value="Plan Activa Care - 4 ses">Plan Activa Care - 4 ses</option>
-            <option value="Plan Pro Care - 6 ses">Plan Pro Care - 6 ses</option>
-            <option value="Plan Integral - 10 ses">Plan Integral - 10 ses</option>
-            <option value="Sesión Individual">Sesión Individual</option>
-          </select>
-        </div>
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-semibold text-slate-700">Frecuencia Semanal</label>
-          <Input 
-            placeholder="Ej: 2 veces por semana"
-            value={frecuencia}
-            onChange={(e) => setFrecuencia(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-semibold text-slate-700">Objetivos a Corto Plazo</label>
-        <Textarea 
-          placeholder="Ej: Disminuir EVA a 3/10, mejorar ROM..."
-          value={objetivosCortoPlazo}
-          onChange={(e) => setObjetivosCortoPlazo(e.target.value)}
-        />
-      </div>
-    </div>
-  );
-
-  if (!paciente) return <Dialog open={isOpen} onOpenChange={onClose}><div className="flex h-64 items-center justify-center"><p className="text-slate-500">Cargando...</p></div></Dialog>;
+  if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()} className="max-w-4xl min-h-[500px]">
-          <DialogHeader className="p-6 border-b border-slate-100 flex-shrink-0 flex justify-between items-start">
-            <div>
-              <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <Stethoscope className="w-5 h-5 text-blue-600" />
-                Nueva Evaluación Inicial TMO
-              </DialogTitle>
-              <DialogDescription>
-                Paciente: {paciente?.nombre_completo || paciente?.full_name}
-              </DialogDescription>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="flex h-[90vh] w-full max-w-5xl flex-col rounded-2xl bg-white shadow-2xl overflow-hidden">
+        {/* Encabezado Clínico */}
+        <div className="flex items-center justify-between border-b px-6 py-4 bg-slate-900 text-white">
+          <div>
+            <h2 className="text-xl font-bold">Evaluación Inicial TMO & Diagnóstico Funcional</h2>
+            <p className="text-xs text-slate-400">
+              Paciente: <span className="font-semibold text-emerald-400">{paciente?.nombre_completo}</span> • RUT: {paciente?.rut}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+        </div>
+
+        {/* Barra de Pestañas Rápidas */}
+        <div className="flex border-b bg-slate-50 px-6 gap-2">
+          {[
+            { id: 'anamnesis', label: '1. Antecedentes & Trabajo' },
+            { id: 'sintoma', label: '2. Síntoma & Cronología' },
+            { id: 'examen', label: '3. Examen & Pruebas Especiales' },
+            { id: 'diagnostico', label: '4. Diagnóstico (CIE/CIF/TMO)' },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id as any)}
+              className={`py-3 px-4 text-xs font-semibold border-b-2 transition-all ${
+                tab === t.id
+                  ? 'border-blue-600 text-blue-700 bg-white shadow-sm'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Contenedor con Scroll */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {tab === 'anamnesis' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700">Puesto de Trabajo y Ergonomía</label>
+                <textarea
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Ej. Administrativo, sedente 8 hrs frente a pantalla, altura de monitor deficiente, sin pausa activa..."
+                  value={form.puesto_trabajo_ergonomia}
+                  onChange={(e) => handleChange('puesto_trabajo_ergonomia', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Cirugías, Fracturas y Traumatismos</label>
+                <textarea
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Ej. Apendicectomía 2018, esguince tobillo D grado II hace 3 años..."
+                  value={form.cirugias_traumatismos}
+                  onChange={(e) => handleChange('cirugias_traumatismos', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Farmacoterapia Actual</label>
+                <input
+                  type="text"
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm"
+                  placeholder="Ej. Paracetamol 1g c/8h, Ibuprofeno 400mg SOS, Celecoxib..."
+                  value={form.farmacos_actuales}
+                  onChange={(e) => handleChange('farmacos_actuales', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Actividad Física y Deporte</label>
+                <input
+                  type="text"
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm"
+                  placeholder="Ej. Sedentario / Pádel 2 veces por semana / Gimnasio 3 veces..."
+                  value={form.habitos_actividad_fisica}
+                  onChange={(e) => handleChange('habitos_actividad_fisica', e.target.value)}
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs font-bold text-rose-700">Banderas Rojas / Alertas de Seguridad</label>
+                <input
+                  type="text"
+                  className="w-full mt-1 p-2.5 border border-rose-200 bg-rose-50 rounded-lg text-sm"
+                  placeholder="Banderas rojas del dolor raquídeo, pérdida de fuerza inexplicable, fiebre, compromiso sensitivo progresivo..."
+                  value={form.banderas_rojas_alerta}
+                  onChange={(e) => handleChange('banderas_rojas_alerta', e.target.value)}
+                />
+              </div>
             </div>
-            
-            {/* Stepper Header */}
-            <div className="flex gap-2 text-xs font-semibold">
-              {[1, 2, 3, 4].map((step) => (
-                <div 
-                  key={step} 
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    paso === step ? 'bg-blue-600 text-white' : paso > step ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'
-                  }`}
+          )}
+
+          {tab === 'sintoma' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700">Mecanismo y Cronología de Inicio</label>
+                <textarea
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm"
+                  rows={3}
+                  placeholder="Ej. Inicio insidioso hace 2 meses tras aumento de carga laboral; empeora hace 5 días tras levantar una caja..."
+                  value={form.inicio_sintoma_cronologia}
+                  onChange={(e) => handleChange('inicio_sintoma_cronologia', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Factores Agravantes y Aliviantes</label>
+                <textarea
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm"
+                  rows={3}
+                  placeholder="Agrava: flexión lumbar y sedente >30 min. Alivia: bipedestación, calor local, decúbito prono..."
+                  value={form.factores_agravantes_aliviantes}
+                  onChange={(e) => handleChange('factores_agravantes_aliviantes', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Comportamiento en 24 Horas</label>
+                <input
+                  type="text"
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm"
+                  placeholder="Rigidez matinal de 10 min, dolor mecánico que incrementa hacia la tarde..."
+                  value={form.comportamiento_24h}
+                  onChange={(e) => handleChange('comportamiento_24h', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Nivel de Irritabilidad Tisular</label>
+                <select
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm bg-white font-semibold"
+                  value={form.irritabilidad_tisular}
+                  onChange={(e) => handleChange('irritabilidad_tisular', e.target.value)}
                 >
-                  {step}
+                  <option value="Baja">Baja (Dolor al final de rango, cede inmediatamente)</option>
+                  <option value="Moderada">Moderada (Dolor en rango medio, latencia corta)</option>
+                  <option value="Alta">Alta (Dolor antes de rango, latencia prolongada)</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Dolor Inicial (ENA 0-10)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm bg-white font-semibold"
+                  value={form.dolor_inicial_ena}
+                  onChange={(e) => handleChange('dolor_inicial_ena', parseInt(e.target.value))}
+                />
+              </div>
+            </div>
+          )}
+
+          {tab === 'examen' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 md:col-span-1">
+                <label className="text-xs font-bold text-slate-700">Inspección Postural</label>
+                <textarea
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm"
+                  rows={2}
+                  placeholder="Ej. Desplazamiento lateral, hiperlordosis..."
+                  value={form.inspeccion_postura}
+                  onChange={(e) => handleChange('inspeccion_postura', e.target.value)}
+                />
+              </div>
+              <div className="col-span-2 md:col-span-1">
+                <label className="text-xs font-bold text-slate-700">Movilidad Activa (ROM)</label>
+                <textarea
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm"
+                  rows={2}
+                  placeholder="Ej. Flexión completa con dolor al final de rango..."
+                  value={form.movilidad_activa_rom}
+                  onChange={(e) => handleChange('movilidad_activa_rom', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Pruebas Especiales Ortopédicas</label>
+                <textarea
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm"
+                  rows={3}
+                  placeholder="Ej. Spurling (-), Distracción cervical (+), ULNT1 derecho positivo a 30°, Hawkins-Kennedy (+)..."
+                  value={form.pruebas_especiales_ortopedicas}
+                  onChange={(e) => handleChange('pruebas_especiales_ortopedicas', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Control Motor y Pruebas Funcionales</label>
+                <textarea
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm"
+                  rows={3}
+                  placeholder="Ej. Trendelenburg dinámico leve derecho, déficit de activación de multífidos L4-L5, disquinesia escapular..."
+                  value={form.pruebas_funcionales_control_motor}
+                  onChange={(e) => handleChange('pruebas_funcionales_control_motor', e.target.value)}
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs font-bold text-slate-700">Otros Hallazgos Relevantes</label>
+                <textarea
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm"
+                  rows={2}
+                  placeholder="Palpación miofascial dolorosa en cuadrado lumbar, hipomovilidad articular zigoapofisaria..."
+                  value={form.hallazgos_relevantes}
+                  onChange={(e) => handleChange('hallazgos_relevantes', e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {tab === 'diagnostico' && (
+            <div className="space-y-4">
+              {/* Botón Asistente IA */}
+              <div className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                <div>
+                  <h4 className="text-sm font-bold text-emerald-950">✨ Asistente Diagnóstico IA (CIE / CIF / TMO)</h4>
+                  <p className="text-xs text-emerald-700">Analiza todos los antecedentes y pruebas clínicas ingresadas para sugerir la codificación internacional.</p>
                 </div>
-              ))}
+                <button
+                  type="button"
+                  onClick={handleGenerateAI}
+                  disabled={loadingAI}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm transition-all flex items-center gap-2"
+                >
+                  {loadingAI ? 'Analizando...' : 'Generar Codificación'}
+                </button>
+              </div>
+
+              {/* Cuadrícula de Códigos Oficiales */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 border rounded-xl bg-slate-50">
+                  <span className="text-[10px] font-extrabold uppercase text-slate-400">CIE-10 (Estándar Fonasa / Isapres)</span>
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      type="text"
+                      className="w-28 font-mono font-bold text-emerald-800 p-2 bg-white border rounded text-sm"
+                      placeholder="M54.5"
+                      value={form.cie10_codigo}
+                      onChange={(e) => handleChange('cie10_codigo', e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      className="flex-1 p-2 bg-white border rounded text-sm"
+                      placeholder="Lumbago no especificado..."
+                      value={form.cie10_glosa}
+                      onChange={(e) => handleChange('cie10_glosa', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 border rounded-xl bg-slate-50">
+                  <span className="text-[10px] font-extrabold uppercase text-slate-400">CIE-11 (Estándar OMS)</span>
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      type="text"
+                      className="w-28 font-mono font-bold text-blue-800 p-2 bg-white border rounded text-sm"
+                      placeholder="ME84.2"
+                      value={form.cie11_codigo}
+                      onChange={(e) => handleChange('cie11_codigo', e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      className="flex-1 p-2 bg-white border rounded text-sm"
+                      placeholder="Dolor lumbar crónico primario..."
+                      value={form.cie11_glosa}
+                      onChange={(e) => handleChange('cie11_glosa', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Diagnóstico Funcional CIF */}
+              <div>
+                <label className="text-xs font-bold text-slate-700">Diagnóstico Kinésico Funcional (CIF)</label>
+                <textarea
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm font-sans"
+                  rows={3}
+                  value={form.diagnostico_cif}
+                  onChange={(e) => handleChange('diagnostico_cif', e.target.value)}
+                />
+              </div>
+
+              {/* Diagnóstico Biomecánico TMO */}
+              <div>
+                <label className="text-xs font-bold text-slate-700">Diagnóstico Patomecánico & TMO</label>
+                <textarea
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm"
+                  rows={3}
+                  value={form.diagnostico_tmo_biomecanico}
+                  onChange={(e) => handleChange('diagnostico_tmo_biomecanico', e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-700">Objetivos Terapéuticos (SMART)</label>
+                  <textarea
+                    className="w-full mt-1 p-2.5 border rounded-lg text-sm font-sans"
+                    rows={3}
+                    value={form.objetivos_terapeuticos}
+                    onChange={(e) => handleChange('objetivos_terapeuticos', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700">Pronóstico y Plan Sugerido</label>
+                  <textarea
+                    className="w-full mt-1 p-2.5 border rounded-lg text-sm font-sans"
+                    rows={3}
+                    value={form.pronostico_sesiones}
+                    onChange={(e) => handleChange('pronostico_sesiones', e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
-          </DialogHeader>
+          )}
+        </div>
 
-          <DialogBody className="p-6 overflow-y-auto bg-slate-50 flex-1">
-            {paso === 1 && renderPaso1()}
-            {paso === 2 && renderPaso2()}
-            {paso === 3 && renderPaso3()}
-            {paso === 4 && renderPaso4()}
-          </DialogBody>
-
-          <DialogFooter className="p-6 border-t border-slate-100 bg-white flex justify-between items-center flex-shrink-0">
-            {paso > 1 ? (
-              <Button variant="outline" onClick={() => setPaso(paso - 1)} type="button">
-                <ChevronLeft className="w-4 h-4 mr-1" /> Atrás
-              </Button>
-            ) : (
-              <div /> // Spacer
-            )}
-
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={onClose} type="button">
-                Cancelar
-              </Button>
-              {paso < 4 ? (
-                <Button onClick={() => setPaso(paso + 1)} type="button" className="bg-blue-600 hover:bg-blue-700 text-white">
-                  Siguiente <ChevronRight className="w-4 h-4 ml-1" />
-                </Button>
-              ) : (
-                <Button onClick={handleGuardar} disabled={loading} type="button" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
-                  {loading ? 'Guardando...' : 'Guardar Evaluación Inicial TMO'}
-                </Button>
-              )}
-            </div>
-          </DialogFooter>
-    </Dialog>
+        {/* Pie del Modal con Guardado */}
+        <div className="border-t bg-slate-50 px-6 py-4 flex justify-between items-center">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 font-medium cursor-pointer">
+            Cancelar
+          </button>
+          <button
+            onClick={() => onSuccess(form)}
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2"
+          >
+            📋 Guardar Evaluación Completa
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

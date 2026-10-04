@@ -6,7 +6,6 @@ import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { getChileanDate, formatCLP, getWhatsAppUrl } from '@/lib/utils';
 import { AppointmentModal } from '@/components/appointments/AppointmentModal';
-import { InitialAssessmentModal } from "@/components/clinical/InitialAssessmentModal";
 import { InitialEvaluationModal } from '@/components/clinical/InitialEvaluationModal';
 import { DischargeReportModal } from '@/components/clinical/DischargeReportModal';
 import { ReimbursementCertificate } from '@/components/clinical/ReimbursementCertificate';
@@ -185,8 +184,7 @@ export function ClinicalRecordView({
   // Modales
   const [abrirAgendarModal, setAbrirAgendarModal] = useState(false);
   const [abrirEvaluacionModal, setAbrirEvaluacionModal] = useState(false);
-  const [abrirAssessmentModal, setAbrirAssessmentModal] = useState(false);
-  const [modoEvaluacion, setModoEvaluacion] = useState<'nueva' | 'editar'>('editar');
+    const [modoEvaluacion, setModoEvaluacion] = useState<'nueva' | 'editar'>('editar');
   const [abrirEditarPaciente, setAbrirEditarPaciente] = useState(false);
   const [abrirDischargeModal, setAbrirDischargeModal] = useState(false);
   const [abrirCertificadoModal, setAbrirCertificadoModal] = useState(false);
@@ -1288,16 +1286,9 @@ export function ClinicalRecordView({
                   className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Nueva Evaluación TMO (Reingreso)</span>
+                  <span>📋 Evaluación Inicial TMO</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setAbrirAssessmentModal(true)}
-                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Activity className="w-3.5 h-3.5" />
-                  <span>✨ Evaluación Asistida por IA</span>
-                </button>
+                
 
                 {evaluacionInicialTMO && (
                   <button
@@ -1435,16 +1426,9 @@ export function ClinicalRecordView({
                   className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs inline-flex items-center gap-2 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>+ Registrar Primera Evaluación Inicial TMO</span>
+                  <span>📋 Evaluación Inicial TMO</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setAbrirAssessmentModal(true)}
-                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Activity className="w-3.5 h-3.5" />
-                  <span>✨ Evaluación Asistida por IA</span>
-                </button>
+                
               </div>
             )}
 
@@ -1775,19 +1759,7 @@ export function ClinicalRecordView({
             rut: paciente.rut
           }}
           onClose={() => setAbrirAgendarModal(false)}
-          onSuccess={async () => {
-            setAbrirAgendarModal(false);
-            await cargarDatos();
-            toast.success('¡Próxima cita agendada exitosamente!');
-          }}
-        />
-      )}
-
-            {abrirAssessmentModal && paciente && (
-        <InitialAssessmentModal
-          paciente={paciente}
-          onClose={() => setAbrirAssessmentModal(false)}
-          onSave={async (form: any) => {
+          onSuccess={async (form: any) => {
             const supabaseClient = createClient();
             if (!supabaseClient) return;
             try {
@@ -1799,7 +1771,7 @@ export function ClinicalRecordView({
                 ...form
               };
               
-              if (evaluacionInicialTMO?.id) {
+              if (evaluacionInicialTMO?.id && modoEvaluacion === 'editar') {
                 const { error } = await supabaseClient.from('evaluaciones_iniciales_tmo').update(payload).eq('id', evaluacionInicialTMO.id);
                 if (error) throw error;
               } else {
@@ -1807,8 +1779,8 @@ export function ClinicalRecordView({
                 if (error) throw error;
               }
               
-              toast.success('Evaluación AI guardada correctamente');
-              setAbrirAssessmentModal(false);
+              toast.success('Evaluación Inicial guardada correctamente');
+              setAbrirEvaluacionModal(false);
               await cargarDatos();
             } catch (error: any) {
               console.error(error);
@@ -1817,6 +1789,7 @@ export function ClinicalRecordView({
           }}
         />
       )}
+
 
       {/* Evaluación Inicial TMO */}
       {abrirEvaluacionModal && paciente && (
