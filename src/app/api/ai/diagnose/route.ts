@@ -1,105 +1,63 @@
-// src/app/api/ai/diagnose/route.ts
 import { NextResponse } from 'next/server';
 
-async function getAvailableGeminiModel(apiKey: string): Promise<string> {
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-    if (res.ok) {
-      const data = await res.json();
-      const models = data.models || [];
-      
-      // Buscar modelos que soporten generateContent y priorizar flash
-      const candidate = models.find((m: any) => 
-        m.supportedGenerationMethods?.includes('generateContent') && 
-        (m.name.includes('gemini-1.5-flash') || m.name.includes('gemini-2.0-flash') || m.name.includes('flash'))
-      );
-      
-      if (candidate) {
-        // Limpiar el prefijo 'models/' si viene incluido
-        return candidate.name.replace('models/', '');
-      }
-
-      // Si no encuentra flash, buscar cualquier gemini válido
-      const anyModel = models.find((m: any) => m.supportedGenerationMethods?.includes('generateContent'));
-      if (anyModel) {
-        return anyModel.name.replace('models/', '');
-      }
-    }
-  } catch (err) {
-    console.warn('Fallo en consulta de modelos disponibles, usando fallback:', err);
-  }
-  
-  // Fallback seguro por defecto
-  return 'gemini-1.5-flash';
-}
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: 'GEMINI_API_KEY no configurada' }, { status: 500 });
+      console.error('GEMINI_API_KEY no existe en las variables de entorno de Vercel.');
+      return NextResponse.json(
+        { error: 'Falta la variable GEMINI_API_KEY en Vercel.' },
+        { status: 500 }
+      );
     }
 
     const payload = await req.json();
 
     const systemPrompt = `
-Eres un Kinesiólogo Especialista en Terapia Manual Ortopédica (TMO) certificado bajo estándares de la International Federation of Orthopaedic Manipulative Physical Therapists (IFOMPT) y del Ministerio de Salud de Chile (Fonasa/Isapres).
-
-Tu labor es analizar la evaluación clínica completa del paciente y generar un informe diagnóstico riguroso, estructurado y aplicable.
-
-Debes responder OBLIGATORIAMENTE en formato JSON con la siguiente estructura exacta:
+Eres un Kinesiólogo Especialista en Terapia Manual Ortopédica (TMO) y miembro de IFOMPT.
+Analiza la evaluación clínica y responde EXCLUSIVAMENTE con un JSON válido sin texto adicional:
 {
-  "cie10_codigo": "Código CIE-10 (ej. M54.5, M75.1, M22.2)",
-  "cie10_glosa": "Glosa clínica oficial Fonasa/CIE-10",
-  "cie11_codigo": "Código CIE-11 de la OMS (ej. ME84.2, FB40.1)",
-  "cie11_glosa": "Glosa oficial CIE-11",
-  "diagnostico_cif": "Diagnóstico kinésico según la CIF (OMS) abarcando: Deficiencias en Funciones Corporales (b), Estructuras (s), Limitación en Actividades (d) y Restricción en Participación laboral/recreativa (d).",
-  "diagnostico_tmo_biomecanico": "Diagnóstico patomecánico y de TMO (disfunción articular, componente miofascial, control motor, neurodinamia e irritabilidad tisular).",
-  "objetivos_terapeuticos": "Objetivos SMART a corto, mediano y largo plazo.",
-  "pronostico_sesiones": "Estimación recomendada (ej. 4 a 6 sesiones, o Plan Pro Care / Integral)"
+  "cie10_codigo": "Código CIE-10 (ej. M54.5)",
+  "cie10_glosa": "Glosa CIE-10",
+  "cie11_codigo": "Código CIE-11 (ej. ME84.2)",
+  "cie11_glosa": "Glosa CIE-11",
+  "diagnostico_cif": "Diagnóstico según la CIF (OMS)",
+  "diagnostico_apta": "Patrón de Práctica Preferida y Síndrome del Sistema del Movimiento (APTA)",
+  "diagnostico_tmo_biomecanico": "Diagnóstico TMO e irritabilidad tisular",
+  "objetivos_terapeuticos": "Objetivos SMART",
+  "pronostico_sesiones": "Plan sugerido (ej. Pro Care 6 sesiones)"
 }
 `;
 
     const userPrompt = `
-DATOS DEL PACIENTE:
-- Edad: ${payload.edad ?? 'No especificada'}
-- Sexo: ${payload.sexo ?? 'No especificado'}
-- Motivo de Consulta: ${payload.motivo_consulta ?? ''}
-- Puesto de Trabajo / Ergonomía: ${payload.puesto_trabajo_ergonomia ?? 'No especificado'}
-- Antecedentes (Cirugías / Fracturas / Traumatismos): ${payload.cirugias_traumatismos ?? 'Sin antecedentes relevantes'}
-- Farmacoterapia Actual: ${payload.farmacos_actuales ?? 'Sin fármacos'}
-- Banderas Rojas / Alertas: ${payload.banderas_rojas_alerta ?? 'Negativas'}
-
-ANAMNESIS PRÓXIMA Y COMPORTAMIENTO DEL SÍNTOMA:
-- Cronología / Mecanismo de Inicio: ${payload.inicio_sintoma_cronologia ?? ''}
-- Tiempo de Evolución: ${payload.tiempo_evolucion ?? ''}
-- Comportamiento 24h: ${payload.comportamiento_24h ?? ''}
-- Factores Agravantes / Aliviantes: ${payload.factores_agravantes_aliviantes ?? ''}
-- Nivel de Irritabilidad Tisular: ${payload.irritabilidad_tisular ?? 'Moderada'}
-- Dolor Inicial ENA (0-10): ${payload.dolor_inicial_ena ?? 0}
-
-HALLAZGOS DEL EXAMEN FÍSICO Y BIOMECÁNICA:
-- Inspección Postural: ${payload.inspeccion_postura ?? ''}
-- Movilidad Activa (ROM): ${payload.movilidad_activa_rom ?? ''}
-- Juego Articular (Joint Play): ${payload.juego_articular_joint_play ?? ''}
-- Neurodinamia Basal: ${payload.neurodinamia_basal ?? ''}
-- Pruebas Especiales Ortopédicas: ${payload.pruebas_especiales_ortopedicas ?? 'Sin pruebas específicas adicionales'}
-- Pruebas Funcionales / Control Motor: ${payload.pruebas_funcionales_control_motor ?? 'Sin hallazgos adicionales'}
-- Hallazgos Relevantes Adicionales: ${payload.hallazgos_relevantes ?? ''}
+Paciente: ${payload.nombre_completo || 'Paciente'}
+Edad: ${payload.edad || 'No especificada'}
+Motivo: ${payload.motivo_consulta || 'No especificado'}
+Trabajo/Ergonomía: ${payload.puesto_trabajo_ergonomia || 'No especificado'}
+Cirugías/Antecedentes: ${payload.cirugias_traumatismos || 'Sin antecedentes'}
+Fármacos: ${payload.farmacos_actuales || 'Sin fármacos'}
+Síntoma/Cronología: ${payload.inicio_sintoma_cronologia || 'No especificado'}
+Irritabilidad: ${payload.irritabilidad_tisular || 'Moderada'}
+Dolor ENA: ${payload.dolor_inicial_ena ?? 5}
+Hallazgos y Pruebas Ortopédicas: ${payload.pruebas_especiales_ortopedicas || 'No especificadas'}
+Pruebas Funcionales: ${payload.pruebas_funcionales_control_motor || 'No especificadas'}
 `;
 
-    // 1. Detectar el modelo disponible dinámicamente
-    const modelName = await getAvailableGeminiModel(apiKey);
-    console.log(`Usando modelo Gemini detectado: ${modelName}`);
+    // Usar modelo gemini-1.5-flash oficial
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-    // 2. Ejecutar la llamada con el modelo detectado
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-    
+    console.log('Iniciando llamada a Gemini API...');
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+        contents: [
+          {
+            parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }],
+          },
+        ],
         generationConfig: {
           responseMimeType: 'application/json',
           temperature: 0.2,
@@ -109,17 +67,24 @@ HALLAZGOS DEL EXAMEN FÍSICO Y BIOMECÁNICA:
 
     const data = await response.json();
 
+    // 1. SI GOOGLE DEVUELVE ERROR: No intentar parsear, devolver el mensaje textual de Google
     if (!response.ok || data.error) {
-      console.error('Error de API Gemini:', data.error);
+      const errorMsg = data.error?.message || `Error HTTP ${response.status}: ${response.statusText}`;
+      console.error('Respuesta de error desde Google Gemini API:', JSON.stringify(data.error || data));
       return NextResponse.json(
-        { error: data.error?.message || 'Error en la respuesta de la IA' },
-        { status: response.status || 500 }
+        { error: `Google AI: ${errorMsg}` },
+        { status: response.status || 400 }
       );
     }
 
+    // 2. EXTRAER TEXTO Y LIMPIAR
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
-      return NextResponse.json({ error: 'Respuesta vacía de la IA' }, { status: 500 });
+      console.error('Gemini respondió 200 OK pero sin candidates:', JSON.stringify(data));
+      return NextResponse.json(
+        { error: 'Google AI no generó contenido para esta consulta.' },
+        { status: 500 }
+      );
     }
 
     const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -127,7 +92,10 @@ HALLAZGOS DEL EXAMEN FÍSICO Y BIOMECÁNICA:
 
     return NextResponse.json(parsed);
   } catch (error: any) {
-    console.error('Error en diagnóstico IA:', error);
-    return NextResponse.json({ error: error.message || 'Error interno del servidor' }, { status: 500 });
+    console.error('Error no controlado en /api/ai/diagnose:', error);
+    return NextResponse.json(
+      { error: error?.message || 'Error interno del servidor' },
+      { status: 500 }
+    );
   }
 }

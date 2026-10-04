@@ -121,27 +121,29 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!data.error) {
-        setForm((prev) => ({
-          ...prev,
-          cie10_codigo: data.cie10_codigo,
-          cie10_glosa: data.cie10_glosa,
-          cie11_codigo: data.cie11_codigo,
-          cie11_glosa: data.cie11_glosa,
-          diagnostico_cif: data.diagnostico_cif,
-          diagnostico_apta: data.diagnostico_apta,
-          diagnostico_tmo_biomecanico: data.diagnostico_tmo_biomecanico,
-          objetivos_terapeuticos: data.objetivos_terapeuticos,
-          pronostico_sesiones: data.pronostico_sesiones,
-        }));
-        setTab('diagnostico');
-        toast.success('Análisis IA completado.');
-      } else {
-        toast.error('Error al generar diagnóstico IA.');
+      
+      if (!res.ok || data.error) {
+        toast.error(data.error || 'Error al generar diagnóstico');
+        return;
       }
-    } catch (e) {
+      
+      setForm((prev) => ({
+        ...prev,
+        cie10_codigo: data.cie10_codigo,
+        cie10_glosa: data.cie10_glosa,
+        cie11_codigo: data.cie11_codigo,
+        cie11_glosa: data.cie11_glosa,
+        diagnostico_cif: data.diagnostico_cif,
+        diagnostico_apta: data.diagnostico_apta,
+        diagnostico_tmo_biomecanico: data.diagnostico_tmo_biomecanico,
+        objetivos_terapeuticos: data.objetivos_terapeuticos,
+        pronostico_sesiones: data.pronostico_sesiones,
+      }));
+      setTab('diagnostico');
+      toast.success('Análisis IA completado.');
+    } catch (e: any) {
       console.error(e);
-      toast.error('Error de red al generar diagnóstico IA.');
+      toast.error(e.message || 'Error de red al generar diagnóstico IA.');
     } finally {
       setLoadingAI(false);
     }
