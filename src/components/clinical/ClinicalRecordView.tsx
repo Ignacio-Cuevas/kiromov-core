@@ -371,7 +371,7 @@ export function ClinicalRecordView({
       puntos.push({
         id: 'eval-inicial',
         etiqueta: 'Ingreso',
-        fecha: evaluacionInicialTMO.fecha_evaluacion || evaluacionInicialTMO.fecha,
+        fecha: evaluacionInicialTMO?.fecha_evaluacion || evaluacionInicialTMO?.fecha,
         ena: evaIngreso,
         esIngreso: true
       });
@@ -886,7 +886,7 @@ export function ClinicalRecordView({
                       )}
                       
                 {/* 4. Codificación AI Internacional */}
-                {(evaluacionInicialTMO.cie10_codigo || evaluacionInicialTMO.cie11_codigo || evaluacionInicialTMO.diagnostico_cif) && (
+                {evaluacionInicialTMO && (evaluacionInicialTMO?.cie10_codigo || evaluacionInicialTMO?.cie11_codigo || evaluacionInicialTMO?.diagnostico_cif) && (
                   <div className="col-span-1 md:col-span-2 bg-gradient-to-r from-emerald-50 to-teal-50 p-5 rounded-xl border border-emerald-100 shadow-xs space-y-3">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800 border-b border-emerald-200 pb-2 flex items-center gap-2">
                       <Activity className="w-4 h-4" />
@@ -895,17 +895,17 @@ export function ClinicalRecordView({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                       <div className="bg-white p-3 rounded shadow-sm border border-emerald-100">
                         <span className="font-extrabold text-emerald-700 block mb-1">CIE-10 (Fonasa)</span>
-                        <p className="font-mono text-slate-800">{evaluacionInicialTMO.cie10_codigo || '-'}</p>
-                        <p className="text-slate-600 mt-1">{evaluacionInicialTMO.cie10_glosa || '-'}</p>
+                        <p className="font-mono text-slate-800">{evaluacionInicialTMO?.cie10_codigo || '-'}</p>
+                        <p className="text-slate-600 mt-1">{evaluacionInicialTMO?.cie10_glosa || '-'}</p>
                       </div>
                       <div className="bg-white p-3 rounded shadow-sm border border-emerald-100">
                         <span className="font-extrabold text-emerald-700 block mb-1">CIE-11 (OMS)</span>
-                        <p className="font-mono text-slate-800">{evaluacionInicialTMO.cie11_codigo || '-'}</p>
-                        <p className="text-slate-600 mt-1">{evaluacionInicialTMO.cie11_glosa || '-'}</p>
+                        <p className="font-mono text-slate-800">{evaluacionInicialTMO?.cie11_codigo || '-'}</p>
+                        <p className="text-slate-600 mt-1">{evaluacionInicialTMO?.cie11_glosa || '-'}</p>
                       </div>
                       <div className="md:col-span-2 bg-white p-3 rounded shadow-sm border border-emerald-100">
                         <span className="font-extrabold text-emerald-700 block mb-1">Diagnóstico Funcional CIF</span>
-                        <p className="text-slate-700">{evaluacionInicialTMO.diagnostico_cif || '-'}</p>
+                        <p className="text-slate-700">{evaluacionInicialTMO?.diagnostico_cif || '-'}</p>
                       </div>
                     </div>
                   </div>
@@ -1254,7 +1254,7 @@ export function ClinicalRecordView({
                 </h2>
                 <p className="text-xs text-slate-500">
                   {evaluacionInicialTMO 
-                    ? `Evaluación del ${evaluacionInicialTMO.fecha_evaluacion || evaluacionInicialTMO.fecha} • ${(evaluacionInicialTMO.kinesiologo || 'Ignacio Cuevas').startsWith('Klgo.') ? (evaluacionInicialTMO.kinesiologo || 'Ignacio Cuevas') : `Klgo. ${evaluacionInicialTMO.kinesiologo || 'Ignacio Cuevas'}`}`
+                    ? `Evaluación del ${evaluacionInicialTMO?.fecha_evaluacion || evaluacionInicialTMO?.fecha} • ${(evaluacionInicialTMO?.kinesiologo || 'Ignacio Cuevas').startsWith('Klgo.') ? (evaluacionInicialTMO?.kinesiologo || 'Ignacio Cuevas') : `Klgo. ${evaluacionInicialTMO?.kinesiologo || 'Ignacio Cuevas'}`}`
                     : 'Sin evaluación inicial registrada'}
                 </p>
               </div>
@@ -1313,23 +1313,23 @@ export function ClinicalRecordView({
                 <div className="col-span-1 md:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-2xl">
-                      {evaluacionInicialTMO.segmento_evaluado === 'lumbar' ? '🦴' : 
-                       evaluacionInicialTMO.segmento_evaluado === 'cervical' ? '🧠' : 
-                       evaluacionInicialTMO.segmento_evaluado === 'hombro' ? '💪' : 
-                       evaluacionInicialTMO.segmento_evaluado === 'cadera' ? '🦵' : 
-                       evaluacionInicialTMO.segmento_evaluado === 'rodilla' ? '🦵' : 
-                       evaluacionInicialTMO.segmento_evaluado === 'tobillo_pie' ? '🦶' : '➕'}
+                      {evaluacionInicialTMO?.segmento_evaluado === 'lumbar' ? '🦴' : 
+                       evaluacionInicialTMO?.segmento_evaluado === 'cervical' ? '🧠' : 
+                       evaluacionInicialTMO?.segmento_evaluado === 'hombro' ? '💪' : 
+                       evaluacionInicialTMO?.segmento_evaluado === 'cadera' ? '🦵' : 
+                       evaluacionInicialTMO?.segmento_evaluado === 'rodilla' ? '🦵' : 
+                       evaluacionInicialTMO?.segmento_evaluado === 'tobillo_pie' ? '🦶' : '➕'}
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        {evaluacionInicialTMO.segmento_evaluado === 'lumbar' ? 'Columna Lumbar' : 
-                         evaluacionInicialTMO.segmento_evaluado === 'cervical' ? 'Columna Cervical' : 
-                         evaluacionInicialTMO.segmento_evaluado === 'hombro' ? 'Hombro' : 
-                         evaluacionInicialTMO.segmento_evaluado === 'cadera' ? 'Cadera y Pelvis' : 
-                         evaluacionInicialTMO.segmento_evaluado === 'rodilla' ? 'Rodilla' : 
-                         evaluacionInicialTMO.segmento_evaluado === 'tobillo_pie' ? 'Tobillo y Pie' : 'Evaluación General'}
+                        {evaluacionInicialTMO?.segmento_evaluado === 'lumbar' ? 'Columna Lumbar' : 
+                         evaluacionInicialTMO?.segmento_evaluado === 'cervical' ? 'Columna Cervical' : 
+                         evaluacionInicialTMO?.segmento_evaluado === 'hombro' ? 'Hombro' : 
+                         evaluacionInicialTMO?.segmento_evaluado === 'cadera' ? 'Cadera y Pelvis' : 
+                         evaluacionInicialTMO?.segmento_evaluado === 'rodilla' ? 'Rodilla' : 
+                         evaluacionInicialTMO?.segmento_evaluado === 'tobillo_pie' ? 'Tobillo y Pie' : 'Evaluación General'}
                       </h3>
-                      <p className="text-sm font-medium text-slate-500">Evaluación Inicial — {evaluacionInicialTMO.fecha_evaluacion ? formatearFechaLimpia(evaluacionInicialTMO.fecha_evaluacion) : '-'}</p>
+                      <p className="text-sm font-medium text-slate-500">Evaluación Inicial — {evaluacionInicialTMO?.fecha_evaluacion ? formatearFechaLimpia(evaluacionInicialTMO?.fecha_evaluacion) : '-'}</p>
                     </div>
                   </div>
                   <div className="flex gap-4 text-center">
