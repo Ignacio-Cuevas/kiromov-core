@@ -77,38 +77,16 @@ function calcularHoraFin(horaInicio?: string | null, duracionMin: number = 45): 
 // Estilo Pastel Suave con Barra Lateral de 4px sólida
 function getPastelCardTheme(cita: any) {
   const estado = String(cita?.estado || 'pendiente').toLowerCase();
+  
+  let borderColor = 'border-l-slate-400';
+  if (['confirmada'].includes(estado)) borderColor = 'border-l-emerald-500';
+  else if (['pendiente'].includes(estado)) borderColor = 'border-l-amber-500';
+  else if (['asistio', 'asistió', 'atendida', 'atendido'].includes(estado)) borderColor = 'border-l-slate-400';
+  else if (['no_asistio', 'no asistió', 'cancelada'].includes(estado)) borderColor = 'border-l-rose-500';
 
-  const isCancelada = estado === 'cancelada';
-  const isConfirmada = estado === 'confirmada';
-  const isAtendida = ['asistio', 'asistió', 'atendida', 'atendido'].includes(estado);
-  const isNoAsistio = ['no_asistio', 'no asistió'].includes(estado);
-
-  if (isConfirmada) {
-    return {
-      card: 'bg-emerald-50 border-emerald-200 border-l-4 border-l-emerald-500 text-emerald-950 hover:bg-emerald-100/70',
-      dot: 'bg-emerald-500'
-    };
-  } else if (isAtendida) {
-    return {
-      card: 'bg-blue-50 border-blue-200 border-l-4 border-l-blue-500 text-blue-950 hover:bg-blue-100/70',
-      dot: 'bg-blue-600'
-    };
-  } else if (isNoAsistio) {
-    return {
-      card: 'bg-rose-50 border-rose-200 border-l-4 border-l-rose-500 text-rose-950 hover:bg-rose-100/70',
-      dot: 'bg-rose-500'
-    };
-  } else if (isCancelada) {
-    return {
-      card: 'bg-rose-50 border-rose-200 border-l-4 border-l-rose-500 text-rose-950 opacity-60 hover:bg-rose-100/70 line-through',
-      dot: 'bg-rose-500'
-    };
-  }
-
-  // Por defecto: Pendiente
   return {
-    card: 'bg-amber-50 border-amber-200 border-l-4 border-l-amber-500 text-amber-950 hover:bg-amber-100/70',
-    dot: 'bg-amber-500'
+    card: `bg-white shadow-xs border-y border-r border-slate-200/80 border-l-4 ${borderColor} rounded-lg text-slate-900 hover:shadow-md`,
+    dot: borderColor.replace('border-l-', 'bg-')
   };
 }
 
@@ -192,7 +170,7 @@ export function ClinicalTimeGrid({
           {/* CUERPO DE LA GRILLA: EJE Y (Horas) + COLUMNAS */}
           <div className="flex relative" style={{ height: `${TOTAL_GRID_HEIGHT}px` }}>
             {/* EJE Y (Vertical izquierdo): Horas redondas y limpias de 08:00 a 20:00 */}
-            <div className="w-16 sm:w-20 shrink-0 border-r border-slate-200 bg-slate-50/50 relative">
+            <div className="w-16 sm:w-20 shrink-0 border-r border-slate-200 bg-white shadow-xs relative z-10">
               {timeSlots.map((slot, sIdx) => {
                 const topPx = sIdx * (HOUR_HEIGHT / 2);
                 return (
@@ -339,23 +317,25 @@ export function ClinicalTimeGrid({
                           left: '3px',
                           right: '3px',
                         }}
-                        className={`absolute z-20 rounded-xl border p-2 transition-all duration-150 cursor-pointer shadow-2xs hover:shadow-md hover:scale-[1.01] hover:z-30 overflow-hidden flex flex-col justify-between ${theme.card}`}
+                        className={`absolute z-20 transition-all duration-150 cursor-pointer hover:scale-[1.01] hover:z-30 overflow-hidden flex flex-col justify-between p-2 ${theme.card}`}
                       >
-                        {/* 1. Nombre del Paciente en Negrita */}
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold truncate leading-tight" title={pacienteNombre}>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold leading-tight line-clamp-2" title={pacienteNombre}>
                             {pacienteNombre}
                           </p>
-                          {/* 2. Prestación o Motivo */}
-                          <p className="text-[10px] text-slate-600 truncate mt-0.5" title={motivoTexto}>
-                            {motivoTexto}
-                          </p>
                         </div>
-
-                        {/* 3. Rango de Horario en Texto Pequeño */}
-                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-0.5 border-t border-black/5">
-                          <span>{horaInicio} - {horaFin}</span>
-                          <span className={`w-1.5 h-1.5 rounded-full ${theme.dot}`} />
+                        
+                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-0.5 border-t border-slate-100 mt-1">
+                          <span>{horaInicio}</span>
+                          {(() => {
+                            const pData = cita.paciente || cita.pacientes || {};
+                            const debePago = pData.estado_pago === 'pendiente' && (pData.valor_total || 0) > 0;
+                            return debePago ? (
+                              <span className="text-[9px] font-bold text-rose-600 bg-rose-50 px-1 rounded border border-rose-100" title={`Debe ${pData.valor_total}`}>$</span>
+                            ) : (
+                              <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded border border-emerald-100">✓</span>
+                            );
+                          })()}
                         </div>
                       </div>
                     );

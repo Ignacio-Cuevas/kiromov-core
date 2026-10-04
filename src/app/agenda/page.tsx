@@ -111,6 +111,7 @@ function AgendaContent() {
 
   const [isSyncing, setIsSyncing] = useState(false);
 
+
   // Bloqueos de Horario y Configuración de Jornada
   const [checkoutCita, setCheckoutCita] = useState<CitaExtendida | null>(null);
   const [activeTab, setActiveTab] = useState<'agenda' | 'disponibilidad'>('agenda');
@@ -411,6 +412,16 @@ function AgendaContent() {
     }
     return citas;
   }, [citas, filtroEstado]);
+
+  React.useEffect(() => {
+    if (vista === 'dia' && citasFiltradas.length > 0 && !selectedPatientForDrawer) {
+      // Intentar buscar la cita mas cercana o la primera
+      const first = citasFiltradas[0];
+      const p = first.pacientes || { id: first.paciente_id };
+      setSelectedPatientForDrawer(p);
+      setSelectedCitaForSuite(first);
+    }
+  }, [vista, citasFiltradas]);
 
   const diasAMostrar = useMemo(() => {
     if (vista === 'dia') {
@@ -730,7 +741,7 @@ function AgendaContent() {
     else if (s === 'cancelada' || s === 'no_asistio') { borderColor = 'border-l-rose-500 border-slate-200'; bgColor = 'bg-rose-50/20'; }
 
     const tienePlan = p.estado_plan !== 'sin_plan' && (p.total_sesiones || 0) > 0;
-    const debePago = p.estado_pago === 'pendiente';
+    const debePago = p.estado_pago === 'pendiente' && (p.valor_total || 0) > 0;
     const motivo = cita.motivo_consulta || 'Sesión Kinésica';
 
     // Rango horario monoespaciado
@@ -744,9 +755,9 @@ function AgendaContent() {
       <div key={cita.id} className={`relative flex flex-col p-3 rounded-lg border border-l-4 ${borderColor} ${bgColor} hover:shadow-md transition-all cursor-pointer group`}>
         <div className="flex justify-between items-start">
           <div className="flex flex-col min-w-0 pr-10">
-            <span className="font-mono text-xs text-slate-500 tabular-nums">${horaInicio} - ${horaFin}</span>
-            <span className="font-bold text-slate-900 text-sm mt-0.5 leading-tight">${p.nombre_completo}</span>
-            <span className="text-xs text-slate-500 truncate mt-0.5" title={motivo}>${motivo}</span>
+            <span className="font-mono text-xs text-slate-500 tabular-nums">{horaInicio} - {horaFin}</span>
+            <span className="font-bold text-slate-900 text-sm mt-0.5 leading-tight">{p.nombre_completo}</span>
+            <span className="text-xs text-slate-500 truncate mt-0.5" title={motivo}>{motivo}</span>
           </div>
           
           {/* Hover actions */}
