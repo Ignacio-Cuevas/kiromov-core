@@ -1,4 +1,6 @@
-import { NextResponse } from 'next/server';
+const fs = require('fs');
+
+const routeCode = `import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +17,7 @@ export async function POST(req: Request) {
 
     const payload = await req.json();
 
-    const systemPrompt = `
+    const systemPrompt = \`
 Eres un Kinesiólogo Especialista en Terapia Manual Ortopédica (TMO) y miembro de IFOMPT.
 Analiza la evaluación clínica y responde EXCLUSIVAMENTE con un JSON válido sin texto adicional:
 {
@@ -29,24 +31,24 @@ Analiza la evaluación clínica y responde EXCLUSIVAMENTE con un JSON válido si
   "objetivos_terapeuticos": "Objetivos SMART",
   "pronostico_sesiones": "Plan sugerido (ej. Pro Care 6 sesiones)"
 }
-`;
+\`;
 
-    const userPrompt = `
-Paciente: ${payload.nombre_completo || 'Paciente'}
-Edad: ${payload.edad || 'No especificada'}
-Motivo: ${payload.motivo_consulta || 'No especificado'}
-Trabajo/Ergonomía: ${payload.puesto_trabajo_ergonomia || 'No especificado'}
-Cirugías/Antecedentes: ${payload.cirugias_traumatismos || 'Sin antecedentes'}
-Fármacos: ${payload.farmacos_actuales || 'Sin fármacos'}
-Síntoma/Cronología: ${payload.inicio_sintoma_cronologia || 'No especificado'}
-Irritabilidad: ${payload.irritabilidad_tisular || 'Moderada'}
-Dolor ENA: ${payload.dolor_inicial_ena ?? 5}
-Hallazgos y Pruebas Ortopédicas: ${payload.pruebas_especiales_ortopedicas || 'No especificadas'}
-Pruebas Funcionales: ${payload.pruebas_funcionales_control_motor || 'No especificadas'}
-`;
+    const userPrompt = \`
+Paciente: \${payload.nombre_completo || 'Paciente'}
+Edad: \${payload.edad || 'No especificada'}
+Motivo: \${payload.motivo_consulta || 'No especificado'}
+Trabajo/Ergonomía: \${payload.puesto_trabajo_ergonomia || 'No especificado'}
+Cirugías/Antecedentes: \${payload.cirugias_traumatismos || 'Sin antecedentes'}
+Fármacos: \${payload.farmacos_actuales || 'Sin fármacos'}
+Síntoma/Cronología: \${payload.inicio_sintoma_cronologia || 'No especificado'}
+Irritabilidad: \${payload.irritabilidad_tisular || 'Moderada'}
+Dolor ENA: \${payload.dolor_inicial_ena ?? 5}
+Hallazgos y Pruebas Ortopédicas: \${payload.pruebas_especiales_ortopedicas || 'No especificadas'}
+Pruebas Funcionales: \${payload.pruebas_funcionales_control_motor || 'No especificadas'}
+\`;
 
     // Usar modelo gemini-3.8-flash oficial
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+    const url = \`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=\${apiKey}\`;
 
     console.log('Iniciando llamada a Gemini API...');
     const response = await fetch(url, {
@@ -55,7 +57,7 @@ Pruebas Funcionales: ${payload.pruebas_funcionales_control_motor || 'No especifi
       body: JSON.stringify({
         contents: [
           {
-            parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }],
+            parts: [{ text: \`\${systemPrompt}\\n\\n\${userPrompt}\` }],
           },
         ],
         generationConfig: {
@@ -69,10 +71,10 @@ Pruebas Funcionales: ${payload.pruebas_funcionales_control_motor || 'No especifi
 
     // 1. SI GOOGLE DEVUELVE ERROR: No intentar parsear, devolver el mensaje textual de Google
     if (!response.ok || data.error) {
-      const errorMsg = data.error?.message || `Error HTTP ${response.status}: ${response.statusText}`;
+      const errorMsg = data.error?.message || \`Error HTTP \${response.status}: \${response.statusText}\`;
       console.error('Respuesta de error desde Google Gemini API:', JSON.stringify(data.error || data));
       return NextResponse.json(
-        { error: `Google AI: ${errorMsg}` },
+        { error: \`Google AI: \${errorMsg}\` },
         { status: response.status || 400 }
       );
     }
@@ -87,7 +89,7 @@ Pruebas Funcionales: ${payload.pruebas_funcionales_control_motor || 'No especifi
       );
     }
 
-    const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const cleanJson = rawText.replace(/\`\`\`json\\n?/g, '').replace(/\`\`\`\\n?/g, '').trim();
     const parsed = JSON.parse(cleanJson);
 
     return NextResponse.json(parsed);
@@ -99,3 +101,6 @@ Pruebas Funcionales: ${payload.pruebas_funcionales_control_motor || 'No especifi
     );
   }
 }
+`;
+
+fs.writeFileSync('src/app/api/ai/diagnose/route.ts', routeCode);
