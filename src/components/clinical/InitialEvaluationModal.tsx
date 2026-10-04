@@ -64,6 +64,7 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
     cie11_codigo: evaluacionExistente?.cie11_codigo ?? '',
     cie11_glosa: evaluacionExistente?.cie11_glosa ?? '',
     diagnostico_cif: evaluacionExistente?.diagnostico_cif ?? '',
+    diagnostico_apta: evaluacionExistente?.diagnostico_apta ?? '',
     diagnostico_tmo_biomecanico: evaluacionExistente?.diagnostico_tmo_biomecanico ?? (typeof evaluacionExistente?.diagnostico_tmo === 'string' ? evaluacionExistente?.diagnostico_tmo : ''),
     objetivos_terapeuticos: evaluacionExistente?.objetivos_terapeuticos ?? '',
     pronostico_sesiones: evaluacionExistente?.pronostico_sesiones ?? 'Plan Pro Care (6 sesiones)',
@@ -128,6 +129,7 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
           cie11_codigo: data.cie11_codigo,
           cie11_glosa: data.cie11_glosa,
           diagnostico_cif: data.diagnostico_cif,
+          diagnostico_apta: data.diagnostico_apta,
           diagnostico_tmo_biomecanico: data.diagnostico_tmo_biomecanico,
           objetivos_terapeuticos: data.objetivos_terapeuticos,
           pronostico_sesiones: data.pronostico_sesiones,
@@ -474,7 +476,7 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
                 </div>
               </div>
 
-              {/* Diagnóstico Funcional CIF */}
+                            {/* Diagnóstico Funcional CIF */}
               <div>
                 <label className="text-xs font-bold text-slate-700">Diagnóstico Kinésico Funcional (CIF)</label>
                 <textarea
@@ -482,6 +484,17 @@ export function InitialEvaluationModal({ isOpen, paciente, evaluacionExistente, 
                   rows={3}
                   value={form.diagnostico_cif}
                   onChange={(e) => handleChange('diagnostico_cif', e.target.value)}
+                />
+              </div>
+
+              {/* Diagnóstico APTA */}
+              <div>
+                <label className="text-xs font-bold text-slate-700">Diagnóstico del Sistema del Movimiento (APTA)</label>
+                <textarea
+                  className="w-full mt-1 p-2.5 border rounded-lg text-sm font-sans"
+                  rows={2}
+                  value={form.diagnostico_apta}
+                  onChange={(e) => handleChange('diagnostico_apta', e.target.value)}
                 />
               </div>
 
