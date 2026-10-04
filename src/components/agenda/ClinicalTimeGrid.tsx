@@ -148,7 +148,7 @@ export function ClinicalTimeGrid({
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col select-none">
       {/* Contenedor con scroll horizontal en móviles / pantallas compactas */}
       <div className="overflow-x-auto">
-        <div className={dias.length === 1 ? 'min-w-[500px]' : 'min-w-[1000px]'}>
+        <div className={dias.length === 1 ? 'min-w-[500px]' : 'min-w-[1200px]'}>
           {/* CABECERA SUPERIOR DE DÍAS (Sticky) */}
           <div className="flex border-b border-slate-200 bg-slate-50/95 sticky top-0 z-30 backdrop-blur-xs">
             {/* Esquina superior izquierda (Regleta de horas) */}
@@ -171,14 +171,14 @@ export function ClinicalTimeGrid({
                 <div
                   key={idx}
                   className={`flex-1 p-2.5 text-center border-r border-slate-200 last:border-r-0 transition-colors ${
-                    isToday ? 'bg-indigo-50/60' : ''
+                    isToday ? 'bg-emerald-50/60' : ''
                   }`}
                 >
                   <p className="text-xs font-black tracking-wider text-slate-700">
                     <span className="uppercase text-slate-500 mr-1.5">{nombreDiaCorto}</span>
                     <span
                       className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-black ${
-                        isToday ? 'bg-indigo-600 text-white' : 'text-slate-900'
+                        isToday ? 'bg-emerald-600 text-white' : 'text-slate-900'
                       }`}
                     >
                       {diaNumero}
@@ -255,7 +255,7 @@ export function ClinicalTimeGrid({
                             : 'border-b border-dashed border-slate-100'
                         } ${
                           inWorkingHours
-                            ? 'bg-white hover:bg-indigo-50/60'
+                            ? 'bg-white hover:bg-emerald-50/60'
                             : 'bg-slate-50/70 hover:bg-amber-50/40'
                         }`}
                         style={{
@@ -393,7 +393,7 @@ export function ClinicalTimeGrid({
         </div>
 
         <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
-          <Sparkles className="w-3 h-3 text-indigo-600" />
+          <Sparkles className="w-3 h-3 text-emerald-600" />
           <span>Haz clic en cualquier bloque de cita para ver su ficha y WhatsApp.</span>
         </div>
       </div>

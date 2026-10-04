@@ -31,8 +31,7 @@ import {
   Lock, Settings,
 } from 'lucide-react';
 import { BlockTimeModal, BloqueoAgenda } from '@/components/agenda/BlockTimeModal';
-import { AgendaSidebar, FiltroEstadoCitas } from '@/components/agenda/AgendaSidebar';
-import { ClinicalNavbar } from '@/components/agenda/ClinicalNavbar';
+import { ClinicalNavbar, FiltroEstadoCitas } from '@/components/agenda/ClinicalNavbar';
 import { ClinicalTimeGrid } from '@/components/agenda/ClinicalTimeGrid';
 import { AppointmentPopover, AppointmentPopoverData } from '@/components/agenda/AppointmentPopover';
 import { BoxScheduleView } from '@/components/agenda/BoxScheduleView';
@@ -717,459 +716,79 @@ function AgendaContent() {
     const p = cita.pacientes || {
       id: cita.paciente_id || '',
       nombre_completo: cita.motivo_consulta || 'Paciente Externo (Sin Ficha)',
-      rut: '',
-      telefono: '',
-      email: '',
-      prevision: 'Sin registrar',
-      motivo_consulta: cita.motivo_consulta || '',
-      alertas_seguridad: '',
-      antecedentes_morbidos: '',
-      estado_plan: 'sin_plan',
-      sesiones_usadas: 0,
-      total_sesiones: 0,
-      estado_pago: 'al_dia',
-      monto_clp: 0,
+      estado_plan: 'sin_plan', sesiones_usadas: 0, total_sesiones: 0, estado_pago: 'al_dia', valor_total: 0,
     };
     
     const s = String(cita?.estado || 'pendiente').toLowerCase();
-    const tokens = getCitaColorTokens(s);
-    const cleanPhone = p.telefono ? p.telefono.replace(/\D/g, '').slice(-9) : '';
-
-    if (compact) {
-        const { tienePlan: tienePlanCompact, sesionesUsadas, sesionesTotales } = getResumenPlan(p);
-
-        return (
-            <div key={cita.id} className={`rounded-xl border p-3 space-y-2 transition-all hover:shadow-sm mb-2 ${tokens.cardBg}`}>
-                {/* Nivel 1: Hora y Badge de Estado con dot */}
-                <div className="flex items-center justify-between border-b border-black/10 pb-1.5">
-                    <span className={`font-bold text-xs font-mono ${tokens.hora}`}>{cita.hora?.slice(0, 5)}</span>
-                    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${tokens.badge}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tokens.dot}`} />
-                      <select
-                        value={['asistió', 'atendido'].includes(s) ? 'asistio' : s}
-                        onChange={(e) => handleCambiarEstadoCita(cita, e.target.value)}
-                        className="bg-transparent border-none cursor-pointer focus:outline-none text-[10px] font-semibold"
-                      >
-                        <option value="pendiente" className="bg-white text-ink-navy">⏳ Pendiente</option>
-                        <option value="confirmada" className="bg-white text-ink-navy">✓ Confirmada</option>
-                        <option value="asistio" className="bg-white text-ink-navy">✓ Asistió</option>
-                        <option value="no_asistio" className="bg-white text-ink-navy">⚠️ No Asistió</option>
-                        <option value="cancelada" className="bg-white text-ink-navy">✕ Cancelada</option>
-                      </select>
-                    </div>
-                </div>
-
-                {/* Nivel 2: Nombre y Saldo */}
-                <div>
-                    <p className="font-bold text-ink-navy text-xs truncate" title={p.nombre_completo}>
-                      {p.nombre_completo}
-                    </p>
-                    <div className="flex items-center justify-between mt-1 text-[10px]">
-                      <span className="font-semibold text-slate-gray">
-                        {p.prevision || 'Particular'}
-                      </span>
-                      <span className="font-bold text-ink-navy">
-                        {tienePlanCompact ? `${sesionesUsadas}/${sesionesTotales} ses.` : 'Sin plan'}
-                      </span>
-                    </div>
-                </div>
-
-                {/* Nivel 3: Botones Rápidos */}
-                <div className="flex items-center justify-between pt-1 border-t border-black/10">
-                    <a
-                      href={cleanPhone ? generarMensajeConfirmacion(cita) : '#'}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] text-slate-gray hover:text-signal-blue font-medium transition-colors"
-                      title="WhatsApp"
-                    >
-                      💬 WhatsApp
-                    </a>
-                    <button
-                      onClick={() => {
-                        if (p.id) {
-                          setSelectedPatientForDrawer(p);
-                          setSelectedCitaForSuite(cita);
-                          setIsDrawerOpen(true);
-                        } else {
-                          toast.info('Cita sin ficha clínica vinculada.');
-                        }
-                      }}
-                      className="text-[11px] text-signal-blue font-semibold hover:underline"
-                    >
-                      Ficha →
-                    </button>
-                </div>
-            </div>
-        );
-    }
+    
+    // Semáforo de bordes
+    let borderColor = 'border-l-slate-400 border-slate-200';
+    let bgColor = 'bg-white';
+    if (s === 'confirmada') { borderColor = 'border-l-emerald-500 border-slate-200'; bgColor = 'bg-emerald-50/20'; }
+    else if (s === 'pendiente') { borderColor = 'border-l-amber-500 border-slate-200'; bgColor = 'bg-amber-50/20'; }
+    else if (s === 'asistio' || s === 'asistió' || s === 'atendido') { borderColor = 'border-l-slate-400 border-slate-300'; bgColor = 'bg-slate-50'; }
+    else if (s === 'cancelada' || s === 'no_asistio') { borderColor = 'border-l-rose-500 border-slate-200'; bgColor = 'bg-rose-50/20'; }
 
     const tienePlan = p.estado_plan !== 'sin_plan' && (p.total_sesiones || 0) > 0;
-    const pct = tienePlan ? Math.min(100, Math.round(((p.sesiones_usadas || 0) / (p.total_sesiones || 1)) * 100)) : 0;
     const debePago = p.estado_pago === 'pendiente';
-    const montoPendiente = formatCLP(p.valor_total || 0);
+    const motivo = cita.motivo_consulta || 'Sesión Kinésica';
+
+    // Rango horario monoespaciado
+    const horaInicio = cita.hora?.slice(0, 5) || '00:00';
+    const duracion = 45;
+    const dateMock = new Date(`1970-01-01T${horaInicio}:00`);
+    dateMock.setMinutes(dateMock.getMinutes() + duracion);
+    const horaFin = dateMock.toTimeString().slice(0, 5);
 
     return (
-      <div key={cita.id} className={`rounded-cards border p-4 sm:p-5 space-y-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-calendly-lg mb-3 shadow-calendly ${tokens.cardBg}`}>
-        {/* Cabecera y acciones de gestión */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-black/10 pb-3">
-          <div className="flex items-center gap-3">
-            <span className={`font-bold text-lg sm:text-xl font-mono px-3 py-1.5 rounded-inputs shadow-xs ${tokens.hora}`}>
-              {cita.hora?.slice(0, 5)}
-            </span>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h4 className="font-bold text-ink-navy text-sm sm:text-base">{cita.pacientes?.nombre_completo || p.nombre_completo}</h4>
-                {p.prevision && (
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
-                    String(p.prevision || '').toLowerCase().includes('convenio')
-                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                      : String(p.prevision || '').toLowerCase().includes('isapre')
-                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                      : String(p.prevision || '').toLowerCase().includes('fonasa')
-                      ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                      : 'bg-pebble text-slate-gray'
-                  }`}>
-                    {p.prevision}
-                  </span>
-                )}
-                {/* Badge de Estado con dot */}
-                <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${tokens.badge}`}>
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${tokens.dot}`} />
-                  <select
-                    value={['asistió', 'atendido'].includes(s) ? 'asistio' : s}
-                    onChange={(e) => handleCambiarEstadoCita(cita, e.target.value)}
-                    className="bg-transparent border-none cursor-pointer focus:outline-none font-semibold text-[11px]"
-                  >
-                    <option value="pendiente" className="bg-white text-ink-navy">⏳ Pendiente</option>
-                    <option value="confirmada" className="bg-white text-ink-navy">✓ Confirmada</option>
-                    <option value="asistio" className="bg-white text-ink-navy">✓ Asistió</option>
-                    <option value="no_asistio" className="bg-white text-ink-navy">⚠️ No Asistió</option>
-                    <option value="cancelada" className="bg-white text-ink-navy">✕ Cancelada</option>
-                  </select>
-                </div>
-              </div>
-              <p className="text-xs text-slate-gray font-mono mt-1">
-                {formatRut(p.rut) || 'Sin RUT'} • <span className="font-sans italic">{cita.motivo_consulta || 'Sesión Kinésica'}</span>
-              </p>
-              {(p.alertas_seguridad || p.antecedentes_morbidos) && (
-                <div className="bg-rose-50/80 border border-rose-200 text-rose-900 p-2.5 rounded-xl text-xs space-y-0.5 mt-2">
-                  <span className="font-bold flex items-center gap-1 text-[11px] text-rose-800 uppercase tracking-wider">
-                    🚩 Alerta Seguridad TMO
-                  </span>
-                  <p className="text-xs text-rose-950 leading-relaxed whitespace-normal break-words font-medium">
-                    {p.alertas_seguridad || p.antecedentes_morbidos}
-                  </p>
-                </div>
-              )}
-            </div>
+      <div key={cita.id} className={`relative flex flex-col p-3 rounded-lg border border-l-4 ${borderColor} ${bgColor} hover:shadow-md transition-all cursor-pointer group`}>
+        <div className="flex justify-between items-start">
+          <div className="flex flex-col min-w-0 pr-10">
+            <span className="font-mono text-xs text-slate-500 tabular-nums">${horaInicio} - ${horaFin}</span>
+            <span className="font-bold text-slate-900 text-sm mt-0.5 leading-tight">${p.nombre_completo}</span>
+            <span className="text-xs text-slate-500 truncate mt-0.5" title={motivo}>${motivo}</span>
           </div>
           
-          <div className="flex items-center gap-2 self-end sm:self-auto">
-            <button onClick={() => {
-              setEditingCita(cita);
-              setEditForm({ fecha: cita.fecha, hora: cita.hora, motivo: cita.motivo_consulta || '', profesional: cita.profesional || '' });
-            }} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition-colors" title="Editar horario">✏️</button>
-            <button onClick={() => { setDeletingCita(cita); }} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors" title="Cancelar cita">🗑️</button>
+          {/* Hover actions */}
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white p-1 rounded-md shadow-sm border border-slate-100">
+            <button onClick={(e) => { e.stopPropagation(); setSelectedPatientForDrawer(p); setSelectedCitaForSuite(cita); setIsDrawerOpen(true); }} className="p-1 hover:bg-slate-100 rounded text-slate-600" title="Ver Ficha">📋</button>
+            <button onClick={(e) => { e.stopPropagation(); window.open(generarMensajeConfirmacion(cita), '_blank'); }} className="p-1 hover:bg-emerald-50 rounded text-emerald-600" title="WhatsApp">💬</button>
+            <button onClick={(e) => { e.stopPropagation(); setCheckoutCita(cita); }} className="p-1 hover:bg-blue-50 rounded text-blue-600" title="Cobrar">💳</button>
+            <button onClick={(e) => { e.stopPropagation(); handleCambiarEstadoCita(cita, 'asistio'); }} className="p-1 hover:bg-emerald-50 rounded text-emerald-600" title="Marcar Asistió">✓</button>
           </div>
         </div>
 
-        {/* Panel Integrado de Tratamiento, Saldo y Estado */}
-        <div className="bg-white/90 p-3.5 rounded-xl border border-slate-200/80 shadow-xs space-y-2.5 text-xs">
-
-          {/* Fila 1: Tratamiento y Saldo de Sesiones */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                Tratamiento
-              </span>
-              <p className="font-bold text-slate-900 text-xs mt-0.5" title={p.nombre_plan || 'Plan'}>
-                {tienePlan ? (p.nombre_plan || 'Plan Kinésico') : 'Sin plan activo'}
-              </p>
-            </div>
-
-            {tienePlan && (p.total_sesiones || 0) > 0 ? (
-              <div className="text-right">
-                <span className="font-mono font-bold text-slate-800 text-xs">
-                  {p.sesiones_usadas}/{p.total_sesiones} ses.
-                </span>
-                <span className="text-[11px] text-slate-500 ml-1">
-                  ({p.sesiones_restantes} rest.)
-                </span>
-                <div className="w-24 h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1 ml-auto">
-                  <div
-                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-              </div>
-            ) : (
-              <span className="text-slate-400 text-[11px] italic">Sin sesiones prepagadas</span>
-            )}
-          </div>
-
-          {/* Fila 2: Financiamiento y Estado Clínico */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
-
-            {/* Estado Financiero sin texto quebrado */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Financiamiento:
-              </span>
-
-              {/* Caso 1: Si el plan está pagado */}
-              {p?.plan_id && p?.estado_pago === 'pagado' && p?.estado_plan !== 'finalizado' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-                  ✓ Plan Pagado (Al día)
-                  {p.numero_boleta && <span className="text-[10px] text-slate-500 ml-1 font-mono">(Bol: {p.numero_boleta})</span>}
-                </span>
-              )}
-
-              {/* Caso 2: Si tiene cobro pendiente y el plan NO está finalizado */}
-              {p?.plan_id && p?.estado_pago === 'pendiente' && p?.estado_plan !== 'finalizado' && (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
-                    🔴 Debe ({montoPendiente})
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.valor_total, paciente_id: p.id }); }}
-                    className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold shadow-xs transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    💳 Cobrar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCancelingPlan({
-                        id: p.plan_id,
-                        nombre_plan: p.nombre_plan,
-                        total_sesiones: p.total_sesiones,
-                        sesiones_usadas: p.sesiones_usadas,
-                        monto_clp: p.valor_total,
-                        paciente_id: p.id,
-                        pacientes: p
-                      });
-                    }}
-                    className="px-1.5 py-0.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-semibold transition-colors cursor-pointer whitespace-nowrap"
-                    title="Ajustar o cancelar plan"
-                  >
-                    ⚙️
-                  </button>
-                </div>
-              )}
-
-              {/* Caso 3: Si completó su plan */}
-              {p?.estado_plan === 'finalizado' && (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
-                    ⚠️ Plan Finalizado
-                  </span>
-                  {p.estado_pago === 'pendiente' ? (
-                    <button
-                      type="button"
-                      onClick={() => { setSettlingPlan({ id: p.plan_id, nombre_plan: p.nombre_plan, monto_clp: p.valor_total, paciente_id: p.id }); }}
-                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold shadow-xs transition-colors cursor-pointer whitespace-nowrap"
-                    >
-                      💳 Cobrar ({montoPendiente})
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => { setAssignTreatmentModal({ isOpen: true, paciente: p }); }}
-                      className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors whitespace-nowrap cursor-pointer"
-                    >
-                      + Nuevo Plan
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Caso 4: Si no tiene plan */}
-              {(!p?.plan_id || p?.estado_plan === 'sin_plan') && (
-                <button
-                  type="button"
-                  onClick={() => { setAssignTreatmentModal({ isOpen: true, paciente: p }); }}
-                  className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors whitespace-nowrap cursor-pointer"
-                >
-                  + Asignar Tratamiento / Plan
-                </button>
-              )}
-            </div>
-
-            {/* Dolor ENA y Estado Clínico */}
-            <div className="flex items-center gap-1.5 text-slate-600">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Dolor:</span>
-              <span className="font-bold text-slate-900 font-mono text-xs">
-                ENA {p?.ultimo_dolor_ena !== undefined && p?.ultimo_dolor_ena !== null && p.ultimo_dolor_ena >= 0 ? `${p.ultimo_dolor_ena}/10` : '- / 10'}
-              </span>
-              {requiereReevaluacion(p) && (
-                <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 whitespace-nowrap ml-1">
-                  ⚠️ Reevaluación
-                </span>
-              )}
-            </div>
-
-          </div>
-
-          {/* Alerta de última sesión si aplica */}
-          {p.sesiones_restantes === 1 && (
-            <div className="pt-1 border-t border-slate-100">
-              <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md block text-center animate-pulse">
-                🎯 Hoy es su última sesión del plan
-              </span>
-            </div>
+        {/* Badges inferiores */}
+        <div className="flex gap-2 mt-2 pt-2 border-t border-slate-100/50">
+          {tienePlan && (
+            <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded-sm font-medium border border-blue-100">
+              {p.sesiones_usadas}/{p.total_sesiones} ses.
+            </span>
           )}
-
-        </div>
-
-        {/* Botonera Operativa Inferior */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-          <div className="flex flex-wrap items-center gap-2">
-            {cleanPhone && (
-              <a href={generarMensajeConfirmacion(cita)} target="_blank" rel="noreferrer" className="min-h-[44px] px-3.5 py-2 rounded-buttons border border-hairline bg-paper hover:bg-pebble text-slate-gray text-[12px] font-semibold inline-flex items-center justify-center gap-1.5 shadow-calendly-btn transition-colors cursor-pointer">
-                💬 Solicitar Confirmación
-              </a>
-            )}
-            {s === 'pendiente' && (
-              <button onClick={() => handleMarcarConfirmada(cita.id)} className="min-h-[44px] px-3.5 py-2 rounded-buttons bg-signal-blue hover:bg-deep-cobalt text-white text-[12px] font-semibold transition-colors cursor-pointer shadow-calendly-btn flex items-center justify-center">
-                ✓ Confirmar
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {!['asistio', 'asistió', 'atendido', 'no_asistio', 'cancelada'].includes(s) && (
-              <>
-                <button onClick={() => handleRegistrarAsistencia(cita)} className="min-h-[44px] px-3.5 py-2 rounded-buttons bg-signal-blue hover:bg-deep-cobalt text-white text-[12px] font-semibold flex items-center justify-center gap-1 shadow-calendly-btn transition-colors cursor-pointer">
-                  ✓ Registrar Asistencia
-                </button>
-                <button
-                  onClick={() => {
-                    if (p.id) {
-                      handleRegistrarInasistencia(cita.id, p.id);
-                    } else {
-                      handleCambiarEstadoCita(cita, 'no_asistio');
-                    }
-                  }}
-                  className="min-h-[44px] px-3.5 py-2 rounded-buttons border border-hairline bg-pebble hover:bg-mist-gray/30 text-slate-gray text-[12px] font-semibold transition-colors cursor-pointer flex items-center justify-center"
-                >
-                  🚫 No Asistió
-                </button>
-              </>
-            )}
-            <button
-              onClick={() => {
-                if (p.id) {
-                  setSelectedPatientForDrawer(p);
-                  setSelectedCitaForSuite(cita);
-                  setIsDrawerOpen(true);
-                } else {
-                  toast.info('Cita sin ficha clínica vinculada en base de datos.');
-                }
-              }}
-              className="min-h-[44px] px-3.5 py-2 rounded-buttons bg-ink-navy hover:bg-slate-gray text-white text-[12px] font-semibold flex items-center justify-center gap-1 shadow-calendly-btn transition-colors cursor-pointer"
-            >
-              Ficha & SOAP →
-            </button>
-          </div>
+          {debePago ? (
+            <span className="text-[10px] px-1.5 py-0.5 bg-rose-50 text-rose-700 rounded-sm font-medium border border-rose-100">
+              Debe {formatCLP(p.valor_total || 0)}
+            </span>
+          ) : (
+            <span className="text-[10px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-sm font-medium border border-emerald-100">
+              ✓ Pagado
+            </span>
+          )}
         </div>
       </div>
     );
   };
-
-  const renderDia = () => {
-    const diaActualStr = getFormattedLocalDate(fechaBase);
-    const bloqueosDia = bloqueos.filter(b => b.fecha_inicio <= diaActualStr && b.fecha_fin >= diaActualStr);
-
-    return (
-      <div className="p-4 sm:p-6 space-y-4 min-h-[400px]">
-        {/* Franjas Bloqueadas con Rayado Diagonal */}
-        {bloqueosDia.length > 0 && (
-          <div className="space-y-3">
-            {bloqueosDia.map(b => (
-              <div
-                key={b.id}
-                className="rounded-2xl border-2 border-dashed border-amber-300 bg-[repeating-linear-gradient(45deg,#fffdf7,#fffdf7_12px,#fef3c7_12px,#fef3c7_24px)] p-4 sm:p-5 flex items-center justify-between shadow-xs transition-all"
-              >
-                <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-900 flex items-center justify-center font-bold text-lg border border-amber-300">
-                    🔒
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-amber-950 text-sm sm:text-base">
-                        {b.titulo}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold uppercase border border-amber-200">
-                        {b.tipo}
-                      </span>
-                    </div>
-                    <p className="text-xs text-amber-800/90 font-mono font-medium mt-0.5">
-                      {b.dia_completo
-                        ? `Bloqueo de día completo (${b.fecha_inicio} al ${b.fecha_fin})`
-                        : `Horario Bloqueado: ${b.hora_inicio || '09:00'} - ${b.hora_fin || '10:00'} hrs`}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleDesbloquearDirecto(b)}
-                  className="px-3.5 py-1.5 bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-slate-200 hover:border-rose-300 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
-                >
-                  Desbloquear
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {citas.length === 0 && bloqueosDia.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-mist-gray">
-            <CalendarDays className="w-12 h-12 mb-3 text-hairline" />
-            <p className="text-[16px] font-semibold text-slate-gray">No hay citas para este día</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {citas.map(c => renderCardCita(c, false))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-cloud pb-20 font-gilroy text-ink-navy">
-      
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6 sm:space-y-8 print:hidden">
-        
-        {/* Pestañas Principales: Agenda / Disponibilidad de Box */}
+      <main className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6 sm:space-y-8 print:hidden">
         {activeTab === 'disponibilidad' ? (
           <BoxScheduleView
             onBackToAgenda={() => setActiveTab('agenda')}
-            onSavedSuccess={() => {
-              setActiveTab('agenda');
-              loadAgenda();
-            }}
+            onSavedSuccess={() => { setActiveTab('agenda'); loadAgenda(); }}
           />
         ) : (
-          <div className="flex flex-col lg:flex-row gap-5 items-start">
-            {/* Panel Lateral Izquierdo (Sidebar 280px Fijo) */}
-            <AgendaSidebar
-              fechaSeleccionada={fechaBase}
-              onSelectFecha={(d) => {
-                setFechaBase(d);
-              }}
-              filtroEstado={filtroEstado}
-              onFiltroEstadoChange={(f) => setFiltroEstado(f)}
-              conteos={conteosFiltro}
-              onConfigurarHorariosBox={() => setActiveTab('disponibilidad')}
-              onSincronizarGoogleCalendar={handleSincronizarCalendario}
-              isSyncing={isSyncing}
-            />
-
-            {/* Panel Central (Grilla Horaria Médica) */}
-            <div className="flex-1 min-w-0 w-full space-y-4">
-              {/* Barra Superior Central: Conmutador [ Día ] [ Semana ], Hoy, Flechas, Título y + Nueva Cita */}
+          <div className="flex flex-col gap-5 items-start">
+            <div className="w-full space-y-4">
               <ClinicalNavbar
                 fechaBase={fechaBase}
                 vista={vista}
@@ -1178,159 +797,69 @@ function AgendaContent() {
                 onToday={setToday}
                 onNuevaCita={() => setShowNewCitaModal(true)}
                 onBloquearHorario={() => setShowBlockModal(true)}
+                filtroEstado={filtroEstado}
+                onFiltroEstadoChange={(f) => setFiltroEstado(f)}
               />
 
-              {/* Grilla Médica o Loader */}
               {loading ? (
                 <div className="bg-white rounded-2xl p-16 border border-slate-200/90 shadow-sm flex flex-col items-center justify-center min-h-[450px]">
-                  <Loader2 className="w-8 h-8 animate-spin mb-3 text-indigo-600" />
+                  <Loader2 className="w-8 h-8 animate-spin mb-3 text-emerald-600" />
                   <p className="text-sm font-semibold text-slate-600">Cargando agenda clínica...</p>
                 </div>
+              ) : vista === 'dia' ? (
+                // COCKPIT DE ATENCIÓN (VISTA DÍA)
+                <div className="flex gap-4 h-[calc(100vh-200px)] min-h-[600px]">
+                  {/* Panel Izquierdo: 40% */}
+                  <div className="w-2/5 flex flex-col gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm overflow-y-auto">
+                    <h3 className="text-sm font-bold text-slate-800">Citas del Día</h3>
+                    {citasFiltradas.length === 0 ? (
+                      <p className="text-sm text-slate-500">No hay citas registradas para hoy.</p>
+                    ) : (
+                      citasFiltradas.map((c) => (
+                        <div key={c.id} onClick={() => {
+                          const p = c.pacientes || { id: c.paciente_id };
+                          setSelectedPatientForDrawer(p as any);
+                          setSelectedCitaForSuite(c);
+                        }}>
+                          {renderCardCita(c, false)}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {/* Panel Derecho: 60% */}
+                  <div className="w-3/5 bg-slate-50 rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
+                    {selectedPatientForDrawer ? (
+                      <ClinicalRecordView 
+                        onClose={() => setSelectedPatientForDrawer(null)} 
+                        pacienteId={selectedPatientForDrawer?.id || ''} 
+                        citaId={selectedCitaForSuite?.id || ''}
+                        onSuccess={() => loadAgenda()} 
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                        <User className="w-12 h-12 mb-2 opacity-50" />
+                        <p className="text-sm font-medium">Seleccione un paciente para ver el Cockpit.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ) : (
+                // VISTA SEMANA
                 <ClinicalTimeGrid
                   dias={diasAMostrar}
                   citas={citasFiltradas}
                   bloqueos={bloqueos}
                   semanaConfig={semanaConfig}
                   duracionPredeterminada={duracionPredeterminada}
-                  onSelectEmptySlot={(fecha, hora) => {
-                    setNewCita((prev) => ({ ...prev, fecha, hora, pacienteId: '' }));
-                    setShowNewCitaModal(true);
-                  }}
-                  onSelectCita={(cita) => {
-                    setSelectedCitaForPopover(cita);
-                    setIsPopoverOpen(true);
-                  }}
-                  onDesbloquear={(b) => handleDesbloquearDirecto(b)}
+                  onSelectEmptySlot={(fecha, hora) => { setNewCita((prev) => ({ ...prev, fecha, hora, pacienteId: '' })); setShowNewCitaModal(true); }}
+                  onSelectCita={(cita) => { setSelectedCitaForPopover(cita); setIsPopoverOpen(true); }}
+                  onDesbloquear={handleDesbloquearDirecto}
                 />
               )}
             </div>
           </div>
         )}
-
-        {/* Popover Flotante de Detalle de Cita (AgendaPro / Reservo) */}
-        <AppointmentPopover
-          cita={selectedCitaForPopover}
-          isOpen={isPopoverOpen}
-          onClose={() => {
-            setIsPopoverOpen(false);
-            setSelectedCitaForPopover(null);
-          }}
-          onCambiarEstado={async (cita, nuevoEstado) => {
-            await handleCambiarEstadoCita(cita as any, nuevoEstado);
-            if (selectedCitaForPopover && selectedCitaForPopover.id === cita.id) {
-              setSelectedCitaForPopover((prev) => (prev ? { ...prev, estado: nuevoEstado } : null));
-            }
-          }}
-          onGuardarNota={handleGuardarNotaCita}
-          onIrAFicha={(pacienteId, pacienteObj, citaObj) => {
-            const p = pacienteObj || citas.find(c => c.paciente_id === pacienteId)?.pacientes;
-            if (p?.id || pacienteId) {
-              setSelectedPatientForDrawer(p || { id: pacienteId });
-              setSelectedCitaForSuite(citaObj as any);
-              setIsDrawerOpen(true);
-            } else {
-              toast.info('Cita sin ficha clínica vinculada.');
-            }
-          }}
-          onEditarHorario={(cita) => {
-            setEditingCita(cita as any);
-            setEditForm({
-              fecha: cita.fecha || '',
-              hora: cita.hora || '',
-              motivo: cita.motivo_consulta || '',
-              profesional: cita.profesional || ''
-            });
-          }}
-          onCancelarCita={(cita) => {
-            setDeletingCita(cita as any);
-          }}
-        />
-      
-      <Dialog open={!!showNoSessionsAlert} onOpenChange={(open) => !open && setShowNoSessionsAlert(null)}>
-        <DialogHeader>
-          <DialogTitle className="text-amber-600">
-            {showNoSessionsAlert?.reason === 'completed' ? '¡Plan Completado!' : 'Sesiones Agotadas / Sin Plan'}
-          </DialogTitle>
-          <DialogDescription>
-            {showNoSessionsAlert?.reason === 'completed' 
-              ? 'El paciente ha consumido su última sesión del plan.'
-              : 'El paciente no tiene un plan activo con saldo.'}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogBody className="space-y-4 pt-4">
-          <p className="text-sm font-medium text-slate-700 text-center">
-            {showNoSessionsAlert?.reason === 'completed' 
-              ? '¿Deseas Asignar Renovación de Plan o Emitir Certificado de Alta?'
-              : '¿Deseas Asignar un Nuevo Plan / Venta o tienes un Cobro Pendiente que registrar?'}
-          </p>
-        </DialogBody>
-        <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={() => setShowNoSessionsAlert(null)}>Cerrar</Button>
-          {showNoSessionsAlert?.reason === 'completed' && (
-            <Button variant="outline" onClick={() => { 
-                const paciente = pacientes.find(p => p.id === showNoSessionsAlert.pacienteId) || citas.find(c => c.paciente_id === showNoSessionsAlert.pacienteId)?.pacientes;
-                if (paciente) {
-                  setSelectedPatientForDrawer(paciente); 
-                  setIsDrawerOpen(true); 
-                }
-                setShowNoSessionsAlert(null); 
-              }} className="border-blue-200 text-blue-700 hover:bg-blue-50">
-              Emitir Certificado
-            </Button>
-          )}
-          <Button onClick={() => { setIsSaleModalOpen(true); setShowNoSessionsAlert(null); }} className="bg-blue-600 hover:bg-blue-700 text-white font-bold w-full sm:w-auto">
-            {showNoSessionsAlert?.reason === 'completed' ? '+ Asignar Renovación de Plan' : '+ Asignar Nuevo Plan / Venta'}
-          </Button>
-        </DialogFooter>
-      </Dialog>
-
-      <SaleModal 
-        isOpen={isSaleModalOpen} 
-        onClose={() => setIsSaleModalOpen(false)} 
-        onSuccess={() => loadAgenda()} 
-      />
-
-      <SettlePaymentModal 
-        isOpen={!!settlingPlan} 
-        onClose={() => setSettlingPlan(null)} 
-        planEnUso={settlingPlan}
-        onSuccess={() => { setSettlingPlan(null); loadAgenda(); }}
-      />
-
-      <CancelPlanModal
-        isOpen={!!cancelingPlan}
-        plan={cancelingPlan}
-        patientName={cancelingPlan?.pacientes?.nombre_completo}
-        onClose={() => setCancelingPlan(null)}
-        onSuccess={() => { setCancelingPlan(null); loadAgenda(); }}
-      />
-
-      {modalPostAtencion && (
-        <PostSessionModal
-          isOpen={modalPostAtencion.isOpen}
-          paciente={modalPostAtencion.paciente}
-          motivo={modalPostAtencion.motivo}
-          onClose={() => setModalPostAtencion(null)}
-          onSuccess={() => {
-            setModalPostAtencion(null);
-            loadAgenda();
-          }}
-        />
-      )}
-
-      {assignTreatmentModal && (
-        <AssignTreatmentModal
-          isOpen={assignTreatmentModal.isOpen}
-          paciente={assignTreatmentModal.paciente}
-          onClose={() => setAssignTreatmentModal(null)}
-          onSuccess={() => {
-            setAssignTreatmentModal(null);
-            loadAgenda();
-          }}
-        />
-      )}
-</main>
+      </main>
       {isDrawerOpen && (
         <ClinicalRecordView 
           onClose={() => setIsDrawerOpen(false)} 
