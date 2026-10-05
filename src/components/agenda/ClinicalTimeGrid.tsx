@@ -362,44 +362,16 @@ export function ClinicalTimeGrid({
                           left: '3px',
                           right: '3px',
                         }}
-                        className={`absolute z-20 rounded-xl p-2.5 transition-all cursor-pointer hover:scale-[1.01] hover:z-30 overflow-hidden flex flex-col justify-between ${theme.card}`}
+                        className={`absolute z-20 rounded-lg p-1.5 px-2 transition-all cursor-pointer hover:brightness-110 hover:shadow-lg active:scale-[0.98] overflow-hidden flex flex-col ${theme.card}`}
                       >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1 mb-0.5">
-                            <span className={`text-xs font-mono font-bold ${theme.textSecondary}`}>{horaInicio}</span>
-                          </div>
-                          <span className={`text-sm font-bold tracking-tight leading-tight block ${theme.textPrimary}`}>
+                        <div className="min-w-0 flex-1">
+                          <span className={`text-[10px] font-mono font-bold opacity-90 block mb-0.5 ${theme.textSecondary}`}>{horaInicio} - {horaFin}</span>
+                          <span className={`text-xs font-bold leading-tight truncate block ${theme.textPrimary}`}>
                             {pacienteNombre}
                           </span>
-                          <span className={`text-[10px] truncate block mt-0.5 ${theme.textSecondary}`} title={motivoTexto}>
+                          <span className={`text-[10px] opacity-80 truncate block mt-0.5 ${theme.textSecondary}`} title={motivoTexto}>
                             {motivoTexto}
                           </span>
-                        </div>
-                        
-                        <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                          {p.prevision && (
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${theme.pillBg}`}>
-                              {p.prevision}
-                            </span>
-                          )}
-                          {(p.total_sesiones || 0) > 0 && (
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${theme.pillSession}`}>
-                              {p.sesiones_usadas || 0}/{p.total_sesiones} ses.
-                            </span>
-                          )}
-                          
-                          {(() => {
-                            const debePago = p.estado_pago === 'pendiente' && (p.valor_total || 0) > 0;
-                            return debePago ? (
-                              <span className={`font-extrabold text-[10px] px-1.5 py-0.5 rounded-md shadow-xs ${theme.pillPayDebt}`} title={`Debe ${p.valor_total}`}>
-                                🔴 Debe ${(p.valor_total || 0).toLocaleString('es-CL')}
-                              </span>
-                            ) : (
-                              <span className={`font-extrabold text-[10px] px-1.5 py-0.5 rounded-md shadow-xs flex items-center gap-1 ${theme.pillPayOk}`}>
-                                ✓ Pagado
-                              </span>
-                            );
-                          })()}
                         </div>
                       </div>
                     );
