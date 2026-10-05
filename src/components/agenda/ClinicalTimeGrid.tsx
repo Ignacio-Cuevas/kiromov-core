@@ -80,25 +80,45 @@ function getPastelCardTheme(cita: any) {
   
   if (['confirmada'].includes(estado)) {
     return {
-      card: 'bg-emerald-50/90 border border-emerald-300/80 text-emerald-950 border-l-4 border-l-emerald-600 shadow-xs hover:shadow-md',
-      dot: 'bg-emerald-500'
+      card: 'bg-emerald-600 hover:bg-emerald-700 text-white border-l-4 border-l-emerald-800 shadow-md',
+      textPrimary: 'text-white',
+      textSecondary: 'text-emerald-100/90',
+      pillBg: 'bg-white/20 text-white',
+      pillSession: 'bg-emerald-900/60 text-emerald-100',
+      pillPayOk: 'bg-white text-emerald-900',
+      pillPayDebt: 'bg-rose-500 text-white'
     };
   } else if (['asistio', 'asistió', 'atendida', 'atendido'].includes(estado)) {
     return {
-      card: 'bg-slate-100/90 border border-slate-300 text-slate-700 border-l-4 border-l-slate-500 shadow-xs hover:shadow-md',
-      dot: 'bg-slate-500'
+      card: 'bg-slate-700 hover:bg-slate-800 text-slate-100 border-l-4 border-l-slate-900 shadow-sm',
+      textPrimary: 'text-slate-100',
+      textSecondary: 'text-slate-300',
+      pillBg: 'bg-white/20 text-white',
+      pillSession: 'bg-slate-900/60 text-slate-200',
+      pillPayOk: 'bg-emerald-500 text-white',
+      pillPayDebt: 'bg-rose-500 text-white'
     };
   } else if (['no_asistio', 'no asistió', 'cancelada'].includes(estado)) {
     return {
-      card: 'bg-rose-50/90 border border-rose-200 text-rose-900 border-l-4 border-l-rose-500 shadow-xs hover:shadow-md line-through opacity-80',
-      dot: 'bg-rose-500'
+      card: 'bg-rose-600 hover:bg-rose-700 text-white border-l-4 border-l-rose-800 shadow-sm opacity-90',
+      textPrimary: 'text-white',
+      textSecondary: 'text-rose-200',
+      pillBg: 'bg-white/20 text-white',
+      pillSession: 'bg-rose-900/60 text-rose-100',
+      pillPayOk: 'bg-white/80 text-rose-900',
+      pillPayDebt: 'bg-rose-900 text-rose-100'
     };
   }
   
   // Pendiente por defecto
   return {
-    card: 'bg-amber-50/90 border border-amber-300/80 text-amber-950 border-l-4 border-l-amber-500 shadow-xs hover:shadow-md',
-    dot: 'bg-amber-500'
+    card: 'bg-amber-500 hover:bg-amber-600 text-white border-l-4 border-l-amber-700 shadow-md',
+    textPrimary: 'text-white',
+    textSecondary: 'text-amber-100/90',
+    pillBg: 'bg-white/20 text-white',
+    pillSession: 'bg-amber-900/60 text-amber-100',
+    pillPayOk: 'bg-white text-amber-900',
+    pillPayDebt: 'bg-rose-500 text-white'
   };
 }
 
@@ -167,7 +187,7 @@ export function ClinicalTimeGrid({
                   <p className="text-xs font-black tracking-wider text-slate-700">
                     <span className="uppercase text-slate-500 mr-1.5">{nombreDiaCorto}</span>
                     <span
-                      className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-black ${
+                      className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold shadow-sm ${
                         isToday ? 'bg-emerald-600 text-white' : 'text-slate-900'
                       }`}
                     >
@@ -244,9 +264,7 @@ export function ClinicalTimeGrid({
                             ? 'border-b border-slate-200/90'
                             : 'border-b border-dashed border-slate-100'
                         } ${
-                          inWorkingHours
-                            ? 'bg-white hover:bg-emerald-50/60'
-                            : 'bg-slate-50/70 hover:bg-amber-50/40'
+                          inWorkingHours ? 'bg-white hover:bg-emerald-50/60' : 'bg-orange-50/80 hover:bg-orange-100/60'
                         }`}
                         style={{
                           top: `${topPx}px`,
@@ -261,55 +279,38 @@ export function ClinicalTimeGrid({
                     );
                   })}
 
+                  {/* INDICADOR DE HORA ACTUAL */}
+                  {(() => {
+                    const now = new Date();
+                    const nowStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+                    if (nowStr === diaStr) {
+                      const h = now.getHours();
+                      const m = now.getMinutes();
+                      if (h >= START_HOUR && h <= END_HOUR) {
+                        const topPos = ((h - START_HOUR) + m / 60) * HOUR_HEIGHT;
+                        return (
+                          <div className="absolute left-0 right-0 z-40 pointer-events-none" style={{ top: `${topPos}px` }}>
+                            <div className="relative">
+                              <div className="absolute left-0 w-2 h-2 rounded-full bg-emerald-500 -translate-y-1/2 -translate-x-1 shadow-[0_0_4px_rgba(16,185,129,0.8)]"></div>
+                              <div className="w-full border-t-2 border-emerald-500 shadow-[0_1px_2px_rgba(16,185,129,0.2)]"></div>
+                            </div>
+                          </div>
+                        );
+                      }
+                    }
+                    return null;
+                  })()}
+                  
                   {/* CAPA 2: Bloqueos de Horario */}
                   {bloqueosDia.map((b) => {
-                    const topPos = b.dia_completo ? 0 : getTopPosition(b.hora_inicio || '09:00');
-                    const bottomPos = b.dia_completo
-                      ? TOTAL_GRID_HEIGHT
-                      : getTopPosition(b.hora_fin || '10:00');
-                    const heightPos = Math.max(32, bottomPos - topPos);
-
-                    return (
-                      <div
-                        key={b.id}
-                        className="absolute left-1 right-1 z-10 rounded-xl border border-amber-300 bg-[repeating-linear-gradient(45deg,#fffdf7,#fffdf7_10px,#fef3c7_10px,#fef3c7_20px)] p-2 shadow-xs flex flex-col justify-between overflow-hidden"
-                        style={{
-                          top: `${topPos}px`,
-                          height: `${heightPos}px`,
-                        }}
-                      >
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-[11px] font-extrabold text-amber-950 flex items-center gap-1 truncate">
-                            <Lock className="w-3 h-3 text-amber-700 shrink-0" />
-                            {b.titulo}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDesbloquear(b);
-                            }}
-                            className="text-[10px] font-bold text-rose-700 hover:text-rose-900 bg-white/80 hover:bg-white rounded px-1.5 py-0.5 shadow-2xs border border-rose-200 cursor-pointer"
-                            title="Desbloquear horario"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* CAPA 3: Bloques de Cita en Estilo Pastel */}
-                  {/* CAPA: BLOQUEOS DE AGENDA */}
-                  {bloqueos.filter(b => b.fecha_inicio <= diaStr && b.fecha_fin >= diaStr).map(b => {
                     const topPos = getTopPosition(b.hora_inicio || '08:00');
                     const duracionMin = getMinutesFrom8am(b.hora_fin || '09:00') - getMinutesFrom8am(b.hora_inicio || '08:00');
                     const heightPos = Math.max(38, (duracionMin / 60) * HOUR_HEIGHT);
                     
                     if (b.dia_completo) {
                        return (
-                         <div key={b.id} className="absolute z-10 left-1 right-1 top-1 bottom-1 bg-slate-200/80 border border-slate-300 text-slate-700 rounded-lg flex flex-col items-center justify-center p-2 backdrop-blur-[2px]">
-                           <Lock className="w-5 h-5 mb-1 opacity-50" />
+                         <div key={b.id} className="absolute z-10 left-1 right-1 top-1 bottom-1 bg-orange-200/80 border-l-4 border-l-orange-500 border-y border-r border-orange-300 text-orange-950 rounded-xl flex flex-col items-center justify-center p-2 backdrop-blur-[2px]">
+                           <Lock className="w-5 h-5 mb-1 opacity-70" />
                            <span className="text-xs font-bold text-center leading-tight">{b.titulo}</span>
                          </div>
                        );
@@ -318,16 +319,19 @@ export function ClinicalTimeGrid({
                     return (
                       <div
                         key={b.id}
-                        className="absolute z-10 rounded-lg border border-slate-300 bg-slate-200/80 text-slate-700 p-2 flex flex-col items-start overflow-hidden shadow-xs backdrop-blur-[1px]"
+                        className="absolute z-10 bg-orange-200/80 border-l-4 border-l-orange-500 border-y border-r border-orange-300 text-orange-950 rounded-xl p-2.5 shadow-xs overflow-hidden flex flex-col items-start backdrop-blur-[1px]"
                         style={{ top: `${topPos}px`, height: `${heightPos}px`, left: '2px', right: '2px' }}
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <Lock className="w-3 h-3 shrink-0 opacity-60" />
-                          <span className="text-[11px] font-bold truncate leading-tight">{b.titulo}</span>
+                          <Lock className="w-3 h-3 shrink-0 opacity-80" />
+                          <span className="text-xs font-bold truncate leading-tight">{b.titulo}</span>
                         </div>
                       </div>
                     );
                   })}
+
+                  {/* CAPA 3: Bloques de Cita en Estilo Pastel */}
+                  
                   
 {citasDia.map((cita) => {
                     const horaInicio = cita?.hora?.slice(0, 5) || '09:00';
@@ -358,23 +362,42 @@ export function ClinicalTimeGrid({
                           left: '3px',
                           right: '3px',
                         }}
-                        className={`absolute z-20 transition-all duration-150 cursor-pointer hover:scale-[1.01] hover:z-30 overflow-hidden flex flex-col justify-between p-2 ${theme.card}`}
+                        className={`absolute z-20 rounded-xl p-2.5 transition-all cursor-pointer hover:scale-[1.01] hover:z-30 overflow-hidden flex flex-col justify-between ${theme.card}`}
                       >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold leading-tight line-clamp-2" title={pacienteNombre}>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1 mb-0.5">
+                            <span className={`text-xs font-mono font-bold ${theme.textSecondary}`}>{horaInicio}</span>
+                          </div>
+                          <span className={`text-sm font-bold tracking-tight leading-tight block ${theme.textPrimary}`}>
                             {pacienteNombre}
-                          </p>
+                          </span>
+                          <span className={`text-[10px] truncate block mt-0.5 ${theme.textSecondary}`} title={motivoTexto}>
+                            {motivoTexto}
+                          </span>
                         </div>
                         
-                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-0.5 border-t border-slate-100 mt-1">
-                          <span>{horaInicio}</span>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                          {p.prevision && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${theme.pillBg}`}>
+                              {p.prevision}
+                            </span>
+                          )}
+                          {(p.total_sesiones || 0) > 0 && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${theme.pillSession}`}>
+                              {p.sesiones_usadas || 0}/{p.total_sesiones} ses.
+                            </span>
+                          )}
+                          
                           {(() => {
-                            const pData = cita.paciente || cita.pacientes || {};
-                            const debePago = pData.estado_pago === 'pendiente' && (pData.valor_total || 0) > 0;
+                            const debePago = p.estado_pago === 'pendiente' && (p.valor_total || 0) > 0;
                             return debePago ? (
-                              <span className="text-[9px] font-bold text-rose-600 bg-rose-50 px-1 rounded border border-rose-100" title={`Debe ${pData.valor_total}`}>$</span>
+                              <span className={`font-extrabold text-[10px] px-1.5 py-0.5 rounded-md shadow-xs ${theme.pillPayDebt}`} title={`Debe ${p.valor_total}`}>
+                                🔴 Debe ${(p.valor_total || 0).toLocaleString('es-CL')}
+                              </span>
                             ) : (
-                              <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded border border-emerald-100">✓</span>
+                              <span className={`font-extrabold text-[10px] px-1.5 py-0.5 rounded-md shadow-xs flex items-center gap-1 ${theme.pillPayOk}`}>
+                                ✓ Pagado
+                              </span>
                             );
                           })()}
                         </div>
@@ -392,19 +415,19 @@ export function ClinicalTimeGrid({
       <div className="p-3 bg-slate-50/80 border-t border-slate-200 text-xs flex flex-wrap items-center justify-between gap-3 text-slate-600">
         <div className="flex flex-wrap items-center gap-4 text-[11px]">
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-amber-50 border border-amber-300 border-l-4 border-l-amber-500" />
+            <span className="w-3 h-3 rounded bg-amber-500 shadow-sm" />
             <span className="font-semibold text-slate-700">Pendiente</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-emerald-50 border border-emerald-300 border-l-4 border-l-emerald-500" />
+            <span className="w-3 h-3 rounded bg-emerald-600 shadow-sm" />
             <span className="font-semibold text-slate-700">Confirmada</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-blue-50 border border-blue-300 border-l-4 border-l-blue-500" />
+            <span className="w-3 h-3 rounded bg-slate-700 shadow-sm" />
             <span className="font-semibold text-slate-700">Atendida</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-rose-50 border border-rose-300 border-l-4 border-l-rose-500" />
+            <span className="w-3 h-3 rounded bg-rose-600 shadow-sm opacity-90" />
             <span className="font-semibold text-slate-700">Inasistencia / Cancelada</span>
           </div>
           <div className="flex items-center gap-1.5">
