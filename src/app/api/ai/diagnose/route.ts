@@ -2,14 +2,6 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-// Lista de modelos ordenada por preferencia (velocidad / costo / disponibilidad)
-const CANDIDATE_MODELS = [
-  'gemini-3.8-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro',
-];
-
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -57,48 +49,82 @@ Pruebas Funcionales: ${payload.pruebas_funcionales_control_motor || 'No especifi
       },
     });
 
-    let lastErrorMessage = '';
+    // 1. OBTENER EN VIVO LOS MODELOS REALES DISPONIBLES EN TU CUENTA
+    let candidateModels: string[] = [];
+    try {
+      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        const available = (listData.models || [])
+          .filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
+          .map((m: any) => m.name.replace('models/', ''));
 
-    // 2. BUCLE EN CASCADA: Intentar con cada modelo si el anterior está saturado o no disponible
-    for (const model of CANDIDATE_MODELS) {
-      try {
-        console.log(`Intentando generar diagnóstico con modelo: ${model}...`);
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: requestBody,
+        // Ordenar: primero los modelos 'flash' más recientes, luego cualquier otro
+        candidateModels = available.sort((a: string, b: string) => {
+          if (a.includes('3.8') || a.includes('flash')) return -1;
+          if (b.includes('3.8') || b.includes('flash')) return 1;
+          return 0;
         });
+      }
+    } catch (listErr) {
+      console.warn('No se pudo listar modelos dinámicamente:', listErr);
+    }
 
-        const data = await response.json();
+    // Si la lista de Google devolvió modelos, usarlos; de lo contrario, usar gemini-3.8-flash por defecto
+    if (candidateModels.length === 0) {
+      candidateModels = ['gemini-3.8-flash'];
+    }
 
-        // Si el modelo responde OK y con contenido, parsear y retornar de inmediato
-        if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-          const rawText = data.candidates[0].content.parts[0].text;
-          const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-          const parsed = JSON.parse(cleanJson);
-          console.log(`Diagnóstico generado exitosamente con el modelo: ${model}`);
-          return NextResponse.json(parsed);
+    console.log('Modelos reales disponibles en tu cuenta:', candidateModels);
+
+    let lastError = '';
+
+    // 2. BUCLE EN CASCADA CON REINTENTO RÁPIDO
+    for (const model of candidateModels) {
+      for (let intento = 1; intento <= 2; intento++) {
+        try {
+          console.log(`Llamando a modelo ${model} (intento ${intento})...`);
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: requestBody,
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+            const rawText = data.candidates[0].content.parts[0].text;
+            const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            return NextResponse.json(JSON.parse(cleanJson));
+          }
+
+          const msg = data.error?.message || `HTTP ${response.status}`;
+          lastError = msg;
+
+          // Si es alta demanda (503/high demand) y es el primer intento, pausar 1.2 segundos y reintentar
+          if ((response.status === 503 || msg.includes('high demand')) && intento === 1) {
+            console.log(`Modelo ${model} con alta demanda momentánea. Esperando 1.2s...`);
+            await new Promise((resolve) => setTimeout(resolve, 1200));
+            continue;
+          }
+
+          // Si es otro error o falló el reintento, pasar al siguiente modelo
+          break;
+        } catch (err: any) {
+          lastError = err.message;
+          break;
         }
-
-        // Si falló (ej. high demand, rate limit o 404), registrar y continuar con el siguiente modelo
-        const errorDetail = data.error?.message || `HTTP ${response.status}: ${response.statusText}`;
-        console.warn(`Modelo ${model} no disponible (${errorDetail}). Probando siguiente modelo...`);
-        lastErrorMessage = errorDetail;
-      } catch (err: any) {
-        console.warn(`Error de red al consultar ${model}:`, err.message);
-        lastErrorMessage = err.message;
       }
     }
 
-    // Si todos los modelos de la lista fallaron, retornar el último error recibido
     return NextResponse.json(
-      { error: `Google AI (todos los modelos saturados): ${lastErrorMessage}` },
+      { error: `Google AI: ${lastError}` },
       { status: 503 }
     );
   } catch (error: any) {
-    console.error('Error no controlado en diagnóstico IA:', error);
-    return NextResponse.json({ error: error?.message || 'Error interno del servidor' }, { status: 500 });
+    console.error('Error no controlado:', error);
+    return NextResponse.json({ error: error?.message || 'Error interno' }, { status: 500 });
   }
 }
