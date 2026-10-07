@@ -2,15 +2,19 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
+// Lista de modelos ordenada por preferencia (velocidad / costo / disponibilidad)
+const CANDIDATE_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+];
+
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error('GEMINI_API_KEY no existe en las variables de entorno de Vercel.');
-      return NextResponse.json(
-        { error: 'Falta la variable GEMINI_API_KEY en Vercel.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Falta GEMINI_API_KEY en Vercel.' }, { status: 500 });
     }
 
     const payload = await req.json();
@@ -45,57 +49,56 @@ Hallazgos y Pruebas Ortopédicas: ${payload.pruebas_especiales_ortopedicas || 'N
 Pruebas Funcionales: ${payload.pruebas_funcionales_control_motor || 'No especificadas'}
 `;
 
-    // Usar modelo gemini-3.8-flash oficial
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
-
-    console.log('Iniciando llamada a Gemini API...');
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.2,
-        },
-      }),
+    const requestBody = JSON.stringify({
+      contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.2,
+      },
     });
 
-    const data = await response.json();
+    let lastErrorMessage = '';
 
-    // 1. SI GOOGLE DEVUELVE ERROR: No intentar parsear, devolver el mensaje textual de Google
-    if (!response.ok || data.error) {
-      const errorMsg = data.error?.message || `Error HTTP ${response.status}: ${response.statusText}`;
-      console.error('Respuesta de error desde Google Gemini API:', JSON.stringify(data.error || data));
-      return NextResponse.json(
-        { error: `Google AI: ${errorMsg}` },
-        { status: response.status || 400 }
-      );
+    // 2. BUCLE EN CASCADA: Intentar con cada modelo si el anterior está saturado o no disponible
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        console.log(`Intentando generar diagnóstico con modelo: ${model}...`);
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: requestBody,
+        });
+
+        const data = await response.json();
+
+        // Si el modelo responde OK y con contenido, parsear y retornar de inmediato
+        if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+          const rawText = data.candidates[0].content.parts[0].text;
+          const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+          const parsed = JSON.parse(cleanJson);
+          console.log(`Diagnóstico generado exitosamente con el modelo: ${model}`);
+          return NextResponse.json(parsed);
+        }
+
+        // Si falló (ej. high demand, rate limit o 404), registrar y continuar con el siguiente modelo
+        const errorDetail = data.error?.message || `HTTP ${response.status}: ${response.statusText}`;
+        console.warn(`Modelo ${model} no disponible (${errorDetail}). Probando siguiente modelo...`);
+        lastErrorMessage = errorDetail;
+      } catch (err: any) {
+        console.warn(`Error de red al consultar ${model}:`, err.message);
+        lastErrorMessage = err.message;
+      }
     }
 
-    // 2. EXTRAER TEXTO Y LIMPIAR
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawText) {
-      console.error('Gemini respondió 200 OK pero sin candidates:', JSON.stringify(data));
-      return NextResponse.json(
-        { error: 'Google AI no generó contenido para esta consulta.' },
-        { status: 500 }
-      );
-    }
-
-    const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const parsed = JSON.parse(cleanJson);
-
-    return NextResponse.json(parsed);
-  } catch (error: any) {
-    console.error('Error no controlado en /api/ai/diagnose:', error);
+    // Si todos los modelos de la lista fallaron, retornar el último error recibido
     return NextResponse.json(
-      { error: error?.message || 'Error interno del servidor' },
-      { status: 500 }
+      { error: `Google AI (todos los modelos saturados): ${lastErrorMessage}` },
+      { status: 503 }
     );
+  } catch (error: any) {
+    console.error('Error no controlado en diagnóstico IA:', error);
+    return NextResponse.json({ error: error?.message || 'Error interno del servidor' }, { status: 500 });
   }
 }
