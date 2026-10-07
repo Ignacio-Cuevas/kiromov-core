@@ -1353,11 +1353,13 @@ export function ClinicalRecordView({
                     1. Anamnesis y Dolor
                   </h3>
                   <div className="space-y-2 text-xs">
-                    <p><span className="font-bold text-slate-700">Motivo:</span> {evaluacionInicialTMO.anamnesis?.motivo_consulta || '-'}</p>
-                    <p><span className="font-bold text-slate-700">Tiempo de evolución:</span> {evaluacionInicialTMO.anamnesis?.tiempo_evolucion || '-'}</p>
-                    <p><span className="font-bold text-slate-700">Dolor nocturno:</span> {evaluacionInicialTMO.anamnesis?.dolor_nocturno ? 'Sí' : 'No'}</p>
-                    <p><span className="font-bold text-slate-700">Aumenta con:</span> {evaluacionInicialTMO.anamnesis?.aumenta_con || '-'}</p>
-                    <p><span className="font-bold text-slate-700">Disminuye con:</span> {evaluacionInicialTMO.anamnesis?.disminuye_con || '-'}</p>
+                    <p><span className="font-bold text-slate-700">Motivo:</span> {evaluacionInicialTMO.motivo_consulta || evaluacionInicialTMO.motivo || paciente?.motivo_consulta || 'Sin registro'}</p>
+                    <p><span className="font-bold text-slate-700">Tiempo de evolución:</span> {evaluacionInicialTMO.tiempo_evolucion || 'Sin registro'}</p>
+                    <p><span className="font-bold text-slate-700">Cronología / Inicio:</span> {evaluacionInicialTMO.inicio_sintoma_cronologia || 'Sin registro'}</p>
+                    <p><span className="font-bold text-slate-700">Agravantes / Aliviantes:</span> {evaluacionInicialTMO.factores_agravantes_aliviantes || evaluacionInicialTMO.aumenta_con || 'Sin registro'}</p>
+                    <p><span className="font-bold text-slate-700">Puesto de Trabajo / Ergonomía:</span> {evaluacionInicialTMO.puesto_trabajo_ergonomia || evaluacionInicialTMO.ocupacion_laboral || 'Sin registro'}</p>
+                    <p><span className="font-bold text-slate-700">Antecedentes:</span> Cirugías/Traumatismos: {evaluacionInicialTMO.cirugias_traumatismos || 'Ninguno'} · Fármacos: {evaluacionInicialTMO.farmacos_actuales || 'Ninguno'}</p>
+                    <p><span className="font-bold text-slate-700">Nivel de Irritabilidad:</span> <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">{evaluacionInicialTMO.irritabilidad_tisular || 'Moderada'}</span></p>
                     
                     {evaluacionInicialTMO.anamnesis?.banderas_rojas?.length > 0 && (
                       <div className="mt-2 p-2 bg-rose-50 rounded text-rose-700">
@@ -1372,19 +1374,10 @@ export function ClinicalRecordView({
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
                     2. Pruebas y Segmento
                   </h3>
-                  <div className="space-y-2 text-xs overflow-auto max-h-48">
-                    {evaluacionInicialTMO.datos_segmento && Object.keys(evaluacionInicialTMO.datos_segmento).length > 0 ? (
-                      <ul className="space-y-1">
-                        {Object.entries(evaluacionInicialTMO.datos_segmento).map(([key, val]) => (
-                          <li key={key} className="flex justify-between border-b border-slate-50 pb-1">
-                            <span className="text-slate-500 capitalize">{key.replace(/_/g, ' ')}:</span>
-                            <span className="font-semibold text-slate-800">{String(val)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-slate-400">No hay datos de segmento registrados.</p>
-                    )}
+                  <div className="space-y-2 text-xs">
+                    <p><span className="font-bold text-slate-700 block mb-1">Pruebas Especiales Ortopédicas:</span> <span className="text-slate-800">{evaluacionInicialTMO.pruebas_especiales_ortopedicas || 'Sin pruebas registradas'}</span></p>
+                    <p className="mt-2"><span className="font-bold text-slate-700 block mb-1">Control Motor y Funcional:</span> <span className="text-slate-800">{evaluacionInicialTMO.pruebas_funcionales_control_motor || 'Sin alteraciones funcionales'}</span></p>
+                    <p className="mt-2 text-slate-800"><span className="font-bold text-slate-700">Movilidad y Neurodinamia:</span> ROM: {evaluacionInicialTMO.movilidad_activa_rom || 'Completo'} · Neurodinamia: {evaluacionInicialTMO.neurodinamia_basal || 'Normal'}</p>
                   </div>
                 </div>
 
@@ -1412,6 +1405,49 @@ export function ClinicalRecordView({
                     </div>
                   </div>
                 </div>
+
+                {/* 4. Codificación Clínica y Estándares Internacionales */}
+                {(evaluacionInicialTMO.cie10_codigo || evaluacionInicialTMO.diagnostico_cif || evaluacionInicialTMO.diagnostico_apta) && (
+                  <div className="col-span-1 md:col-span-2 mt-2 p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
+                    <h4 className="text-xs font-bold uppercase text-slate-500 tracking-wider">
+                      4. Codificación Clínica y Estándares Internacionales
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* CIE-10 */}
+                      <div className="p-3 bg-white border border-slate-200 rounded-lg shadow-2xs">
+                        <span className="text-[10px] font-extrabold uppercase text-emerald-700">CIE-10 (Fonasa / Isapres)</span>
+                        <p className="text-xs font-mono font-bold text-slate-900 mt-0.5">
+                          {evaluacionInicialTMO.cie10_codigo} {evaluacionInicialTMO.cie10_glosa && `— ${evaluacionInicialTMO.cie10_glosa}`}
+                        </p>
+                      </div>
+
+                      {/* CIE-11 */}
+                      <div className="p-3 bg-white border border-slate-200 rounded-lg shadow-2xs">
+                        <span className="text-[10px] font-extrabold uppercase text-blue-700">CIE-11 (OMS)</span>
+                        <p className="text-xs font-mono font-bold text-slate-900 mt-0.5">
+                          {evaluacionInicialTMO.cie11_codigo || 'ME84.2'} {evaluacionInicialTMO.cie11_glosa && `— ${evaluacionInicialTMO.cie11_glosa}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* CIF */}
+                    {evaluacionInicialTMO.diagnostico_cif && (
+                      <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                        <span className="text-[10px] font-extrabold uppercase text-purple-700">Diagnóstico Kinésico Funcional (CIF - OMS)</span>
+                        <p className="text-xs text-slate-800 mt-1 leading-relaxed">{evaluacionInicialTMO.diagnostico_cif}</p>
+                      </div>
+                    )}
+
+                    {/* APTA */}
+                    {evaluacionInicialTMO.diagnostico_apta && (
+                      <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                        <span className="text-[10px] font-extrabold uppercase text-indigo-700">Diagnóstico del Sistema del Movimiento (APTA)</span>
+                        <p className="text-xs text-slate-800 mt-1 leading-relaxed">{evaluacionInicialTMO.diagnostico_apta}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="bg-white p-12 rounded-xl border border-slate-200 text-center space-y-4">
