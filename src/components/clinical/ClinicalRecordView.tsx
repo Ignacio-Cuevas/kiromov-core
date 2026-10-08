@@ -271,18 +271,28 @@ export function ClinicalRecordView({
   const cargarProximaCita = async (id: string) => {
     if (!supabase) return;
     const hoyStr = getChileanDate();
+    const ahoraStr = new Date().toLocaleTimeString('es-CL', { hour12: false, timeZone: 'America/Santiago' }).slice(0, 5);
+    
     const { data } = await supabase
       .from('citas_atenciones')
       .select('id, fecha, hora, estado, profesional, motivo_consulta')
       .eq('paciente_id', id)
       .gte('fecha', hoyStr)
-      .not('estado', 'in', '("cancelada","no_asistio")')
+      .in('estado', ['pendiente', 'confirmada', 'agendada']) // Solo estados futuros
       .order('fecha', { ascending: true })
-      .order('hora', { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .order('hora', { ascending: true });
 
-    setProximaCita(data || null);
+    if (data && data.length > 0) {
+      // Filtrar las citas de hoy que ya pasaron
+      const futura = data.find(c => {
+        if (c.fecha > hoyStr) return true;
+        // Si es hoy, revisar que la hora sea en el futuro o al menos ahora
+        return c.hora && c.hora.slice(0, 5) >= ahoraStr;
+      });
+      setProximaCita(futura || null);
+    } else {
+      setProximaCita(null);
+    }
   };
 
   // Carga de datos de Supabase
