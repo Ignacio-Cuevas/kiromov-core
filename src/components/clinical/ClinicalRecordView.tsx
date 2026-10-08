@@ -744,10 +744,63 @@ export function ClinicalRecordView({
         {/* PESTAÑA 1: EVOLUCIONES SOAP (30% IZQUIERDA / 70% DERECHA)          */}
         {/* ================================================================== */}
         {tabActiva === 'soap' && (
-          <div className="grid grid-cols-12 gap-4 h-full overflow-hidden">
+          <div className="flex flex-col h-full overflow-hidden space-y-4">
             
-            {/* PANEL IZQUIERDO (30% - col-span-12 lg:col-span-4): TIMELINE + CURVA ENA */}
-            <aside className="col-span-12 lg:col-span-4 h-full flex flex-col space-y-3 overflow-hidden">
+            {/* 1. EXECUTIVE CLINICAL BANNER (TOP) */}
+            {evaluacionInicialTMO && (
+              <details className="bg-white rounded-xl border border-blue-200 shadow-sm group flex-shrink-0">
+                <summary className="cursor-pointer list-none p-3 flex items-center justify-between text-xs hover:bg-blue-50/50 transition-colors">
+                  <div className="flex items-center gap-3 font-medium text-slate-700 truncate">
+                    <span className="font-bold text-blue-800">📌 Diagnóstico Base:</span>
+                    <span className="truncate">{evaluacionInicialTMO?.cie10_codigo || evaluacionInicialTMO?.cie11_codigo || 'Pendiente'} — {evaluacionInicialTMO?.diagnostico_tmo?.diagnostico_tmo || evaluacionInicialTMO?.diagnostico_tmo || 'Sin especificar'}</span>
+                    <span className="text-slate-300">|</span>
+                    <span className="truncate"><span className="font-bold">CIF:</span> {evaluacionInicialTMO?.diagnostico_cif || 'No registrado'}</span>
+                    <span className="text-slate-300">|</span>
+                    <span className="font-bold text-slate-800">ENA Base: {evaluacionInicialTMO.anamnesis?.eva ?? evaluacionInicialTMO.dolor_inicial_ena ?? '-'}/10</span>
+                  </div>
+                  <div className="text-blue-600 font-bold shrink-0 ml-4 flex items-center gap-1 group-open:hidden">
+                    <span>Ver Evaluación Completa</span>
+                    <ChevronDown className="w-4 h-4" />
+                  </div>
+                  <div className="text-blue-600 font-bold shrink-0 ml-4 hidden items-center gap-1 group-open:flex">
+                    <span>Ocultar Evaluación</span>
+                    <ChevronUp className="w-4 h-4" />
+                  </div>
+                </summary>
+                
+                <div className="p-4 border-t border-blue-100 bg-slate-50 rounded-b-xl text-xs space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white p-3 rounded-lg border border-slate-200">
+                      <span className="font-bold text-slate-800 block mb-1">Antecedentes y Ergonomía</span>
+                      <p><strong>Trabajo:</strong> {evaluacionInicialTMO?.puesto_trabajo_ergonomia || '-'}</p>
+                      <p><strong>Fármacos:</strong> {evaluacionInicialTMO?.farmacos_actuales || '-'}</p>
+                      <p><strong>Cirugías/Trauma:</strong> {evaluacionInicialTMO?.cirugias_traumatismos || '-'}</p>
+                      <p><strong>Irritabilidad:</strong> {evaluacionInicialTMO?.irritabilidad_tisular || 'Moderada'}</p>
+                    </div>
+                    
+                    <div className="bg-white p-3 rounded-lg border border-slate-200">
+                      <span className="font-bold text-slate-800 block mb-1">Pruebas Ortopédicas y Segmento</span>
+                      <p><strong>ROM:</strong> {evaluacionInicialTMO?.movilidad_activa_rom || '-'}</p>
+                      <p><strong>Pruebas Especiales:</strong> {evaluacionInicialTMO?.pruebas_especiales_ortopedicas || '-'}</p>
+                      <p><strong>Control Motor:</strong> {evaluacionInicialTMO?.pruebas_funcionales_control_motor || '-'}</p>
+                    </div>
+                    
+                    <div className="md:col-span-2 bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+                      <span className="font-bold text-blue-900 block mb-1">Codificación Internacional Completa</span>
+                      <p><strong>CIE-10:</strong> {evaluacionInicialTMO?.cie10_codigo || '-'} {evaluacionInicialTMO?.cie10_glosa && `— ${evaluacionInicialTMO.cie10_glosa}`}</p>
+                      <p><strong>CIE-11:</strong> {evaluacionInicialTMO?.cie11_codigo || '-'} {evaluacionInicialTMO?.cie11_glosa && `— ${evaluacionInicialTMO.cie11_glosa}`}</p>
+                      <p><strong>CIF:</strong> {evaluacionInicialTMO?.diagnostico_cif || '-'}</p>
+                      <p><strong>APTA:</strong> {evaluacionInicialTMO?.diagnostico_apta || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+              </details>
+            )}
+
+            <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden">
+              
+              {/* PANEL IZQUIERDO (30% - col-span-12 lg:col-span-4): TIMELINE + CURVA ENA */}
+              <aside className="col-span-12 lg:col-span-4 h-full flex flex-col space-y-3 overflow-hidden">
               
               {/* TARJETA SUPERIOR: CURVA DE DOLOR ENA AMPLIA Y CÓMODA */}
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex-shrink-0 space-y-3">
@@ -885,38 +938,7 @@ export function ClinicalRecordView({
                         </span>
                       )}
                       
-                {/* 4. Codificación AI Internacional */}
-                {evaluacionInicialTMO && (evaluacionInicialTMO?.cie10_codigo || evaluacionInicialTMO?.cie11_codigo || evaluacionInicialTMO?.diagnostico_cif) && (
-                  <div className="col-span-1 md:col-span-2 bg-gradient-to-r from-emerald-50 to-teal-50 p-5 rounded-xl border border-emerald-100 shadow-xs space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800 border-b border-emerald-200 pb-2 flex items-center gap-2">
-                      <Activity className="w-4 h-4" />
-                      4. Codificación Clínica y Diagnóstico IA
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                      <div className="bg-white p-3 rounded shadow-sm border border-emerald-100">
-                        <span className="font-extrabold text-emerald-700 block mb-1">CIE-10 (Fonasa)</span>
-                        <p className="font-mono text-slate-800">{evaluacionInicialTMO?.cie10_codigo || '-'}</p>
-                        <p className="text-slate-600 mt-1">{evaluacionInicialTMO?.cie10_glosa || '-'}</p>
-                      </div>
-                      <div className="bg-white p-3 rounded shadow-sm border border-emerald-100">
-                        <span className="font-extrabold text-emerald-700 block mb-1">CIE-11 (OMS)</span>
-                        <p className="font-mono text-slate-800">{evaluacionInicialTMO?.cie11_codigo || '-'}</p>
-                        <p className="text-slate-600 mt-1">{evaluacionInicialTMO?.cie11_glosa || '-'}</p>
-                      </div>
-                                            <div className="md:col-span-2 bg-white p-3 rounded shadow-sm border border-emerald-100">
-                        <span className="font-extrabold text-emerald-700 block mb-1">Diagnóstico Funcional CIF</span>
-                        <p className="text-slate-700">{evaluacionInicialTMO?.diagnostico_cif || '-'}</p>
-                      </div>
-                      
-                      {evaluacionInicialTMO?.diagnostico_apta && (
-                        <div className="md:col-span-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                          <span className="text-xs font-extrabold uppercase text-blue-900 block mb-1">Diagnóstico Kinésico APTA:</span>
-                          <p className="text-sm text-blue-950">{evaluacionInicialTMO.diagnostico_apta}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+
 
                 </div>
               </div>
@@ -941,84 +963,38 @@ export function ClinicalRecordView({
                   </span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 mt-2.5">
-                  {historialSOAP.length === 0 ? (
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 mt-2.5">
+                  {notasCronologicas.length === 0 ? (
                     <p className="text-xs text-slate-400 italic py-6 text-center">
                       No hay notas clínicas previas.
                     </p>
                   ) : (
-                    historialSOAP.map((nota) => {
-                      const expandida = notaExpandidaId === nota.id;
-                      const enaNum = nota.nivel_dolor_ena ?? 0;
-                      return (
-                        <div
-                          key={nota.id}
-                          className="border border-slate-200 rounded-xl p-3 text-xs space-y-2 hover:border-slate-300 transition-colors bg-slate-50/50"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-slate-800 font-mono text-xs">{nota.fecha}</span>
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                              enaNum <= 3 
-                                ? 'bg-emerald-100 text-emerald-800' 
-                                : enaNum <= 6
-                                ? 'bg-amber-100 text-amber-900'
-                                : 'bg-rose-100 text-rose-900'
-                            }`}>
-                              ENA {enaNum}/10
-                            </span>
-
-                            <div className="ml-auto flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleIniciarEdicionNota(nota)}
-                                className="p-1 text-slate-400 hover:text-blue-600 rounded cursor-pointer text-xs hover:bg-blue-50 transition-colors"
-                                title="Editar fecha o nota SOAP"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleEliminarNota(nota.id)}
-                                className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer text-xs hover:bg-rose-50 transition-colors"
-                                title="Eliminar evolución"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                    notasCronologicas.map((ev, idx) => (
+                      <details key={ev.id} className="p-3 bg-white border border-slate-200 rounded-xl group">
+                        <summary className="cursor-pointer flex justify-between items-center text-xs font-bold text-slate-800 list-none">
+                          <div className="flex items-center gap-2">
+                            <span>Sesión {idx + 1} · {ev.fecha}</span>
+                            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full font-mono">ENA {ev.nivel_dolor_ena ?? 0}/10</span>
                           </div>
-
-                          {/* Resumen o Despliegue Completo */}
-                          {expandida ? (
-                            <div className="space-y-2 pt-2 border-t border-slate-200 text-slate-700 leading-relaxed">
-                              {nota.s_subjetivo && <p><strong>S:</strong> {nota.s_subjetivo}</p>}
-                              {nota.o_objetivo && <p><strong>O:</strong> {nota.o_objetivo}</p>}
-                              {nota.a_analisis && <p><strong>A:</strong> {nota.a_analisis}</p>}
-                              {nota.p_plan && <p><strong>P:</strong> {nota.p_plan}</p>}
-                              <button
-                                type="button"
-                                onClick={() => setNotaExpandidaId(null)}
-                                className="text-blue-600 hover:underline font-semibold text-[11px] block mt-1 cursor-pointer"
-                              >
-                                Contraer ▲
-                              </button>
-                            </div>
-                          ) : (
-                            <div>
-                              <p className="text-slate-600 line-clamp-2">
-                                {nota.s_subjetivo || nota.o_objetivo || 'Evolución registrada.'}
-                              </p>
-                              <button
-                                type="button"
-                                onClick={() => setNotaExpandidaId(nota.id)}
-                                className="text-blue-600 hover:underline font-semibold text-[11px] block mt-1 cursor-pointer"
-                              >
-                                Leer más ▼
-                              </button>
-                            </div>
-                          )}
+                          <ChevronDown className="w-4 h-4 text-slate-400 group-open:hidden" />
+                          <ChevronUp className="w-4 h-4 text-slate-400 hidden group-open:block" />
+                        </summary>
+                        <div className="mt-2 pt-2 border-t text-xs text-slate-600 space-y-1 relative">
+                          <div className="absolute right-0 top-0 flex gap-1 bg-white pl-2">
+                            <button type="button" onClick={() => handleIniciarEdicionNota(ev)} className="p-1 text-slate-400 hover:text-blue-600 cursor-pointer">
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button type="button" onClick={() => handleEliminarNota(ev.id)} className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          {ev.s_subjetivo && <p className="pr-12"><strong>S:</strong> {ev.s_subjetivo}</p>}
+                          {ev.o_objetivo && <p className="pr-12"><strong>O:</strong> {ev.o_objetivo}</p>}
+                          {ev.a_analisis && <p className="pr-12"><strong>A:</strong> {ev.a_analisis}</p>}
+                          {ev.p_plan && <p className="pr-12"><strong>P:</strong> {ev.p_plan}</p>}
                         </div>
-                      );
-                    })
+                      </details>
+                    ))
                   )}
                 </div>
               </div>
@@ -1242,7 +1218,7 @@ export function ClinicalRecordView({
 
               </form>
             </main>
-
+          </div>
           </div>
         )}
 
