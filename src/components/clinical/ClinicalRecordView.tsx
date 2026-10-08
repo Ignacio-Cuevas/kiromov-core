@@ -146,6 +146,17 @@ export const formatearFechaLimpia = (fechaStr: string) => {
   return fechaLimpia;
 };
 
+export const formatearFechaChile = (fechaStr: string) => {
+  if (!fechaStr) return "-";
+  const fecha = new Date(`${fechaStr}T12:00:00-03:00`);
+  if (isNaN(fecha.getTime())) return fechaStr;
+  const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const diaSemana = dias[fecha.getDay()];
+  const dd = String(fecha.getDate()).padStart(2, '0');
+  const mm = String(fecha.getMonth() + 1).padStart(2, '0');
+  return `${diaSemana} ${dd}/${mm}`;
+};
+
 export function ClinicalRecordView({
   pacienteId,
   citaId,
@@ -257,6 +268,23 @@ export function ClinicalRecordView({
   const [editP, setEditP] = useState<string>('');
   const [savingNotaEdit, setSavingNotaEdit] = useState<boolean>(false);
 
+  const cargarProximaCita = async (id: string) => {
+    if (!supabase) return;
+    const hoyStr = getChileanDate();
+    const { data } = await supabase
+      .from('citas_atenciones')
+      .select('id, fecha, hora, estado, profesional, motivo_consulta')
+      .eq('paciente_id', id)
+      .gte('fecha', hoyStr)
+      .not('estado', 'in', '("cancelada","no_asistio")')
+      .order('fecha', { ascending: true })
+      .order('hora', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    setProximaCita(data || null);
+  };
+
   // Carga de datos de Supabase
   const cargarDatos = async () => {
     if (!pacienteId || !supabase) return;
@@ -291,18 +319,7 @@ export function ClinicalRecordView({
       if (soaps) setHistorialSOAP(soaps);
 
       // Próxima Cita
-      const hoyStr = getChileanDate();
-      const { data: proxima } = await supabase
-        .from('citas_atenciones')
-        .select('id, fecha, hora, motivo_consulta, estado')
-        .eq('paciente_id', pacienteId)
-        .in('estado', ['pendiente', 'confirmada'])
-        .gte('fecha', hoyStr)
-        .order('fecha', { ascending: true })
-        .order('hora', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      setProximaCita(proxima || null);
+      await cargarProximaCita(pacienteId);
 
       // Todas las citas del paciente (para pestaña Plan)
       const { data: citas } = await supabase
@@ -622,6 +639,24 @@ export function ClinicalRecordView({
           }`}>
             {estaAlDia ? '✓ Al día' : `🔴 Cobro Pendiente`}
           </span>
+
+          {/* Indicador de Próxima Cita */}
+          {proximaCita ? (
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200/80 text-emerald-900 rounded-full text-xs font-medium shadow-2xs shrink-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>
+                Próxima Cita:{' '}
+                <strong className="font-semibold text-emerald-950 font-mono">
+                  {formatearFechaChile(proximaCita.fecha)} · {proximaCita.hora?.slice(0, 5)} hrs
+                </strong>
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 text-amber-900 rounded-full text-xs font-medium shrink-0">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <span>Sin próxima cita agendada</span>
+            </div>
+          )}
           {tieneBanderasRojas && (
             <div className="inline-flex items-center gap-1 text-xs font-extrabold px-2.5 py-1 rounded-lg bg-rose-600 text-white animate-pulse shrink-0 shadow-xs">
               <ShieldAlert className="w-3.5 h-3.5" />
