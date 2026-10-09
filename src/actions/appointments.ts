@@ -281,6 +281,14 @@ export async function createScheduleAppointmentAction(
       if (newlyCreatedPatientId) {
         await supabase.from('pacientes').delete().eq('id', newlyCreatedPatientId);
       }
+      
+      if (errCita?.code === '23505') {
+        return {
+          success: false,
+          error: 'El horario seleccionado ya se encuentra ocupado por otra atención. Por favor elija otro bloque.',
+        };
+      }
+      
       return {
         success: false,
         error: `Error al registrar la cita: ${errCita?.message || 'No se pudo crear la cita'}`,

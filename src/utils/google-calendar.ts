@@ -99,3 +99,39 @@ export async function eliminarEventoGoogleCalendar(googleEventId: string): Promi
     return false;
   }
 }
+
+// C. MODIFICAR EVENTO
+export async function modificarEventoGoogleCalendar(googleEventId: string, params: {
+  fecha: string; // YYYY-MM-DD
+  hora: string;  // HH:mm:ss o HH:mm
+}): Promise<boolean> {
+  try {
+    if (!googleEventId) return false;
+    const calendar = getCalendarClient();
+    
+    const horaLimpia = (params.hora || '09:00').slice(0, 5);
+    const startDateTime = `${params.fecha}T${horaLimpia}:00-03:00`;
+    
+    const [hStr, mStr] = horaLimpia.split(':');
+    const h = parseInt(hStr, 10) || 0;
+    const m = parseInt(mStr, 10) || 0;
+    const totalMinutes = h * 60 + m + 45;
+    const endH = String(Math.floor(totalMinutes / 60) % 24).padStart(2, '0');
+    const endM = String(totalMinutes % 60).padStart(2, '0');
+    const endDateTime = `${params.fecha}T${endH}:${endM}:00-03:00`;
+
+    await calendar.events.patch({
+      calendarId: CALENDAR_ID,
+      eventId: googleEventId,
+      requestBody: {
+        start: { dateTime: startDateTime, timeZone: 'America/Santiago' },
+        end: { dateTime: endDateTime, timeZone: 'America/Santiago' },
+      },
+    });
+
+    return true;
+  } catch (error) {
+    console.error('[Google Calendar API] Error modificando evento:', error);
+    return false;
+  }
+}

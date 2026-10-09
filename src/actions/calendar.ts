@@ -2,7 +2,8 @@
 
 import { 
   crearEventoGoogleCalendar as crearEventoGoogleCalendarUtil, 
-  eliminarEventoGoogleCalendar as eliminarEventoGoogleCalendarUtil 
+  eliminarEventoGoogleCalendar as eliminarEventoGoogleCalendarUtil,
+  modificarEventoGoogleCalendar as modificarEventoGoogleCalendarUtil
 } from '@/utils/google-calendar';
 
 export async function crearEventoGoogleCalendar(params: {
@@ -17,6 +18,10 @@ export async function crearEventoGoogleCalendar(params: {
 
 export async function eliminarEventoGoogleCalendar(googleEventId: string) {
   return await eliminarEventoGoogleCalendarUtil(googleEventId);
+}
+
+export async function modificarEventoGoogleCalendar(googleEventId: string, params: { fecha: string; hora: string; }) {
+  return await modificarEventoGoogleCalendarUtil(googleEventId, params);
 }
 
 export async function syncEventToGoogleCalendar(payload: {
@@ -59,10 +64,16 @@ export async function syncEventToGoogleCalendar(payload: {
     }
 
     if (payload.action === 'update_event') {
-      if (payload.google_event_id) {
-        await eliminarEventoGoogleCalendarUtil(payload.google_event_id);
-      }
-      if (payload.fecha && payload.hora) {
+      if (payload.google_event_id && payload.fecha && payload.hora) {
+        const modificado = await modificarEventoGoogleCalendarUtil(payload.google_event_id, {
+          fecha: payload.fecha,
+          hora: payload.hora
+        });
+        if (modificado) {
+          return { success: true, google_event_id: payload.google_event_id };
+        }
+      } else if (payload.fecha && payload.hora) {
+        // Si no tiene google_event_id, crearlo
         const nuevoEventId = await crearEventoGoogleCalendarUtil({
           pacienteNombre: payload.paciente_nombre || 'Paciente Kiromov',
           pacienteTelefono: payload.paciente_telefono,
