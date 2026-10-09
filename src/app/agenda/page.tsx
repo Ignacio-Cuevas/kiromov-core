@@ -152,16 +152,12 @@ function AgendaContent() {
   const handleSincronizarCalendario = async () => {
     setIsSyncing(true);
     try {
-      const res = await fetch('/api/calendar/sync-all', { method: 'POST' });
+      const res = await fetch('/api/calendar/sync', { method: 'POST' });
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Error al sincronizar con Google Calendar');
       }
-      if (data.totalSincronizadas > 0) {
-        toast.success(`¡Sincronización exitosa! Se sincronizaron ${data.totalSincronizadas} citas con Google Calendar.`);
-      } else {
-        toast.info('Todas las citas vigentes ya estaban sincronizadas con Google Calendar.');
-      }
+      toast.success(data.message || 'Sincronización exitosa');
       loadAgenda();
     } catch (err: any) {
       console.error('Error sincronizando calendario:', err);
@@ -810,6 +806,8 @@ function AgendaContent() {
                 onBloquearHorario={() => setShowBlockModal(true)}
                 filtroEstado={filtroEstado}
                 onFiltroEstadoChange={(f) => setFiltroEstado(f)}
+                onSincronizar={handleSincronizarCalendario}
+                isSyncing={isSyncing}
               />
 
               {loading ? (

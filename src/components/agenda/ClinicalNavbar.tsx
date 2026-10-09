@@ -15,6 +15,8 @@ interface ClinicalNavbarProps {
   onBloquearHorario?: () => void;
   filtroEstado?: FiltroEstadoCitas;
   onFiltroEstadoChange?: (f: FiltroEstadoCitas) => void;
+  onSincronizar?: () => void;
+  isSyncing?: boolean;
 }
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -42,7 +44,7 @@ function formatearTitulo(fechaBase: Date, vista: 'dia' | 'semana'): string {
   return `Semana del ${diaIni} de ${MESES[lunes.getMonth()]} al ${diaFin} de ${MESES[sabado.getMonth()]} de ${sabado.getFullYear()}`;
 }
 
-export function ClinicalNavbar({ fechaBase, vista, onVistaChange, onChangeDate, onToday, onNuevaCita, onBloquearHorario, filtroEstado = 'todas', onFiltroEstadoChange }: ClinicalNavbarProps) {
+export function ClinicalNavbar({ fechaBase, vista, onVistaChange, onChangeDate, onToday, onNuevaCita, onBloquearHorario, filtroEstado = 'todas', onFiltroEstadoChange, onSincronizar, isSyncing }: ClinicalNavbarProps) {
   const titulo = formatearTitulo(fechaBase, vista);
   return (
     <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-4">
@@ -69,6 +71,19 @@ export function ClinicalNavbar({ fechaBase, vista, onVistaChange, onChangeDate, 
           </div>
         )}
         <div className="w-px h-6 bg-slate-200 hidden md:block"></div>
+        
+        {onSincronizar && (
+          <button
+            onClick={onSincronizar}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-xl shadow-xs transition-all disabled:opacity-50"
+            title="Sincronizar citas bidireccionalmente con Google Calendar"
+          >
+            <span className={isSyncing ? 'animate-spin' : ''}>🔄</span>
+            <span className="hidden sm:inline">{isSyncing ? 'Sincronizando...' : 'Google Calendar'}</span>
+          </button>
+        )}
+
         <div className="inline-flex items-center rounded-xl border border-slate-200 bg-slate-100/80 p-0.5">
           <button type="button" onClick={() => onVistaChange('dia')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${vista === 'dia' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Día</button>
           <button type="button" onClick={() => onVistaChange('semana')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${vista === 'semana' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Semana</button>

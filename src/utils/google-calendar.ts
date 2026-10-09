@@ -6,7 +6,7 @@ export function getLastCalendarError() {
   return lastCalendarError;
 }
 
-const getCalendarClient = () => {
+export const getGoogleCalendarClient = () => {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   let rawKey = process.env.GOOGLE_PRIVATE_KEY;
 
@@ -32,7 +32,9 @@ const getCalendarClient = () => {
     ],
   });
 
-  return google.calendar({ version: 'v3', auth });
+  const calendarId = process.env.GOOGLE_CALENDAR_ID || 'ignacio.kiromov@gmail.com';
+
+  return { calendar: google.calendar({ version: 'v3', auth }), calendarId };
 };
 
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'ignacio.kiromov@gmail.com';
@@ -47,7 +49,7 @@ export async function crearEventoGoogleCalendar(params: {
 }): Promise<string | null> {
   try {
     lastCalendarError = null;
-    const calendar = getCalendarClient();
+    const { calendar } = getGoogleCalendarClient();
     
     // Construir fechas ISO con zona horaria de Chile (-03:00)
     const horaLimpia = (params.hora || '09:00').slice(0, 5);
@@ -87,7 +89,7 @@ export async function crearEventoGoogleCalendar(params: {
 export async function eliminarEventoGoogleCalendar(googleEventId: string): Promise<boolean> {
   try {
     if (!googleEventId) return false;
-    const calendar = getCalendarClient();
+    const { calendar } = getGoogleCalendarClient();
     await calendar.events.delete({
       calendarId: CALENDAR_ID,
       eventId: googleEventId,
@@ -107,7 +109,7 @@ export async function modificarEventoGoogleCalendar(googleEventId: string, param
 }): Promise<boolean> {
   try {
     if (!googleEventId) return false;
-    const calendar = getCalendarClient();
+    const { calendar } = getGoogleCalendarClient();
     
     const horaLimpia = (params.hora || '09:00').slice(0, 5);
     const startDateTime = `${params.fecha}T${horaLimpia}:00-03:00`;
