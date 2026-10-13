@@ -9,6 +9,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        kiromov: {
+          primary: 'var(--kiromov-primary)',
+          'primary-hover': 'var(--kiromov-primary-hover)',
+          'primary-subtle': 'var(--kiromov-primary-subtle)',
+          'primary-border': 'var(--kiromov-primary-border)',
+        },
+        surface: {
+          canvas: 'var(--surface-canvas)',
+          card: 'var(--surface-card)',
+          muted: 'var(--surface-muted)',
+        },
         'ink-navy': '#0b3558',
         'signal-blue': '#006bff',
         'slate-gray': '#476788',
@@ -23,8 +34,7 @@ const config: Config = {
         'deep-cobalt': '#004eba',
       },
       fontFamily: {
-        sans: ['Manrope', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        gilroy: ['Gilroy', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-sans)', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         'calendly': 'rgba(71, 103, 136, 0.04) 0px 4px 5px 0px, rgba(71, 103, 136, 0.03) 0px 4px 10px 0px, rgba(71, 103, 136, 0.05) 0px 10px 20px 0px',

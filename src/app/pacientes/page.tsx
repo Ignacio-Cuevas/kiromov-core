@@ -421,7 +421,7 @@ export default function PacientesPage() {
   }, [pacientesFiltrados]);
 
   return (
-    <div className="min-h-screen bg-cloud pb-16 font-gilroy text-ink-navy overflow-x-hidden">
+    <div className="min-h-screen bg-cloud pb-16 font-sans text-ink-navy overflow-x-hidden">
       
       {/* Contenedor Principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8 print:hidden overflow-x-hidden">

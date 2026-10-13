@@ -2,6 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Marca Institucional Kiromov */
+  --kiromov-primary: #059669;        /* Emerald 600 */
+  --kiromov-primary-hover: #047857;  /* Emerald 700 */
+  --kiromov-primary-subtle: #ecfdf5; /* Emerald 50 */
+  --kiromov-primary-border: #a7f3d0; /* Emerald 200 */
+
+  /* Neutros Clínicos (Base Slate) */
+  --surface-canvas: #f8fafc;
+  --surface-card: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text-main: #0f172a;
+  --text-body: #334155;
+  --text-muted: #64748b;
+
+  /* Semáforo de Estado Clínico */
+  --status-pending-bg: #fffbeb;
+  --status-pending-text: #b45309;
+  --status-pending-border: #fde68a;
+
+  --status-confirmed-bg: #ecfdf5;
+  --status-confirmed-text: #047857;
+  --status-confirmed-border: #a7f3d0;
+
+  --status-attended-bg: #f8fafc;
+  --status-attended-text: #475569;
+  --status-attended-border: #e2e8f0;
+
+  --status-noshow-bg: #fff1f2;
+  --status-noshow-text: #be123c;
+  --status-noshow-border: #fecdd3;
+}
+
 @layer base {
   body {
     @apply bg-cloud text-ink-navy antialiased;

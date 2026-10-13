@@ -4,6 +4,13 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import "./globals.css";
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
+import { Inter } from "next/font/google";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "KIROMOV Core | Centro Clínico",
@@ -16,8 +23,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className="h-full">
-      <body className="bg-slate-50/60 text-slate-900 antialiased flex flex-col min-h-full font-gilroy">
+    <html lang="es" className={`h-full ${inter.variable}`}>
+      <body className="bg-slate-50/60 text-slate-900 antialiased flex flex-col min-h-full font-sans">
         <div className="flex min-h-screen bg-slate-50/60 text-slate-900 antialiased">
           {/* Sidebar fijo en escritorio */}
           <Sidebar />

@@ -301,7 +301,7 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
 
 
   return (
-    <div className="min-h-screen bg-cloud pb-20 font-gilroy text-ink-navy">
+    <div className="min-h-screen bg-cloud pb-20 font-sans text-ink-navy">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6 sm:space-y-8 print:hidden">
         
         {/* HEADER Y FILTRO */}
