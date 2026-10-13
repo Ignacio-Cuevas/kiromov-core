@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { getChileanDate, formatCLP, getWhatsAppUrl } from '@/lib/utils';
+import { generarEnlaceWhatsAppConfirmacion } from '@/utils/whatsapp';
 import { AppointmentModal } from '@/components/appointments/AppointmentModal';
 import { InitialEvaluationModal } from '@/components/clinical/InitialEvaluationModal';
 import { DischargeReportModal } from '@/components/clinical/DischargeReportModal';
@@ -615,11 +616,20 @@ export function ClinicalRecordView({
           </span>
           {paciente?.telefono ? (
             <a
-              href={getWhatsAppUrl(paciente.telefono, paciente.nombre_completo)}
+              href={
+                proximaCita
+                  ? generarEnlaceWhatsAppConfirmacion({
+                      paciente_nombre: paciente.nombre_completo,
+                      paciente_telefono: paciente.telefono,
+                      fecha: proximaCita.fecha,
+                      hora: proximaCita.hora || '09:00:00',
+                    })
+                  : getWhatsAppUrl(paciente.telefono, paciente.nombre_completo)
+              }
               target="_blank"
               rel="noreferrer"
               className="text-xs font-mono text-slate-600 bg-slate-50 border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 px-2 py-0.5 rounded-md shrink-0 transition-colors"
-              title="Contactar por WhatsApp"
+              title={proximaCita ? "Confirmar próxima cita por WhatsApp" : "Contactar por WhatsApp"}
             >
               💬 {paciente.telefono}
             </a>
@@ -659,6 +669,22 @@ export function ClinicalRecordView({
                   {formatearFechaChile(proximaCita.fecha)} · {proximaCita.hora?.slice(0, 5)} hrs
                 </strong>
               </span>
+              {paciente?.telefono && (
+                <a
+                  href={generarEnlaceWhatsAppConfirmacion({
+                    paciente_nombre: paciente.nombre_completo,
+                    paciente_telefono: paciente.telefono,
+                    fecha: proximaCita.fecha,
+                    hora: proximaCita.hora || '09:00:00',
+                  })}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ml-1 px-1.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] inline-flex items-center gap-1 transition-colors"
+                  title="Enviar confirmación oficial de cita por WhatsApp (Google Calendar + Vestimenta)"
+                >
+                  💬 Confirmar
+                </a>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 text-amber-900 rounded-full text-xs font-medium shrink-0">
@@ -1649,15 +1675,33 @@ export function ClinicalRecordView({
                                 {cita.motivo_consulta || 'Sesión Kinésica TMO'}
                               </td>
                               <td className="px-4 py-2.5">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  ['asistio', 'asistió', 'atendido'].includes((cita.estado || '').toLowerCase())
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : cita.estado === 'confirmada'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-slate-100 text-slate-700'
-                                }`}>
-                                  {cita.estado || 'Pendiente'}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    ['asistio', 'asistió', 'atendido'].includes((cita.estado || '').toLowerCase())
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : cita.estado === 'confirmada'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-slate-100 text-slate-700'
+                                  }`}>
+                                    {cita.estado || 'Pendiente'}
+                                  </span>
+                                  {paciente?.telefono && cita.fecha && (
+                                    <a
+                                      href={generarEnlaceWhatsAppConfirmacion({
+                                        paciente_nombre: paciente.nombre_completo,
+                                        paciente_telefono: paciente.telefono,
+                                        fecha: cita.fecha,
+                                        hora: cita.hora || '09:00:00',
+                                      })}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-slate-400 hover:text-emerald-600 transition-colors"
+                                      title="Enviar confirmación de esta cita por WhatsApp"
+                                    >
+                                      💬
+                                    </a>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-4 py-2.5 text-slate-600">
                                 {cita.profesional || 'Klgo. Ignacio Cuevas'}

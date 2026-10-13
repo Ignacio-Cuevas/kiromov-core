@@ -3,6 +3,7 @@
 import React from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { formatRut, formatCLP, getWhatsAppUrl } from '@/lib/utils';
+import { generarEnlaceWhatsAppConfirmacion } from '@/utils/whatsapp';
 import { 
   Calendar, 
   Clock, 
@@ -79,12 +80,17 @@ export function AppointmentPopover({
   const debePago = p.estado_pago === 'pendiente' && (p.monto_clp || p.valor_total || 0) > 0;
   const deudaMonto = p.monto_clp || p.valor_total || 0;
 
-  // Mensaje de confirmación WhatsApp
-  const primerNombre = (p.nombre_completo || '').split(' ')[0] || 'Estimado/a';
   const fechaChile = cita.fecha ? cita.fecha.split('-').reverse().join('/') : '';
-  const cleanPhone = (p.telefono || '').replace(/\D/g, '');
-  const textoWhatsApp = `Hola ${primerNombre}, te escribimos de KIROMOV Centro Clínico para confirmar tu sesión de kinesiología agendada para el ${fechaChile} a las ${horaInicio} hrs (Bulnes 470, Of. 75, Chillán). Por favor respóndenos este mensaje para confirmar tu asistencia. ¡Muchas gracias!`;
-  const whatsappUrl = cleanPhone ? `https://wa.me/56${cleanPhone.slice(-9)}?text=${encodeURIComponent(textoWhatsApp)}` : '';
+  // Mensaje de confirmación WhatsApp con enlace de Google Calendar y recomendación clínica
+  const phone = p.telefono || cita.paciente_telefono;
+  const whatsappUrl = phone && cita.fecha
+    ? generarEnlaceWhatsAppConfirmacion({
+        paciente_nombre: nombrePaciente,
+        paciente_telefono: phone,
+        fecha: cita.fecha,
+        hora: cita.hora || horaInicio || '09:00:00',
+      })
+    : '';
 
   return (
     <Popover.Root open={open} onOpenChange={onOpenChange}>

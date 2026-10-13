@@ -8,6 +8,7 @@ import {
   evaluarRiesgoDesercion 
 } from '@/lib/clinical';
 import { formatCLP, formatRut, getWhatsAppUrl } from '@/lib/utils';
+import { generarEnlaceWhatsAppConfirmacion } from '@/utils/whatsapp';
 import { 
   FileText, 
   Calendar, 
@@ -47,6 +48,10 @@ export interface PacienteResumen {
   antecedentes_medicos?: string | null;
   banderas_rojas?: string | null;
   alertas_seguridad?: string | null;
+  proxima_cita?: {
+    fecha: string;
+    hora: string;
+  } | null;
 }
 
 interface PatientsDataGridProps {
@@ -246,11 +251,24 @@ export function PatientsDataGrid({
                       {/* WhatsApp */}
                       {cleanPhone ? (
                         <a
-                          href={getWhatsAppUrl(cleanPhone, p.nombre_completo)}
+                          href={
+                            p.proxima_cita?.fecha
+                              ? generarEnlaceWhatsAppConfirmacion({
+                                  paciente_nombre: p.nombre_completo,
+                                  paciente_telefono: cleanPhone,
+                                  fecha: p.proxima_cita.fecha,
+                                  hora: p.proxima_cita.hora || '09:00:00',
+                                })
+                              : getWhatsAppUrl(cleanPhone, p.nombre_completo)
+                          }
                           target="_blank"
                           rel="noreferrer"
                           className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 border border-transparent transition-colors"
-                          title="Enviar mensaje WhatsApp"
+                          title={
+                            p.proxima_cita?.fecha
+                              ? 'Enviar confirmación de próxima cita por WhatsApp'
+                              : 'Enviar mensaje WhatsApp'
+                          }
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
                         </a>

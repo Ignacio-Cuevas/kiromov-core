@@ -19,6 +19,7 @@ type CitaExtendida = CitaAtencion & {
   paciente_id?: string;
 };
 import { formatRut, formatCLP } from '@/lib/utils';
+import { generarEnlaceWhatsAppConfirmacion } from '@/utils/whatsapp';
 import { toast } from 'sonner';
 import {
   Dialog, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter,
@@ -693,14 +694,12 @@ function AgendaContent() {
   };
 
   const generarMensajeConfirmacion = (cita: CitaExtendida) => {
-    const nombre = formatearNombre(cita?.pacientes?.nombre_completo);
-    const fechaCL = formatearFechaChilena(cita?.fecha || '');
-    const hora = cita?.hora?.slice(0, 5) || '16:00';
-    const telefonoLimpio = cita?.pacientes?.telefono ? String(cita.pacientes.telefono).replace(/\D/g, '').slice(-9) : '';
-
-    const texto = `Hola ${nombre}, te escribimos de Kiromov Centro Clínico para solicitar la confirmación de tu sesión de kinesiología programada para el ${fechaCL} a las ${hora} hrs (Bulnes 470, Of. 75, Chillán). Por favor respóndenos este mensaje para confirmar tu asistencia. ¡Muchas gracias!`;
-
-    return `https://wa.me/56${telefonoLimpio}?text=${encodeURIComponent(texto)}`;
+    return generarEnlaceWhatsAppConfirmacion({
+      paciente_nombre: cita?.pacientes?.nombre_completo || cita?.motivo_consulta || 'Paciente',
+      paciente_telefono: cita?.pacientes?.telefono,
+      fecha: cita?.fecha || '',
+      hora: cita?.hora || '09:00:00',
+    });
   };
 
   const renderCardCita = (cita: CitaExtendida, compact = false) => {

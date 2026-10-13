@@ -38,6 +38,8 @@ export function validateRut(rut: string): boolean {
   return dv === expectedDv;
 }
 
+export { generarEnlaceWhatsAppConfirmacion } from '@/utils/whatsapp';
+
 export function getWhatsAppUrl(phone: string, patientName?: string): string {
   if (!phone) return "#";
   let cleaned = phone.replace(/[^0-9]/g, "");
