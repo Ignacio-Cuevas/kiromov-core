@@ -32,6 +32,7 @@ export default function PlanesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activePlanCounts, setActivePlanCounts] = useState<Record<string, number>>({});
 
   const supabase = createClient();
 
@@ -43,13 +44,19 @@ export default function PlanesPage() {
       let fetchedPlanes: PlanCatalogo[] = [];
 
       if (supabase) {
-        const { data: catData, error } = await supabase
-          .from("catalogo_planes")
-          .select("id, nombre, categoria, total_sesiones, precio_clp, descripcion, activo")
-          .order("precio_clp", { ascending: true });
+        const [catRes, purchasesRes] = await Promise.all([
+          supabase
+            .from("catalogo_planes")
+            .select("id, nombre, categoria, total_sesiones, precio_clp, descripcion, activo")
+            .order("precio_clp", { ascending: true }),
+          supabase
+            .from("compras_planes")
+            .select("catalogo_plan_id, nombre_plan")
+            .eq("estado", "activo")
+        ]);
 
-        if (!error && catData && catData.length > 0) {
-            fetchedPlanes = catData.map((c: any) => ({
+        if (!catRes.error && catRes.data && catRes.data.length > 0) {
+            fetchedPlanes = catRes.data.map((c: any) => ({
               id: c.id,
               nombre_plan: c.nombre, // Map to internal type property
               categoria: c.categoria || "General",
@@ -60,6 +67,16 @@ export default function PlanesPage() {
               descripcion: c.descripcion,
             }));
         }
+
+        const counts: Record<string, number> = {};
+        purchasesRes.data?.forEach((ap: any) => {
+          if (ap.catalogo_plan_id) counts[ap.catalogo_plan_id] = (counts[ap.catalogo_plan_id] || 0) + 1;
+          if (ap.nombre_plan) {
+            const key = ap.nombre_plan.toLowerCase().trim();
+            counts[key] = (counts[key] || 0) + 1;
+          }
+        });
+        setActivePlanCounts(counts);
       }
 
       setPlanes(fetchedPlanes);
@@ -240,14 +257,14 @@ export default function PlanesPage() {
               <span>Actualizar</span>
             </Button>
 
-            {/* Botón Superior [ + Nuevo Plan / Tarifa ] con fondo azul primario visible */}
+            {/* Botón Superior [ + Nuevo Plan / Tarifa ] */}
             <button
               type="button"
               onClick={handleOpenCreate}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl px-4 py-2 flex items-center gap-2 shadow-xs transition-all text-sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl px-4 py-2 flex items-center gap-2 shadow-xs transition-all text-sm cursor-pointer"
             >
-              <Plus className="h-4 w-4" />
-              <span>+ Nuevo Plan / Tarifa</span>
+              <Plus className="w-4 h-4" />
+              <span>Nuevo Plan / Tarifa</span>
             </button>
           </div>
         </div>
@@ -340,6 +357,11 @@ export default function PlanesPage() {
                   ? Math.round(plan.precio_clp / plan.total_sesiones)
                   : plan.precio_clp;
 
+              const countActivos =
+                activePlanCounts[plan.id] ||
+                activePlanCounts[plan.nombre_plan.toLowerCase().trim()] ||
+                0;
+
               return (
                 <div
                   key={plan.id}
@@ -352,9 +374,12 @@ export default function PlanesPage() {
                   <div className="space-y-3">
                     {/* Header: Categoría & Estado en Venta */}
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         {getCategoryBadge(plan.categoria)}
                         {getTypeBadge(plan.tipo)}
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-md">
+                          👥 {countActivos} {countActivos === 1 ? 'paciente activo' : 'pacientes activos'}
+                        </span>
                       </div>
 
                       <button

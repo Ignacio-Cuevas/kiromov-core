@@ -40,7 +40,7 @@ import {
   DIAS_ORDENADOS
 } from '@/lib/availability';
 import { ScheduleAppointmentModal } from '@/components/appointments/ScheduleAppointmentModal';
-import { CheckoutRapidoModal } from '@/components/agenda/CheckoutRapidoModal';
+import { PaymentCheckoutModal } from '@/components/sales/PaymentCheckoutModal';
 
 function getFormattedLocalDate(d: Date): string {
   const year = d.getFullYear();
@@ -1035,10 +1035,13 @@ function AgendaContent() {
         <DialogFooter className="mt-6"><Button variant="outline" onClick={() => setDeletingCita(null)}>Atrás</Button><Button onClick={handleDeleteCita} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 text-white">{isDeleting ? 'Eliminando...' : 'Sí, cancelar cita'}</Button></DialogFooter>
       </Dialog>
 
-      <CheckoutRapidoModal
+      <PaymentCheckoutModal
         isOpen={!!checkoutCita}
         onClose={() => setCheckoutCita(null)}
         cita={checkoutCita}
+        paciente={checkoutCita?.pacientes}
+        pacienteId={checkoutCita?.paciente_id}
+        initialMode="sesion"
         onSuccess={() => {
           setCheckoutCita(null);
           loadAgenda();

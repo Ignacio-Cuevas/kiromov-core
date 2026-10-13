@@ -1,12 +1,12 @@
 'use client';
 
-import { Suspense, useEffect, useState, useMemo } from "react";
-import { SettlePaymentModal } from "@/components/sales/SettlePaymentModal";
+import React, { Suspense, useEffect, useState, useMemo, Fragment } from "react";
+import { PaymentCheckoutModal } from "@/components/sales/PaymentCheckoutModal";
 import { CancelPlanModal } from "@/components/sales/CancelPlanModal";
 import { EditExpenseModal } from "@/components/finanzas/EditExpenseModal";
 import { createClient } from "@/utils/supabase/client";
-import { formatCLP, formatRut , getChileanDate } from '@/lib/utils';
-import { Loader2, Plus, CreditCard, TrendingUp, TrendingDown, DollarSign, CheckCircle2, AlertTriangle, X } from "lucide-react";
+import { formatCLP, formatRut, getChileanDate } from '@/lib/utils';
+import { Loader2, Plus, CreditCard, TrendingUp, TrendingDown, DollarSign, CheckCircle2, AlertTriangle, X, ChevronRight, ChevronDown, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 // Componentes UI dummy para no romper dependencias
@@ -14,7 +14,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogBody, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getArancel } from '@/lib/pricing';
-import { CobrarDeudaModal, type DeudaItem } from '@/components/sales/CobrarDeudaModal';
+
+export interface DesgloseDeuda {
+  tipo: 'plan' | 'cita';
+  id: string;
+  fecha: string;
+  detalle: string;
+  saldo: number;
+}
+
+export interface DeudorConsolidado {
+  pacienteId: string;
+  paciente: any;
+  totalDeuda: number;
+  desglose: DesgloseDeuda[];
+}
 
 type PeriodoFiltro = 'este_mes' | 'mes_anterior' | 'este_semestre' | 'este_ano' | 'todo';
 type TabName = 'deben' | 'pagados' | 'planes' | 'egresos';
@@ -36,10 +50,10 @@ function FinanzasContent() {
   const [egresoForm, setEgresoForm] = useState({ concepto: '', categoria: 'Insumos Clínicos', monto: '', formaPago: 'Débito', fecha: '' });
   const [editingEgreso, setEditingEgreso] = useState<any | null>(null);
 
-  const [deudaItemToCobrar, setDeudaItemToCobrar] = useState<DeudaItem | null>(null);
-
-  // Modal Settle & Cancel
-  const [settlingPlan, setSettlingPlan] = useState<any>(null);
+  const [expandedDeudores, setExpandedDeudores] = useState<Set<string>>(new Set());
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [selectedDeudorForCheckout, setSelectedDeudorForCheckout] = useState<DeudorConsolidado | null>(null);
+  const [selectedDeudaItemForCheckout, setSelectedDeudaItemForCheckout] = useState<any | null>(null);
   const [cancelingPlan, setCancelingPlan] = useState<any>(null);
 
   const getRangoFechas = (tipo: string) => {
@@ -234,67 +248,117 @@ function FinanzasContent() {
   
   const hoyStr = new Date().toISOString().split('T')[0];
 
+  // Agrupación de Deudores Consolidados por Paciente Único (Fase 4)
+  const deudoresConsolidados = useMemo<DeudorConsolidado[]>(() => {
+    const map = new Map<string, DeudorConsolidado>();
+
+    // 1. Planes pendientes de pago
+    compras.forEach(t => {
+      if (t.estado !== 'activo') return;
+      const deuda = Number(t.saldo_pendiente ?? t.valor_total) || 0;
+      if (deuda <= 0) return;
+      if (t.estado_pago !== 'pendiente' && !t.saldo_pendiente) return;
+
+      const pacId = t.paciente_id;
+      if (!pacId) return;
+
+      const paciente = t.pacientes || { id: pacId, nombre_completo: 'Paciente sin registrar' };
+
+      if (!map.has(pacId)) {
+        map.set(pacId, {
+          pacienteId: pacId,
+          paciente: { ...paciente, id: pacId },
+          totalDeuda: 0,
+          desglose: []
+        });
+      }
+
+      const item = map.get(pacId)!;
+      item.totalDeuda += deuda;
+      item.desglose.push({
+        tipo: 'plan',
+        id: t.id,
+        fecha: t.fecha_compra ? t.fecha_compra.split('T')[0] : '',
+        detalle: t.nombre_plan || 'Plan Kinésico',
+        saldo: deuda
+      });
+    });
+
+    // 2. Citas pendientes de pago
+    citas.forEach(c => {
+      if (c.estado_pago !== 'pendiente_pago') return;
+      if (c.plan_id) return;
+      if (!c.fecha || c.fecha > hoyStr) return;
+
+      const pacId = c.paciente_id;
+      if (!pacId) return;
+
+      const arancel = getArancel(c.pacientes?.categoria_tarifa);
+      const deuda = Number(c.monto_cobrado) || arancel.sesion_individual;
+      const paciente = c.pacientes || { id: pacId, nombre_completo: 'Paciente sin registrar' };
+
+      if (!map.has(pacId)) {
+        map.set(pacId, {
+          pacienteId: pacId,
+          paciente: { ...paciente, id: pacId },
+          totalDeuda: 0,
+          desglose: []
+        });
+      }
+
+      const item = map.get(pacId)!;
+      item.totalDeuda += deuda;
+      item.desglose.push({
+        tipo: 'cita',
+        id: c.id,
+        fecha: c.fecha,
+        detalle: c.motivo_consulta || 'Sesión Kinésica TMO',
+        saldo: deuda
+      });
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.totalDeuda - a.totalDeuda);
+  }, [compras, citas, hoyStr]);
+
+  const deudoresCount = deudoresConsolidados.length;
+
   const porCobrarPeriodo = useMemo(() => {
-    const planesPendientes = compras
-      .filter((t) => t.estado === 'activo' && (t.estado_pago === 'pendiente' || (t.saldo_pendiente && t.saldo_pendiente > 0)))
-      .reduce((acc, curr) => acc + (Number(curr.saldo_pendiente ?? curr.valor_total) || 0), 0);
-    
-    const citasPendientes = citas
-      .filter((c) => c.estado_pago === 'pendiente_pago' && !c.plan_id && c.fecha && c.fecha <= hoyStr)
-      .reduce((acc, curr) => acc + (Number(curr.monto_cobrado) || getArancel(curr.pacientes?.categoria_tarifa).sesion_individual), 0);
+    return deudoresConsolidados.reduce((acc, curr) => acc + curr.totalDeuda, 0);
+  }, [deudoresConsolidados]);
 
-    return planesPendientes + citasPendientes;
-  }, [compras, citas, hoyStr]);
+  const toggleExpandDeudor = (pacienteId: string) => {
+    setExpandedDeudores(prev => {
+      const next = new Set(prev);
+      if (next.has(pacienteId)) next.delete(pacienteId);
+      else next.add(pacienteId);
+      return next;
+    });
+  };
 
-  const deudoresCount = useMemo(() => {
-    const ids = new Set<string>();
-    compras
-      .filter((t) => t.estado === 'activo' && (t.estado_pago === 'pendiente' || (t.saldo_pendiente && t.saldo_pendiente > 0)))
-      .filter((t) => (Number(t.saldo_pendiente ?? t.valor_total) || 0) > 0)
-      .forEach(t => ids.add(t.paciente_id));
-    citas
-      .filter((c) => c.estado_pago === 'pendiente_pago' && !c.plan_id && c.fecha && c.fecha <= hoyStr)
-      .forEach(c => ids.add(c.paciente_id));
-    return ids.size;
-  }, [compras, citas, hoyStr]);
-
-  // Arrays derivados para las tabs de "Quién Debe"
-  const planesPendientesLista = useMemo(() => compras.filter(t => {
-    if (t.estado !== 'activo') return false;
-    const deuda = t.saldo_pendiente ?? (t.valor_total ?? 0);
-    return deuda > 0 && (t.estado_pago === 'pendiente' || t.saldo_pendiente > 0);
-  }), [compras]);
-  
-  const citasPendientesLista = useMemo(() => citas.filter(c => {
-    if (c.estado_pago !== 'pendiente_pago') return false;
-    if (c.plan_id) return false;
-    if (!c.fecha || c.fecha > hoyStr) return false;
-    return true;
-  }).map(c => {
-    const arancel = getArancel(c.pacientes?.categoria_tarifa);
-    const valorTotal = Number(c.monto_cobrado) || arancel.sesion_individual;
-    return { ...c, valorRealCalculado: valorTotal };
-  }), [citas, hoyStr]);
-  
   const planesActivosLista = useMemo(() => {
     return compras.filter(t => t.estado === 'activo' && (t.total_sesiones > t.sesiones_usadas));
   }, [compras]);
 
-  const handleCobrarCita = (telefono: string, nombre: string, monto: number, fecha: string) => {
-    const cleanPhone = (telefono || '').replace(/\D/g, '').slice(-9);
-    if (!cleanPhone) { toast.error('Paciente sin teléfono'); return; }
-    
-    const texto = `Hola ${nombre.split(' ')[0]}, te saludamos de Kiromov Centro Clínico.
-Esperamos que tu tratamiento vaya muy bien. Te recordamos que mantienes un saldo pendiente de ${formatCLP(monto)} correspondiente a tu atención del día ${fecha}.
+  const handleCobrarWhatsApp = (deudor: DeudorConsolidado) => {
+    const telefono = deudor.paciente?.telefono || '';
+    const cleanPhone = telefono.replace(/\D/g, '').slice(-9);
+    if (!cleanPhone) {
+      toast.error('Paciente sin teléfono registrado');
+      return;
+    }
 
-Puedes transferir a los datos de la clínica:
+    const primerNombre = (deudor.paciente?.nombre_completo || '').split(' ')[0] || 'Estimado/a';
+    const texto = `Hola ${primerNombre}, te saludamos de KIROMOV Centro Clínico.
+Esperamos que tu tratamiento vaya muy bien. Te recordamos que mantienes un saldo pendiente consolidado de ${formatCLP(deudor.totalDeuda)}.
+
+Datos para transferencia:
 • Banco: Santander
 • Tipo de Cuenta: Corriente
 • N° Cuenta: 7654321
-• Rut: 76.543.210-9
+• RUT: 76.543.210-9
 • Correo: pagos@kiromov.cl
 
-Si ya realizaste la transferencia, por favor envíanos el comprobante por este medio. ¡Muchas gracias!`;
+Por favor envíanos tu comprobante por este medio al realizar el pago. ¡Muchas gracias!`;
 
     window.open(`https://wa.me/56${cleanPhone}?text=${encodeURIComponent(texto)}`, '_blank');
   };
@@ -459,10 +523,10 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
                   </div>
                 )}
 
-                {/* 3. QUIÉN DEBE */}
+                {/* 3. QUIÉN DEBE (Consolidado por Paciente Único) */}
                 {activeTab === 'deben' && (
                   <div className="overflow-x-auto">
-                    {planesPendientesLista.length === 0 && citasPendientesLista.length === 0 ? (
+                    {deudoresConsolidados.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                         <CheckCircle2 className="w-12 h-12 mb-3 text-emerald-400" />
                         <p className="text-base font-bold text-slate-700">¡Todo al día!</p>
@@ -470,118 +534,157 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
                       </div>
                     ) : (
                       <table className="w-full text-left text-sm whitespace-nowrap">
-                        <thead className="bg-amber-50 text-amber-700 border-b border-amber-100 text-xs uppercase tracking-wider font-bold">
+                        <thead className="bg-amber-50 text-amber-900 border-b border-amber-200 text-xs uppercase tracking-wider font-bold">
                           <tr>
                             <th className="py-3 px-4">Paciente</th>
                             <th className="py-3 px-4">Teléfono</th>
-                            <th className="py-3 px-4">Adeuda</th>
-                            <th className="py-3 px-4 text-right">Total</th>
-                            <th className="py-3 px-4 text-right">Pagado</th>
-                            <th className="py-3 px-4 text-right">Debe</th>
-                            <th className="py-3 px-4 text-center">Acción</th>
+                            <th className="py-3 px-4">Obligaciones</th>
+                            <th className="py-3 px-4 text-right">Deuda Consolidada</th>
+                            <th className="py-3 px-4 text-center">Acciones</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {planesPendientesLista.map((c) => {
-                            const valorTotal = c.valor_total ?? 0;
-                            const pagado = c.monto_pagado ?? 0;
-                            const deuda = c.saldo_pendiente ?? valorTotal;
+                          {deudoresConsolidados.map((d) => {
+                            const isExpanded = expandedDeudores.has(d.pacienteId);
+                            const p = d.paciente;
                             return (
-                            <tr key={c.id} className="hover:bg-amber-50/30 transition-colors">
-                              <td className="py-3 px-4">
-                                <div className="font-bold text-slate-900">{c.pacientes?.nombre_completo}</div>
-                                <div className="text-[10px] text-slate-400 font-mono">{formatRut(c.pacientes?.rut)}</div>
-                              </td>
-                              <td className="py-3 px-4 text-slate-600 text-xs">{c.pacientes?.telefono || 'N/A'}</td>
-                              <td className="py-3 px-4 font-medium text-slate-700 text-xs">
-                                <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] mr-1 uppercase">Plan</span>
-                                {c.nombre_plan}
-                              </td>
-                              <td className="py-3 px-4 text-right text-slate-500 font-medium">
-                                {formatCLP(valorTotal)}
-                              </td>
-                              <td className="py-3 px-4 text-right text-emerald-600 font-medium">
-                                {formatCLP(pagado)}
-                              </td>
-                              <td className="py-3 px-4 text-right font-black text-rose-600 text-base">
-                                {formatCLP(deuda)}
-                              </td>
-                              <td className="py-3 px-4 text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <Button 
-                                    onClick={() => handleCobrarCita(c.pacientes?.telefono, c.pacientes?.nombre_completo, deuda, c.fecha_compra)} 
-                                    variant="outline" 
-                                    className="min-h-[44px] sm:min-h-0 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl text-xs font-bold shadow-2xs h-auto py-2 px-3 cursor-pointer"
-                                  >
-                                    💬 WhatsApp
-                                  </Button>
-                                  <Button 
-                                    onClick={() => setDeudaItemToCobrar({
-                                      tipo: 'plan',
-                                      id: c.id,
-                                      paciente_id: c.paciente_id,
-                                      paciente_nombre: c.pacientes?.nombre_completo,
-                                      concepto: c.nombre_plan || 'Plan Kinésico',
-                                      deuda: deuda,
-                                      fecha: c.fecha_compra || c.created_at
-                                    })} 
-                                    className="min-h-[44px] sm:min-h-0 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm h-auto py-2 px-3 cursor-pointer"
-                                  >
-                                    💵 Registrar Pago
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                            );
-                          })}
-                          {citasPendientesLista.map((c) => {
-                            const valorTotal = c.valorRealCalculado;
-                            return (
-                            <tr key={c.id} className="hover:bg-amber-50/30 transition-colors">
-                              <td className="py-3 px-4">
-                                <div className="font-bold text-slate-900">{c.pacientes?.nombre_completo}</div>
-                                <div className="text-[10px] text-slate-400 font-mono">{formatRut(c.pacientes?.rut)}</div>
-                              </td>
-                              <td className="py-3 px-4 text-slate-600 text-xs">{c.pacientes?.telefono || 'N/A'}</td>
-                              <td className="py-3 px-4 font-medium text-slate-700 text-xs">
-                                <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] mr-1 uppercase">Cita</span>
-                                {c.motivo_consulta}
-                              </td>
-                              <td className="py-3 px-4 text-right text-slate-500 font-medium">
-                                {formatCLP(valorTotal)}
-                              </td>
-                              <td className="py-3 px-4 text-right text-emerald-600 font-medium">
-                                $0
-                              </td>
-                              <td className="py-3 px-4 text-right font-black text-rose-600 text-base">
-                                {formatCLP(valorTotal)}
-                              </td>
-                              <td className="py-3 px-4 text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <Button 
-                                    onClick={() => handleCobrarCita(c.pacientes?.telefono, c.pacientes?.nombre_completo, valorTotal, c.fecha)} 
-                                    variant="outline" 
-                                    className="min-h-[44px] sm:min-h-0 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl text-xs font-bold shadow-2xs h-auto py-2 px-3 cursor-pointer"
-                                  >
-                                    💬 WhatsApp
-                                  </Button>
-                                  <Button 
-                                    onClick={() => setDeudaItemToCobrar({
-                                      tipo: 'cita',
-                                      id: c.id,
-                                      paciente_id: c.paciente_id,
-                                      paciente_nombre: c.pacientes?.nombre_completo,
-                                      concepto: c.motivo_consulta || 'Sesión Kinésica',
-                                      deuda: valorTotal,
-                                      fecha: c.fecha
-                                    })} 
-                                    className="min-h-[44px] sm:min-h-0 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm h-auto py-2 px-3 cursor-pointer"
-                                  >
-                                    💵 Registrar Pago
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
+                              <React.Fragment key={d.pacienteId}>
+                                <tr className="hover:bg-amber-50/30 transition-colors">
+                                  {/* Paciente y toggle acordeón */}
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleExpandDeudor(d.pacienteId)}
+                                        className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                                        title={isExpanded ? "Ocultar desglose" : "Ver desglose de deuda"}
+                                      >
+                                        <span className={`inline-block transform transition-transform text-xs font-bold ${isExpanded ? 'rotate-90' : ''}`}>
+                                          ▶
+                                        </span>
+                                      </button>
+                                      <div>
+                                        <div
+                                          className="font-bold text-slate-900 hover:text-emerald-700 transition-colors cursor-pointer"
+                                          onClick={() => toggleExpandDeudor(d.pacienteId)}
+                                        >
+                                          {p.nombre_completo || 'Paciente sin registrar'}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 font-mono">
+                                          {p.rut ? formatRut(p.rut) : 'Sin RUT'}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Teléfono */}
+                                  <td className="py-3 px-4 text-slate-600 text-xs font-mono">
+                                    {p.telefono || 'N/A'}
+                                  </td>
+
+                                  {/* Ítems pendientes */}
+                                  <td className="py-3 px-4 text-xs">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleExpandDeudor(d.pacienteId)}
+                                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100/70 border border-amber-200 text-amber-900 font-bold hover:bg-amber-100 transition-colors cursor-pointer text-xs"
+                                    >
+                                      <span>{d.desglose.length} {d.desglose.length === 1 ? 'ítem' : 'ítems'}</span>
+                                      <span className="text-[10px] text-amber-700">{isExpanded ? '▲' : '▼'}</span>
+                                    </button>
+                                  </td>
+
+                                  {/* Deuda consolidada */}
+                                  <td className="py-3 px-4 text-right font-mono font-extrabold text-rose-600 text-base tabular-nums">
+                                    {formatCLP(d.totalDeuda)}
+                                  </td>
+
+                                  {/* Acciones Rápidas Compactas */}
+                                  <td className="py-3 px-4 text-center">
+                                    <div className="flex items-center justify-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedDeudorForCheckout(d);
+                                          setSelectedDeudaItemForCheckout(null);
+                                          setIsCheckoutOpen(true);
+                                        }}
+                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                                        title="Abrir checkout para cobrar deuda"
+                                      >
+                                        <CreditCard className="w-3.5 h-3.5" />
+                                        <span>Cobrar</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCobrarWhatsApp(d)}
+                                        className="p-1.5 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl transition-colors cursor-pointer text-sm"
+                                        title={`Enviar recordatorio de cobro por WhatsApp a ${p.nombre_completo}`}
+                                      >
+                                        💬
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+
+                                {/* ACORDEÓN DESPLEGABLE: Desglose por ítem */}
+                                {isExpanded && (
+                                  <tr className="bg-slate-50/90 border-b border-slate-200/90">
+                                    <td colSpan={5} className="py-3 px-6 sm:px-8">
+                                      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs space-y-2">
+                                        <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1.5">
+                                          <span>Detalle de Obligaciones Pendientes</span>
+                                          <span>Subtotal</span>
+                                        </div>
+                                        <div className="divide-y divide-slate-100 text-xs">
+                                          {d.desglose.map((sub, sIdx) => (
+                                            <div key={sIdx} className="py-2 flex items-center justify-between gap-4">
+                                              <div className="flex items-center gap-2 min-w-0">
+                                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
+                                                  sub.tipo === 'plan' ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                                }`}>
+                                                  {sub.tipo}
+                                                </span>
+                                                <span className="font-semibold text-slate-800 truncate">{sub.detalle}</span>
+                                                {sub.fecha && (
+                                                  <span className="text-[11px] text-slate-400 font-mono shrink-0">
+                                                    📅 {sub.fecha}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="flex items-center gap-3 shrink-0">
+                                                <span className="font-mono font-bold text-rose-600 tabular-nums">
+                                                  {formatCLP(sub.saldo)}
+                                                </span>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setSelectedDeudaItemForCheckout({
+                                                      tipo: sub.tipo,
+                                                      id: sub.id,
+                                                      plan_id: sub.tipo === 'plan' ? sub.id : undefined,
+                                                      cita_id: sub.tipo === 'cita' ? sub.id : undefined,
+                                                      concepto: sub.detalle,
+                                                      deudaTotal: sub.saldo,
+                                                      fecha: sub.fecha
+                                                    });
+                                                    setSelectedDeudorForCheckout(d);
+                                                    setIsCheckoutOpen(true);
+                                                  }}
+                                                  className="px-2 py-1 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg cursor-pointer"
+                                                >
+                                                  Cobrar este ítem
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
                             );
                           })}
                         </tbody>
@@ -705,21 +808,28 @@ Si ya realizaste la transferencia, por favor envíanos el comprobante por este m
         </DialogFooter>
       </Dialog>
 
-      <SettlePaymentModal 
-        isOpen={!!settlingPlan} 
-        onClose={() => setSettlingPlan(null)} 
-        planEnUso={settlingPlan}
-        onSuccess={() => { setSettlingPlan(null); loadData(); }}
-      />
-      
-      <CobrarDeudaModal 
-        isOpen={!!deudaItemToCobrar}
-        onClose={() => setDeudaItemToCobrar(null)}
-        item={deudaItemToCobrar}
+      <PaymentCheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => {
+          setIsCheckoutOpen(false);
+          setSelectedDeudorForCheckout(null);
+          setSelectedDeudaItemForCheckout(null);
+        }}
         onSuccess={() => {
-          setDeudaItemToCobrar(null);
+          setIsCheckoutOpen(false);
+          setSelectedDeudorForCheckout(null);
+          setSelectedDeudaItemForCheckout(null);
           loadData();
         }}
+        initialMode="deuda"
+        paciente={selectedDeudorForCheckout?.paciente}
+        pacienteId={selectedDeudorForCheckout?.pacienteId}
+        deudaInfo={selectedDeudaItemForCheckout || (selectedDeudorForCheckout ? {
+          deudaTotal: selectedDeudorForCheckout.totalDeuda,
+          concepto: `Deuda consolidada (${selectedDeudorForCheckout.desglose.length} ítems)`,
+          plan_id: selectedDeudorForCheckout.desglose.find(x => x.tipo === 'plan')?.id,
+          cita_id: selectedDeudorForCheckout.desglose.find(x => x.tipo === 'cita')?.id
+        } : null)}
       />
 
       <CancelPlanModal

@@ -33,10 +33,10 @@ const navItems: NavItem[] = [
     emoji: '💰',
   },
   {
-    name: 'Configuración',
-    href: '/planes', // Temporalmente apunta a planes hasta que haya una vista de configuración general
+    name: 'Aranceles & Planes',
+    href: '/planes',
     icon: <ClipboardList className="w-4 h-4" />,
-    emoji: '⚙️',
+    emoji: '🏷️',
   },
 ];
 

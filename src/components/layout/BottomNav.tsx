@@ -11,7 +11,7 @@ export function BottomNav() {
     { label: 'Pacientes', href: '/pacientes', icon: '📋' },
     { label: 'Agenda', href: '/agenda', icon: '📅' },
     { label: 'Finanzas', href: '/finanzas', icon: '📊' },
-    { label: 'Planes', href: '/planes', icon: '⚙️' },
+    { label: 'Aranceles', href: '/planes', icon: '🏷️' },
   ];
 
   // No mostrar la barra en la pantalla de login

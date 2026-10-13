@@ -13,8 +13,7 @@ import { CuentaCorrienteTab } from '@/components/clinical/CuentaCorrienteTab';
 import { EditPatientDialog } from '@/components/patients/EditPatientDialog';
 import { ManagePlanModal } from '@/components/patients/ManagePlanModal';
 import { RenewPlanDialog } from '@/components/patients/RenewPlanDialog';
-import { CobrarSesionSimpleModal } from '@/components/sales/CobrarSesionSimpleModal';
-import { SettlePaymentModal } from '@/components/sales/SettlePaymentModal';
+import { PaymentCheckoutModal } from '@/components/sales/PaymentCheckoutModal';
 import { CancelPlanModal } from '@/components/sales/CancelPlanModal';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -1963,10 +1962,13 @@ export function ClinicalRecordView({
 
       {/* Registrar Pago / Cobro del Plan */}
       {abrirSettlePaymentModal && planActivo && (
-        <SettlePaymentModal
+        <PaymentCheckoutModal
           isOpen={abrirSettlePaymentModal}
           onClose={() => setAbrirSettlePaymentModal(false)}
+          initialMode="deuda"
           planEnUso={planActivo}
+          paciente={paciente}
+          pacienteId={paciente?.id}
           onSuccess={async () => {
             setAbrirSettlePaymentModal(false);
             await cargarDatos();
@@ -2008,13 +2010,16 @@ export function ClinicalRecordView({
 
       {/* Cobrar Sesión Simple */}
       {abrirCobrarSesionModal && paciente && (
-        <CobrarSesionSimpleModal
+        <PaymentCheckoutModal
           isOpen={abrirCobrarSesionModal}
           onClose={() => setAbrirCobrarSesionModal(false)}
+          initialMode="sesion"
+          paciente={paciente}
           pacienteId={paciente.id}
           categoriaTarifa={paciente.categoria_tarifa}
-          citaId={citaId}
+          cita={citaId ? { id: citaId, paciente_id: paciente.id } : null}
           onSuccess={async () => {
+            setAbrirCobrarSesionModal(false);
             await cargarDatos();
             onSuccess?.();
           }}

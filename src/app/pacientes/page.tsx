@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { SaleModal } from "@/components/sales/SaleModal";
+import { PaymentCheckoutModal } from "@/components/sales/PaymentCheckoutModal";
 import { PatientModal } from "@/components/patients/PatientModal";
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
@@ -863,13 +863,14 @@ export default function PacientesPage() {
 
         {/* 4. MONTAJE DINÁMICO DE MODALES (LAZY / DISCRIMINADO) */}
         {activeModal?.type === 'sale' && (
-          <SaleModal 
+          <PaymentCheckoutModal 
             isOpen={true} 
             onClose={() => setActiveModal(null)} 
             onSuccess={() => {
               setActiveModal(null);
               cargarPacientes();
             }}
+            initialMode="plan"
           />
         )}
 
