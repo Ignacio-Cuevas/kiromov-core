@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { BloqueoAgenda } from '@/components/agenda/BlockTimeModal';
+import { AppointmentPopover } from '@/components/agenda/AppointmentPopover';
 import {
   SemanaHorariosBox,
   isSlotInWorkingHours,
@@ -11,24 +12,27 @@ import {
   Clock,
   Plus,
   Lock,
-  Calendar,
   Sparkles
 } from 'lucide-react';
 
 const START_HOUR = 8;  // 08:00
 const END_HOUR = 21;   // 21:00 (cubre hasta las 20:00 - 20:30)
 const HOURS_COUNT = END_HOUR - START_HOUR; // 13 horas
-const HOUR_HEIGHT = 60; // 60px de altura fija por hora
-const TOTAL_GRID_HEIGHT = HOURS_COUNT * HOUR_HEIGHT; // 780px
+const HOUR_HEIGHT = 80; // 80px de altura fija por hora (escala ergonómica)
+const TOTAL_GRID_HEIGHT = HOURS_COUNT * HOUR_HEIGHT; // 1040px
 
-interface ClinicalTimeGridProps {
+export interface ClinicalTimeGridProps {
   dias: Date[]; // Días a mostrar (Lunes a Sábado si es semana, o 1 día si es vista diaria)
   citas: any[]; // Citas extendidas normalizadas
   bloqueos: BloqueoAgenda[];
   semanaConfig?: SemanaHorariosBox;
   duracionPredeterminada?: number;
   onSelectEmptySlot: (fecha: string, hora: string) => void;
-  onSelectCita: (cita: any) => void;
+  onSelectCita?: (cita: any) => void;
+  onCambiarEstadoCita?: (cita: any, nuevoEstado: string) => void;
+  onAbrirFicha?: (pacienteId: string, cita: any) => void;
+  onCobrar?: (cita: any) => void;
+  onEditarCita?: (cita: any) => void;
   onDesbloquear: (bloqueo: BloqueoAgenda) => void;
 }
 
@@ -74,51 +78,39 @@ function calcularHoraFin(horaInicio?: string | null, duracionMin: number = 45): 
   return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
 }
 
-// Estilo Pastel Suave con Barra Lateral de 4px sólida
+// Estilo Kiromov Precision con Borde Izquierdo Sólido y Fondos Clínicos Suaves
 function getPastelCardTheme(cita: any) {
   const estado = String(cita?.estado || 'pendiente').toLowerCase();
   
   if (['confirmada'].includes(estado)) {
     return {
-      card: 'bg-emerald-600 hover:bg-emerald-700 text-white border-l-4 border-l-emerald-800 shadow-md',
-      textPrimary: 'text-white',
-      textSecondary: 'text-emerald-100/90',
-      pillBg: 'bg-white/20 text-white',
-      pillSession: 'bg-emerald-900/60 text-emerald-100',
-      pillPayOk: 'bg-white text-emerald-900',
-      pillPayDebt: 'bg-rose-500 text-white'
+      card: 'bg-emerald-50/95 hover:bg-emerald-100/90 text-emerald-950 border border-emerald-300 border-l-4 border-l-emerald-600 shadow-xs',
+      textPrimary: 'text-emerald-950',
+      textSecondary: 'text-emerald-700',
+      badgeBg: 'bg-emerald-200/80 text-emerald-900',
     };
   } else if (['asistio', 'asistió', 'atendida', 'atendido'].includes(estado)) {
     return {
-      card: 'bg-slate-700 hover:bg-slate-800 text-slate-100 border-l-4 border-l-slate-900 shadow-sm',
-      textPrimary: 'text-slate-100',
-      textSecondary: 'text-slate-300',
-      pillBg: 'bg-white/20 text-white',
-      pillSession: 'bg-slate-900/60 text-slate-200',
-      pillPayOk: 'bg-emerald-500 text-white',
-      pillPayDebt: 'bg-rose-500 text-white'
+      card: 'bg-slate-100/95 hover:bg-slate-200/80 text-slate-900 border border-slate-300 border-l-4 border-l-slate-700 shadow-xs',
+      textPrimary: 'text-slate-900',
+      textSecondary: 'text-slate-600',
+      badgeBg: 'bg-slate-200 text-slate-800',
     };
   } else if (['no_asistio', 'no asistió', 'cancelada'].includes(estado)) {
     return {
-      card: 'bg-rose-600 hover:bg-rose-700 text-white border-l-4 border-l-rose-800 shadow-sm opacity-90',
-      textPrimary: 'text-white',
-      textSecondary: 'text-rose-200',
-      pillBg: 'bg-white/20 text-white',
-      pillSession: 'bg-rose-900/60 text-rose-100',
-      pillPayOk: 'bg-white/80 text-rose-900',
-      pillPayDebt: 'bg-rose-900 text-rose-100'
+      card: 'bg-rose-50/95 hover:bg-rose-100/90 text-rose-950 border border-rose-300 border-l-4 border-l-rose-500 shadow-xs opacity-90',
+      textPrimary: 'text-rose-950',
+      textSecondary: 'text-rose-700',
+      badgeBg: 'bg-rose-200/80 text-rose-900',
     };
   }
   
   // Pendiente por defecto
   return {
-    card: 'bg-amber-500 hover:bg-amber-600 text-white border-l-4 border-l-amber-700 shadow-md',
-    textPrimary: 'text-white',
-    textSecondary: 'text-amber-100/90',
-    pillBg: 'bg-white/20 text-white',
-    pillSession: 'bg-amber-900/60 text-amber-100',
-    pillPayOk: 'bg-white text-amber-900',
-    pillPayDebt: 'bg-rose-500 text-white'
+    card: 'bg-amber-50/95 hover:bg-amber-100/90 text-amber-950 border border-amber-300 border-l-4 border-l-amber-500 shadow-xs',
+    textPrimary: 'text-amber-950',
+    textSecondary: 'text-amber-700',
+    badgeBg: 'bg-amber-200/80 text-amber-900',
   };
 }
 
@@ -130,8 +122,14 @@ export function ClinicalTimeGrid({
   duracionPredeterminada = 45,
   onSelectEmptySlot,
   onSelectCita,
+  onCambiarEstadoCita,
+  onAbrirFicha,
+  onCobrar,
+  onEditarCita,
   onDesbloquear
 }: ClinicalTimeGridProps) {
+  const [popoverCitaId, setPopoverCitaId] = useState<string | null>(null);
+
   // Generar regleta horaria fija (horas de 08:00 a 20:00 con intervalos de 30 min)
   const timeSlots = useMemo(() => {
     const slots: { label: string; hour: number; minute: number; isHour: boolean }[] = [];
@@ -156,63 +154,68 @@ export function ClinicalTimeGrid({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col select-none">
-      {/* Contenedor con scroll horizontal en móviles / pantallas compactas */}
-      <div className="overflow-x-auto">
-        <div className={dias.length === 1 ? 'min-w-[500px]' : 'min-w-[1200px]'}>
+      {/* Contenedor responsivo sin scroll horizontal rígido en laptops */}
+      <div className="overflow-x-auto w-full">
+        <div className={dias.length === 1 ? 'w-full min-w-[320px]' : 'w-full min-w-[640px] lg:min-w-0'}>
           {/* CABECERA SUPERIOR DE DÍAS (Sticky) */}
           <div className="flex border-b border-slate-200 bg-slate-50/95 sticky top-0 z-30 backdrop-blur-xs">
             {/* Esquina superior izquierda (Regleta de horas) */}
-            <div className="w-16 sm:w-20 shrink-0 p-3 border-r border-slate-200 flex flex-col items-center justify-center bg-slate-100/70 text-[11px] font-bold text-slate-500">
-              <Clock className="w-4 h-4 text-slate-400 mb-0.5" />
+            <div className="w-14 sm:w-16 shrink-0 p-2.5 border-r border-slate-200 flex flex-col items-center justify-center bg-slate-100/70 text-[10px] font-bold text-slate-500">
+              <Clock className="w-3.5 h-3.5 text-slate-400 mb-0.5" />
               <span>HORA</span>
             </div>
 
-            {/* Columnas de Días (Lunes a Sábado o Día Único) */}
-            {dias.map((dia, idx) => {
-              const diaStr = getFormattedLocalDate(dia);
-              const isToday = diaStr === todayStr;
-              const nombreDiaCorto = dia
-                .toLocaleDateString('es-CL', { weekday: 'short' })
-                .replace('.', '')
-                .toUpperCase();
-              const diaNumero = dia.getDate();
+            {/* Columnas de Días */}
+            <div
+              className="flex-1 min-w-0 grid"
+              style={{ gridTemplateColumns: `repeat(${dias.length}, minmax(0, 1fr))` }}
+            >
+              {dias.map((dia, idx) => {
+                const diaStr = getFormattedLocalDate(dia);
+                const isToday = diaStr === todayStr;
+                const nombreDiaCorto = dia
+                  .toLocaleDateString('es-CL', { weekday: 'short' })
+                  .replace('.', '')
+                  .toUpperCase();
+                const diaNumero = dia.getDate();
 
-              return (
-                <div
-                  key={idx}
-                  className={`flex-1 p-2.5 text-center border-r border-slate-200 last:border-r-0 transition-colors ${
-                    isToday ? 'bg-emerald-50/60' : ''
-                  }`}
-                >
-                  <p className="text-xs font-black tracking-wider text-slate-700">
-                    <span className="uppercase text-slate-500 mr-1.5">{nombreDiaCorto}</span>
-                    <span
-                      className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold shadow-sm ${
-                        isToday ? 'bg-emerald-600 text-white' : 'text-slate-900'
-                      }`}
-                    >
-                      {diaNumero}
-                    </span>
-                  </p>
-                </div>
-              );
-            })}
+                return (
+                  <div
+                    key={idx}
+                    className={`p-2 sm:p-2.5 text-center border-r border-slate-200 last:border-r-0 transition-colors ${
+                      isToday ? 'bg-emerald-50/60' : ''
+                    }`}
+                  >
+                    <p className="text-xs font-black tracking-wider text-slate-700 flex items-center justify-center gap-1 sm:gap-1.5">
+                      <span className="uppercase text-slate-500 text-[11px]">{nombreDiaCorto}</span>
+                      <span
+                        className={`inline-flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full text-xs sm:text-sm font-bold shadow-xs ${
+                          isToday ? 'bg-emerald-600 text-white' : 'text-slate-900'
+                        }`}
+                      >
+                        {diaNumero}
+                      </span>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* CUERPO DE LA GRILLA: EJE Y (Horas) + COLUMNAS */}
           <div className="flex relative" style={{ height: `${TOTAL_GRID_HEIGHT}px` }}>
             {/* EJE Y (Vertical izquierdo): Horas redondas y limpias de 08:00 a 20:00 */}
-            <div className="w-16 sm:w-20 shrink-0 border-r border-slate-200 bg-white shadow-xs relative z-10">
+            <div className="w-14 sm:w-16 shrink-0 border-r border-slate-200 bg-white shadow-xs relative z-10">
               {timeSlots.map((slot, sIdx) => {
                 const topPx = sIdx * (HOUR_HEIGHT / 2);
                 return (
                   <div
                     key={sIdx}
-                    className="absolute left-0 right-0 pr-2.5 text-right flex items-center justify-end"
+                    className="absolute left-0 right-0 pr-2 text-right flex items-center justify-end"
                     style={{ top: `${topPx}px`, height: `${HOUR_HEIGHT / 2}px` }}
                   >
                     {slot.isHour ? (
-                      <span className="text-xs font-mono font-bold text-slate-700 -translate-y-2.5 bg-slate-50/90 px-1 rounded">
+                      <span className="text-[11px] sm:text-xs font-mono font-bold text-slate-700 -translate-y-2.5 bg-slate-50/90 px-1 rounded">
                         {slot.label}
                       </span>
                     ) : (
@@ -226,193 +229,256 @@ export function ClinicalTimeGrid({
             </div>
 
             {/* COLUMNAS DE DÍAS */}
-            {dias.map((dia, diaIdx) => {
-              const diaStr = getFormattedLocalDate(dia);
-              const diaSemana = dia.getDay();
+            <div
+              className="flex-1 min-w-0 grid relative"
+              style={{ gridTemplateColumns: `repeat(${dias.length}, minmax(0, 1fr))` }}
+            >
+              {dias.map((dia, diaIdx) => {
+                const diaStr = getFormattedLocalDate(dia);
+                const diaSemana = dia.getDay();
 
-              // Citas del día
-              const citasDia = citas.filter((c) => c?.fecha === diaStr);
+                // Citas del día
+                const citasDia = citas.filter((c) => c?.fecha === diaStr);
 
-              // Bloqueos del día
-              const bloqueosDia = bloqueos.filter(
-                (b) => b.fecha_inicio <= diaStr && b.fecha_fin >= diaStr
-              );
+                // Bloqueos del día
+                const bloqueosDia = bloqueos.filter(
+                  (b) => b.fecha_inicio <= diaStr && b.fecha_fin >= diaStr
+                );
 
-              return (
-                <div
-                  key={diaIdx}
-                  className="flex-1 border-r border-slate-200 last:border-r-0 relative overflow-hidden"
-                  style={{ height: `${TOTAL_GRID_HEIGHT}px` }}
-                >
-                  {/* CAPA 1: Celdas Horarias de Fondo (Espacios libres y fuera de turno) */}
-                  {timeSlots.map((slot, slotIdx) => {
-                    const topPx = slotIdx * (HOUR_HEIGHT / 2);
-                    const slotTime = slot.label;
-                    const inWorkingHours = isSlotInWorkingHours(diaSemana, slotTime, semanaConfig);
+                return (
+                  <div
+                    key={diaIdx}
+                    className="border-r border-slate-200 last:border-r-0 relative overflow-hidden h-full"
+                    style={{ height: `${TOTAL_GRID_HEIGHT}px` }}
+                  >
+                    {/* CAPA 1: Celdas Horarias de Fondo (Espacios libres y fuera de turno) */}
+                    {timeSlots.map((slot, slotIdx) => {
+                      const topPx = slotIdx * (HOUR_HEIGHT / 2);
+                      const slotTime = slot.label;
+                      const inWorkingHours = isSlotInWorkingHours(diaSemana, slotTime, semanaConfig);
 
-                    return (
-                      <div
-                        key={slotIdx}
-                        onClick={() => onSelectEmptySlot(diaStr, slotTime)}
-                        title={
-                          inWorkingHours
-                            ? `Hacer clic para agendar cita el ${diaStr} a las ${slotTime}`
-                            : `Horario fuera de turno habitual (${slotTime}). Clic para agendamiento excepcional.`
-                        }
-                        className={`absolute left-0 right-0 transition-colors cursor-pointer group flex items-center justify-end pr-2 ${
-                          slot.isHour
-                            ? 'border-b border-slate-200/90'
-                            : 'border-b border-dashed border-slate-100'
-                        } ${
-                          inWorkingHours ? 'bg-white hover:bg-emerald-50/60' : 'bg-orange-50/80 hover:bg-orange-100/60'
-                        }`}
-                        style={{
-                          top: `${topPx}px`,
-                          height: `${HOUR_HEIGHT / 2}px`,
-                        }}
-                      >
-                        {/* Botón flotante al pasar el cursor */}
-                        <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold text-indigo-700 bg-white/95 px-2 py-0.5 rounded-md shadow-2xs border border-indigo-200 pointer-events-none flex items-center gap-1">
-                          <Plus className="w-3 h-3" /> {slotTime}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      return (
+                        <div
+                          key={slotIdx}
+                          onClick={() => onSelectEmptySlot(diaStr, slotTime)}
+                          title={
+                            inWorkingHours
+                              ? `Hacer clic para agendar cita el ${diaStr} a las ${slotTime}`
+                              : `Horario fuera de turno habitual (${slotTime}). Clic para agendamiento excepcional.`
+                          }
+                          className={`absolute left-0 right-0 transition-colors cursor-pointer group flex items-center justify-end pr-2 ${
+                            slot.isHour
+                              ? 'border-b border-slate-200/90'
+                              : 'border-b border-dashed border-slate-100'
+                          } ${
+                            inWorkingHours ? 'bg-white hover:bg-emerald-50/50' : 'bg-orange-50/70 hover:bg-orange-100/60'
+                          }`}
+                          style={{
+                            top: `${topPx}px`,
+                            height: `${HOUR_HEIGHT / 2}px`,
+                          }}
+                        >
+                          {/* Botón flotante al pasar el cursor */}
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold text-emerald-800 bg-white/95 px-2 py-0.5 rounded-md shadow-xs border border-emerald-200 pointer-events-none flex items-center gap-1">
+                            <Plus className="w-3 h-3" /> {slotTime}
+                          </span>
+                        </div>
+                      );
+                    })}
 
-                  {/* INDICADOR DE HORA ACTUAL */}
-                  {(() => {
-                    const now = new Date();
-                    const nowStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-                    if (nowStr === diaStr) {
-                      const h = now.getHours();
-                      const m = now.getMinutes();
-                      if (h >= START_HOUR && h <= END_HOUR) {
-                        const topPos = ((h - START_HOUR) + m / 60) * HOUR_HEIGHT;
-                        return (
-                          <div className="absolute left-0 right-0 z-40 pointer-events-none" style={{ top: `${topPos}px` }}>
-                            <div className="relative">
-                              <div className="absolute left-0 w-2 h-2 rounded-full bg-emerald-500 -translate-y-1/2 -translate-x-1 shadow-[0_0_4px_rgba(16,185,129,0.8)]"></div>
-                              <div className="w-full border-t-2 border-emerald-500 shadow-[0_1px_2px_rgba(16,185,129,0.2)]"></div>
+                    {/* INDICADOR DE HORA ACTUAL */}
+                    {(() => {
+                      const now = new Date();
+                      const nowStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+                      if (nowStr === diaStr) {
+                        const h = now.getHours();
+                        const m = now.getMinutes();
+                        if (h >= START_HOUR && h <= END_HOUR) {
+                          const topPos = ((h - START_HOUR) + m / 60) * HOUR_HEIGHT;
+                          return (
+                            <div className="absolute left-0 right-0 z-40 pointer-events-none" style={{ top: `${topPos}px` }}>
+                              <div className="relative">
+                                <div className="absolute left-0 w-2 h-2 rounded-full bg-emerald-500 -translate-y-1/2 -translate-x-1 shadow-[0_0_4px_rgba(16,185,129,0.8)]"></div>
+                                <div className="w-full border-t-2 border-emerald-500 shadow-[0_1px_2px_rgba(16,185,129,0.2)]"></div>
+                              </div>
                             </div>
-                          </div>
-                        );
+                          );
+                        }
                       }
-                    }
-                    return null;
-                  })()}
-                  
-                  {/* CAPA 2: Bloqueos de Horario */}
-                  {bloqueosDia.map((b) => {
-                    const topPos = getTopPosition(b.hora_inicio || '08:00');
-                    const duracionMin = getMinutesFrom8am(b.hora_fin || '09:00') - getMinutesFrom8am(b.hora_inicio || '08:00');
-                    const heightPos = Math.max(38, (duracionMin / 60) * HOUR_HEIGHT);
+                      return null;
+                    })()}
                     
-                    if (b.dia_completo) {
-                       return (
-                         <div key={b.id} className="absolute z-10 left-1 right-1 top-1 bottom-1 bg-orange-200/80 border-l-4 border-l-orange-500 border-y border-r border-orange-300 text-orange-950 rounded-xl flex flex-col items-center justify-center p-2 backdrop-blur-[2px]">
-                           <Lock className="w-5 h-5 mb-1 opacity-70" />
-                           <span className="text-xs font-bold text-center leading-tight">{b.titulo}</span>
-                         </div>
-                       );
-                    }
-                    
-                    return (
-                      <div
-                        key={b.id}
-                        className="absolute z-10 bg-orange-200/80 border-l-4 border-l-orange-500 border-y border-r border-orange-300 text-orange-950 rounded-xl p-2.5 shadow-xs overflow-hidden flex flex-col items-start backdrop-blur-[1px]"
-                        style={{ top: `${topPos}px`, height: `${heightPos}px`, left: '2px', right: '2px' }}
-                      >
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <Lock className="w-3 h-3 shrink-0 opacity-80" />
-                          <span className="text-xs font-bold truncate leading-tight">{b.titulo}</span>
+                    {/* CAPA 2: Bloqueos de Horario */}
+                    {bloqueosDia.map((b) => {
+                      const topPos = getTopPosition(b.hora_inicio || '08:00');
+                      const duracionMin = getMinutesFrom8am(b.hora_fin || '09:00') - getMinutesFrom8am(b.hora_inicio || '08:00');
+                      const heightPos = Math.max(24, Math.round((duracionMin / 60) * HOUR_HEIGHT));
+                      
+                      if (b.dia_completo) {
+                         return (
+                           <div key={b.id} className="absolute z-10 left-1 right-1 top-1 bottom-1 bg-amber-100/90 border-l-4 border-l-amber-500 border border-amber-300 text-amber-950 rounded-xl flex flex-col items-center justify-center p-2 backdrop-blur-[2px]">
+                             <Lock className="w-4 h-4 mb-1 text-amber-700 opacity-80" />
+                             <span className="text-xs font-bold text-center leading-tight">{b.titulo}</span>
+                           </div>
+                         );
+                      }
+                      
+                      return (
+                        <div
+                          key={b.id}
+                          className="absolute z-10 bg-amber-100/90 border-l-4 border-l-amber-500 border border-amber-300 text-amber-950 rounded-lg p-2 shadow-2xs overflow-hidden flex flex-col items-start backdrop-blur-[1px]"
+                          style={{ top: `${topPos}px`, height: `${heightPos}px`, left: '2px', right: '2px' }}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <Lock className="w-3 h-3 shrink-0 text-amber-700 opacity-80" />
+                            <span className="text-xs font-bold truncate leading-tight">{b.titulo}</span>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
 
-                  {/* CAPA 3: Bloques de Cita en Estilo Pastel */}
-                  
-                  
-{citasDia.map((cita) => {
-                    const horaInicio = cita?.hora?.slice(0, 5) || '09:00';
-                    const duracionMin = getDurationMinutes(cita, duracionPredeterminada);
-                    const topPos = getTopPosition(horaInicio);
-                    const heightPos = Math.max(38, (duracionMin / 60) * HOUR_HEIGHT - 2);
-                    const horaFin = calcularHoraFin(horaInicio, duracionMin);
+                    {/* CAPA 3: Bloques de Cita con Popover Flotante Contextual Anclado */}
+                    {citasDia.map((cita) => {
+                      const horaInicio = cita?.hora?.slice(0, 5) || '09:00';
+                      const duracionMin = getDurationMinutes(cita, duracionPredeterminada);
+                      const topPos = getTopPosition(horaInicio);
+                      const heightPos = Math.round((duracionMin / 60) * HOUR_HEIGHT) - 2;
+                      const horaFin = calcularHoraFin(horaInicio, duracionMin);
 
-                    const theme = getPastelCardTheme(cita);
-                    const p = cita.paciente || cita.pacientes || {};
-                    const pacienteNombre =
-                      p.nombre_completo ||
-                      cita.motivo_consulta?.replace(/^Atención Kinésica - /i, '') ||
-                      'Paciente sin registrar';
+                      const theme = getPastelCardTheme(cita);
+                      const p = cita.paciente || cita.pacientes || {};
+                      const pacienteNombre =
+                        p.nombre_completo ||
+                        cita.motivo_consulta?.replace(/^Atención Kinésica - /i, '') ||
+                        'Paciente sin registrar';
 
-                    const motivoTexto = cita.motivo_consulta || 'Sesión Kinésica TMO';
+                      const motivoTexto = cita.motivo_consulta || 'Sesión Kinésica TMO';
+                      const tienePlan = (p.total_sesiones || 0) > 0;
+                      const sesInfo = tienePlan ? `${p.sesiones_usadas || 0}/${p.total_sesiones}` : null;
+                      const debePago = p.estado_pago === 'pendiente' && (p.monto_clp || p.valor_total || 0) > 0;
 
-                    return (
-                      <div
-                        key={cita.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectCita(cita);
-                        }}
-                        style={{
-                          top: `${topPos}px`,
-                          height: `${heightPos}px`,
-                          left: '3px',
-                          right: '3px',
-                        }}
-                        className={`absolute z-20 rounded-lg p-1.5 px-2 transition-all cursor-pointer hover:brightness-110 hover:shadow-lg active:scale-[0.98] overflow-hidden flex flex-col ${theme.card}`}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <span className={`text-[10px] font-mono font-bold opacity-90 block mb-0.5 ${theme.textSecondary}`}>{horaInicio} - {horaFin}</span>
-                          <span className={`text-xs font-bold leading-tight truncate block ${theme.textPrimary}`}>
-                            {pacienteNombre}
-                          </span>
-                          <span className={`text-[10px] opacity-80 truncate block mt-0.5 ${theme.textSecondary}`} title={motivoTexto}>
-                            {motivoTexto}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+                      return (
+                        <AppointmentPopover
+                          key={cita.id}
+                          cita={cita}
+                          open={popoverCitaId === cita.id}
+                          onOpenChange={(isOpen) => setPopoverCitaId(isOpen ? cita.id : null)}
+                          onCambiarEstado={(c, nuevoEstado) => onCambiarEstadoCita?.(c, nuevoEstado)}
+                          onAbrirFicha={(pacId, c) => onAbrirFicha?.(pacId, c)}
+                          onCobrar={(c) => onCobrar?.(c)}
+                          onEditar={(c) => onEditarCita?.(c)}
+                        >
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectCita?.(cita);
+                            }}
+                            style={{
+                              top: `${topPos}px`,
+                              height: `${heightPos}px`,
+                              left: '2px',
+                              right: '2px',
+                            }}
+                            className={`absolute z-20 rounded-lg p-1.5 px-2 transition-all cursor-pointer hover:brightness-95 hover:shadow-md active:scale-[0.99] overflow-hidden flex flex-col justify-between ${theme.card}`}
+                          >
+                            {duracionMin < 30 ? (
+                              // CITA CORTA (< 30 min): 1 línea ultra compacta
+                              <div className="flex items-center gap-1.5 min-w-0 text-[10px] leading-tight">
+                                <span className="font-mono font-bold shrink-0">{horaInicio}</span>
+                                <span className="font-bold truncate">{pacienteNombre}</span>
+                                {sesInfo && <span className="font-mono opacity-80 shrink-0">({sesInfo})</span>}
+                              </div>
+                            ) : duracionMin < 45 ? (
+                              // CITA MEDIANA (30-44 min): 2 líneas compactas
+                              <div className="min-w-0 flex-1 flex flex-col justify-between">
+                                <div className="flex items-center justify-between text-[10px] font-mono leading-none mb-0.5">
+                                  <span className={`font-bold opacity-90 ${theme.textSecondary}`}>
+                                    {horaInicio} - {horaFin}
+                                  </span>
+                                  {sesInfo && (
+                                    <span className={`text-[9px] font-bold px-1 rounded ${theme.badgeBg}`}>
+                                      {sesInfo}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className={`text-xs font-bold leading-tight truncate block ${theme.textPrimary}`}>
+                                  {pacienteNombre}
+                                </span>
+                              </div>
+                            ) : (
+                              // CITA ESTÁNDAR O LARGA (>= 45 min): 2-3 líneas con jerarquía clínica clara
+                              <div className="min-w-0 flex-1 flex flex-col justify-between">
+                                <div>
+                                  <div className="flex items-center justify-between text-[10px] font-mono leading-none mb-1">
+                                    <span className={`font-bold opacity-90 ${theme.textSecondary}`}>
+                                      {horaInicio} - {horaFin}
+                                    </span>
+                                    {sesInfo && (
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded font-mono ${theme.badgeBg}`}>
+                                        {sesInfo} ses.
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className={`text-xs font-bold leading-snug truncate block ${theme.textPrimary}`}>
+                                    {pacienteNombre}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-1 text-[10px] opacity-85 truncate mt-0.5">
+                                  <span className={`truncate font-medium ${theme.textSecondary}`} title={motivoTexto}>
+                                    {motivoTexto}
+                                  </span>
+                                  {debePago && (
+                                    <span className="text-[9px] font-mono text-rose-600 font-bold shrink-0" title="Saldo pendiente">
+                                      🔴
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </AppointmentPopover>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* PIE DE LEYENDA CLÍNICA EN TONOS PASTEL */}
+      {/* PIE DE LEYENDA CLÍNICA EN TONOS KIROMOV PRECISION */}
       <div className="p-3 bg-slate-50/80 border-t border-slate-200 text-xs flex flex-wrap items-center justify-between gap-3 text-slate-600">
         <div className="flex flex-wrap items-center gap-4 text-[11px]">
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-amber-500 shadow-sm" />
+            <span className="w-3 h-3 rounded bg-amber-400 border border-amber-500 shadow-2xs" />
             <span className="font-semibold text-slate-700">Pendiente</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-emerald-600 shadow-sm" />
+            <span className="w-3 h-3 rounded bg-emerald-600 shadow-2xs" />
             <span className="font-semibold text-slate-700">Confirmada</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-slate-700 shadow-sm" />
-            <span className="font-semibold text-slate-700">Atendida</span>
+            <span className="w-3 h-3 rounded bg-slate-700 shadow-2xs" />
+            <span className="font-semibold text-slate-700">Atendida / Asistió</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-rose-600 shadow-sm opacity-90" />
-            <span className="font-semibold text-slate-700">Inasistencia / Cancelada</span>
+            <span className="w-3 h-3 rounded bg-rose-500 shadow-2xs opacity-90" />
+            <span className="font-semibold text-slate-700">Cancelada / No asistió</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-slate-50 border border-slate-200" />
-            <span className="text-slate-400">Fuera de turno</span>
+            <span className="w-3 h-3 rounded bg-orange-50 border border-orange-200" />
+            <span className="text-slate-500">Fuera de turno</span>
           </div>
         </div>
 
         <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
           <Sparkles className="w-3 h-3 text-emerald-600" />
-          <span>Haz clic en cualquier bloque de cita para ver su ficha y WhatsApp.</span>
+          <span>Haz clic en cualquier cita para ver popover rápido (WhatsApp, Ficha y Cobro).</span>
         </div>
       </div>
     </div>
   );
 }
+
+export default ClinicalTimeGrid;
