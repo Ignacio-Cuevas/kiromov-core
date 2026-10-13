@@ -38,7 +38,7 @@ export function validateRut(rut: string): boolean {
   return dv === expectedDv;
 }
 
-export { generarEnlaceWhatsAppConfirmacion, getWhatsAppUrl } from '@/utils/whatsapp';
+export { generarEnlaceWhatsAppConfirmacion, getWhatsAppUrl, construirMensajeConfirmacionTexto } from '@/utils/whatsapp';
 
 export function formatDateChile(dateString?: string | null): string {
   if (!dateString) return "Sin registros";

@@ -3,7 +3,8 @@
 import React from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { formatRut, formatCLP, getWhatsAppUrl } from '@/lib/utils';
-import { generarEnlaceWhatsAppConfirmacion } from '@/utils/whatsapp';
+import { generarEnlaceWhatsAppConfirmacion, construirMensajeConfirmacionTexto } from '@/utils/whatsapp';
+import { toast } from 'sonner';
 import { 
   Calendar, 
   Clock, 
@@ -93,6 +94,24 @@ export function AppointmentPopover({
         hora: cita.hora || horaInicio || '09:00:00',
       })
     : '';
+
+  const handleCopiarMensaje = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const texto = construirMensajeConfirmacionTexto({
+        ...cita,
+        paciente: p,
+        paciente_nombre: nombrePaciente,
+        paciente_telefono: phone,
+        fecha: cita.fecha,
+        hora: cita.hora || horaInicio || '09:00:00',
+      });
+      await navigator.clipboard.writeText(texto);
+      toast.success('¡Mensaje copiado al portapapeles!');
+    } catch (err) {
+      toast.error('No se pudo copiar el texto');
+    }
+  };
 
   return (
     <Popover.Root open={open} onOpenChange={onOpenChange}>
@@ -248,54 +267,67 @@ export function AppointmentPopover({
           </div>
 
           {/* 4. Acciones Directas */}
-          <div className="pt-2 border-t border-slate-100 grid grid-cols-3 gap-1.5 text-xs">
-            <button
-              type="button"
-              onClick={() => {
-                onOpenChange(false);
-                onAbrirFicha(cita.paciente_id || p.id, cita);
-              }}
-              className="px-2 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-1 cursor-pointer shadow-xs"
-              title="Abrir expediente clínico Medilink"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Ficha</span>
-            </button>
-
-            {whatsappUrl ? (
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="px-2 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-semibold rounded-xl transition-colors flex items-center justify-center gap-1 text-center"
-                title="Hablar por WhatsApp"
-              >
-                <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                <span>WhatsApp</span>
-              </a>
-            ) : (
+          <div className="pt-2 border-t border-slate-100 space-y-1.5 text-xs">
+            <div className="grid grid-cols-2 gap-1.5">
               <button
-                disabled
-                className="px-2 py-2 bg-slate-100 text-slate-400 font-semibold rounded-xl flex items-center justify-center gap-1 opacity-60 cursor-not-allowed"
-                title="Sin teléfono registrado"
+                type="button"
+                onClick={() => {
+                  onOpenChange(false);
+                  onAbrirFicha(cita.paciente_id || p.id, cita);
+                }}
+                className="px-2 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                title="Abrir expediente clínico Medilink"
               >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span>Sin tel.</span>
+                <FileText className="w-3.5 h-3.5" />
+                <span>Ficha</span>
               </button>
-            )}
 
-            <button
-              type="button"
-              onClick={() => {
-                onOpenChange(false);
-                onCobrar(cita);
-              }}
-              className="px-2 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-semibold rounded-xl transition-colors flex items-center justify-center gap-1 cursor-pointer"
-              title="Registrar cobro o checkout de la sesión"
-            >
-              <CreditCard className="w-3.5 h-3.5 text-blue-600" />
-              <span>Cobrar</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenChange(false);
+                  onCobrar(cita);
+                }}
+                className="px-2 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                title="Registrar cobro o checkout de la sesión"
+              >
+                <CreditCard className="w-3.5 h-3.5 text-blue-600" />
+                <span>Cobrar</span>
+              </button>
+            </div>
+
+            {/* Fila WhatsApp & Copiar */}
+            <div className="flex items-center gap-1.5">
+              {whatsappUrl ? (
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-all cursor-pointer"
+                  title="Abrir WhatsApp con mensaje de confirmación"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>💬 WhatsApp</span>
+                </a>
+              ) : (
+                <button
+                  disabled
+                  className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-400 text-xs font-semibold rounded-lg opacity-60 cursor-not-allowed"
+                  title="Sin teléfono registrado"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>Sin tel.</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleCopiarMensaje}
+                className="p-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                title="Copiar texto al portapapeles"
+              >
+                <span>📋 Copiar</span>
+              </button>
+            </div>
           </div>
 
           <Popover.Arrow className="fill-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.1)]" />
