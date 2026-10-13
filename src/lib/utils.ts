@@ -38,19 +38,7 @@ export function validateRut(rut: string): boolean {
   return dv === expectedDv;
 }
 
-export { generarEnlaceWhatsAppConfirmacion } from '@/utils/whatsapp';
-
-export function getWhatsAppUrl(phone: string, patientName?: string): string {
-  if (!phone) return "#";
-  let cleaned = phone.replace(/[^0-9]/g, "");
-  if (cleaned.length === 9 && cleaned.startsWith("9")) {
-    cleaned = "56" + cleaned;
-  }
-  const text = encodeURIComponent(
-    `Hola ${patientName ? patientName.split(" ")[0] : ""}, te escribimos desde KIROMOV Centro Clínico respecto a tus sesiones de kinesiología.`
-  );
-  return `https://wa.me/${cleaned}?text=${text}`;
-}
+export { generarEnlaceWhatsAppConfirmacion, getWhatsAppUrl } from '@/utils/whatsapp';
 
 export function formatDateChile(dateString?: string | null): string {
   if (!dateString) return "Sin registros";

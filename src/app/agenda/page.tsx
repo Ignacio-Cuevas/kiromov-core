@@ -695,6 +695,9 @@ function AgendaContent() {
 
   const generarMensajeConfirmacion = (cita: CitaExtendida) => {
     return generarEnlaceWhatsAppConfirmacion({
+      ...cita,
+      paciente: cita?.pacientes,
+      pacientes: cita?.pacientes,
       paciente_nombre: cita?.pacientes?.nombre_completo || cita?.motivo_consulta || 'Paciente',
       paciente_telefono: cita?.pacientes?.telefono,
       fecha: cita?.fecha || '',

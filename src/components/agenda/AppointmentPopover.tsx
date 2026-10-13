@@ -85,6 +85,8 @@ export function AppointmentPopover({
   const phone = p.telefono || cita.paciente_telefono;
   const whatsappUrl = phone && cita.fecha
     ? generarEnlaceWhatsAppConfirmacion({
+        ...cita,
+        paciente: p,
         paciente_nombre: nombrePaciente,
         paciente_telefono: phone,
         fecha: cita.fecha,
