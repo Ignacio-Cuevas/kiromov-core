@@ -168,6 +168,7 @@ export async function createScheduleAppointmentAction(
     let pacienteNombre = '';
     let pacienteTelefono: string | null = null;
     let newlyCreatedPatientId: string | null = null;
+    let pacientePrevision: string | null = null;
 
     // 3. Crear o vincular paciente (Alta rápida blindada contra duplicaciones)
     if (data.isNewPatient) {
@@ -175,12 +176,12 @@ export async function createScheduleAppointmentAction(
       const cleanRut = data.sin_rut ? null : formatRut(data.rut || '');
 
       // BLINDAJE ANTI-DUPLICADOS: Verificar si el paciente ya existe antes de insertar
-      let pacienteExistente: { id: string; nombre_completo: string; telefono: string | null } | null = null;
+      let pacienteExistente: { id: string; nombre_completo: string; telefono: string | null; prevision?: string | null } | null = null;
 
       if (cleanRut) {
         const { data: porRut } = await supabase
           .from('pacientes')
-          .select('id, nombre_completo, telefono')
+          .select('id, nombre_completo, telefono, prevision')
           .eq('rut', cleanRut)
           .limit(1);
         if (porRut && porRut.length > 0) {
@@ -191,7 +192,7 @@ export async function createScheduleAppointmentAction(
       if (!pacienteExistente && cleanName) {
         const { data: porNombre } = await supabase
           .from('pacientes')
-          .select('id, nombre_completo, telefono')
+          .select('id, nombre_completo, telefono, prevision')
           .ilike('nombre_completo', cleanName)
           .limit(1);
         if (porNombre && porNombre.length > 0) {
@@ -204,6 +205,7 @@ export async function createScheduleAppointmentAction(
         targetPacienteId = pacienteExistente.id;
         pacienteNombre = pacienteExistente.nombre_completo;
         pacienteTelefono = pacienteExistente.telefono;
+        pacientePrevision = (pacienteExistente as any).prevision || 'Particular';
       } else {
         // Insertar nuevo paciente ÚNICA Y EXCLUSIVAMENTE si no existe registro previo
         let rawPhone = (data.telefono || '').replace(/[^\d+]/g, '');
@@ -231,7 +233,7 @@ export async function createScheduleAppointmentAction(
             motivo_consulta: data.motivo_consulta || 'Evaluación Inicial TMO (60 min)',
             estado: 'activo',
           }])
-          .select('id, nombre_completo, telefono')
+          .select('id, nombre_completo, telefono, prevision')
           .single();
 
         if (errInsertPaciente || !nuevoPaciente) {
@@ -245,19 +247,21 @@ export async function createScheduleAppointmentAction(
         newlyCreatedPatientId = nuevoPaciente.id;
         pacienteNombre = nuevoPaciente.nombre_completo;
         pacienteTelefono = nuevoPaciente.telefono;
+        pacientePrevision = (nuevoPaciente as any).prevision || 'Particular';
       }
     } else {
       targetPacienteId = data.pacienteId || '';
 
       const { data: pExistente } = await supabase
         .from('pacientes')
-        .select('id, nombre_completo, telefono')
+        .select('id, nombre_completo, telefono, prevision')
         .eq('id', targetPacienteId)
         .maybeSingle();
 
       if (pExistente) {
         pacienteNombre = pExistente.nombre_completo;
         pacienteTelefono = pExistente.telefono;
+        pacientePrevision = (pExistente as any).prevision || 'Particular';
       }
     }
 
@@ -300,9 +304,10 @@ export async function createScheduleAppointmentAction(
       const googleEventId = await crearEventoGoogleCalendar({
         pacienteNombre: pacienteNombre || 'Paciente Kiromov',
         pacienteTelefono: pacienteTelefono,
+        pacientePrevision: pacientePrevision || 'Particular',
         fecha: data.fecha,
         hora: data.hora.slice(0, 5),
-        motivo: `${data.motivo_consulta} [${data.box || 'Bulnes 470'}]`,
+        motivo: data.motivo_consulta,
       });
 
       if (googleEventId) {
@@ -331,5 +336,65 @@ export async function createScheduleAppointmentAction(
       success: false,
       error: error?.message || 'Error inesperado al procesar el agendamiento.',
     };
+  }
+}
+
+export async function updateScheduleAppointmentAction(params: {
+  citaId: string;
+  fecha: string;
+  hora: string;
+  motivo_consulta: string;
+  profesional?: string;
+  box?: string;
+}) {
+  const supabase = await createClient();
+  if (!supabase) return { success: false, error: 'No se pudo inicializar la base de datos' };
+
+  try {
+    const horaNormalizada = params.hora.length === 5 ? `${params.hora}:00` : params.hora;
+
+    const { data: citaActual, error: errCita } = await supabase
+      .from('citas_atenciones')
+      .select('id, google_event_id, paciente_id, pacientes(nombre_completo, telefono, prevision)')
+      .eq('id', params.citaId)
+      .single();
+
+    if (errCita || !citaActual) {
+      return { success: false, error: 'No se encontró la cita a actualizar' };
+    }
+
+    const { error: errUpdate } = await supabase
+      .from('citas_atenciones')
+      .update({
+        fecha: params.fecha,
+        hora: horaNormalizada,
+        motivo_consulta: params.motivo_consulta,
+        profesional: params.profesional || 'Klgo. Ignacio Cuevas Silva',
+        notas: params.box ? `Box: ${params.box}` : undefined,
+      })
+      .eq('id', params.citaId);
+
+    if (errUpdate) {
+      return { success: false, error: errUpdate.message };
+    }
+
+    if (citaActual.google_event_id) {
+      const pacObj = citaActual.pacientes as any;
+      const { modificarEventoGoogleCalendar } = await import('@/actions/calendar');
+      await modificarEventoGoogleCalendar(citaActual.google_event_id, {
+        fecha: params.fecha,
+        hora: params.hora.slice(0, 5),
+        pacienteNombre: pacObj?.nombre_completo,
+        pacienteTelefono: pacObj?.telefono,
+        pacientePrevision: pacObj?.prevision || 'Particular',
+        motivo: params.motivo_consulta,
+      });
+    }
+
+    revalidatePath('/agenda');
+    revalidatePath('/pacientes');
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 }

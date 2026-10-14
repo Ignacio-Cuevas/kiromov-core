@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
+import { extraerDatosPacienteDeGoogleEvent } from '@/utils/google-calendar';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey =
@@ -22,9 +24,10 @@ interface CalendarPayload {
   hora?: string;  // 'HH:mm:ss' o 'HH:mm'
   motivo_consulta?: string;
   google_event_id: string;
+  summary?: string;
+  description?: string;
+  attendees?: any[];
 }
-
-import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
   // 1. Validación de Seguridad Criptográfica
@@ -78,7 +81,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Evento ya registrado previamente' }, { status: 200 });
     }
 
-    if (!nombre_completo || !fecha || !hora) {
+    // Extraer datos usando la jerarquía estricta
+    const datos = extraerDatosPacienteDeGoogleEvent({
+      summary: body.summary || nombre_completo || '',
+      description: body.description || '',
+      attendees: body.attendees || (email ? [{ email, displayName: nombre_completo }] : []),
+      ...body,
+    });
+
+    const cleanName = datos.nombre || (nombre_completo ? nombre_completo.replace(/^(Cita:\s*|Kiromov\s*-\s*)/i, '').trim() : '');
+    const cleanEmail = datos.email ? datos.email.toLowerCase() : (email ? email.split(',')[0].trim().toLowerCase() : null);
+
+    let cleanTel: string | null = null;
+    const rawTel = datos.telefono || telefono;
+    if (rawTel) {
+      const digits = rawTel.replace(/\D/g, '');
+      if (digits.length >= 9) {
+        cleanTel = `+56${digits.slice(-9)}`;
+      } else if (digits.length >= 8) {
+        cleanTel = `+569${digits.slice(-8)}`;
+      } else {
+        cleanTel = rawTel;
+      }
+    }
+
+    if (!cleanName || !fecha || !hora) {
       return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 });
     }
 
@@ -103,30 +130,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Cita ya agendada en este bloque, vinculada exitosamente' }, { status: 200 });
     }
 
-    // Normalización de Datos y Limpieza Estricta de Prefijos
-    let cleanName = nombre_completo
-      .replace(/^Cita:\s*/i, '')
-      .replace(/^Sesión:\s*/i, '')
-      .replace(/^Kinesiología:\s*/i, '')
-      .replace(/^Cita Kiromov\s*[-–—:]\s*/i, '')
-      .replace(/^Kiromov\s*[-–—:]\s*/i, '')
-      .replace(/^Cita con\s*/i, '')
-      .replace(/\([^)]*\)/g, '') // Remueve paréntesis
-      .trim();
-
-    let cleanTel: string | null = null;
-    if (telefono) {
-      const digits = telefono.replace(/\D/g, '');
-      if (digits.length >= 9) {
-        cleanTel = `+56${digits.slice(-9)}`;
-      }
-    }
-
-    let cleanEmail: string | null = null;
-    if (email) {
-      cleanEmail = email.split(',')[0].trim().toLowerCase();
-    }
-
     // Paso A (Buscar o Vincular Paciente - Blindaje Anti-Duplicados con limit(1))
     let pacienteId: string | null = null;
 
@@ -140,15 +143,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (!pacienteId && cleanTel) {
+      const digits = cleanTel.replace(/\D/g, '');
       const { data: existenteTel } = await supabase
         .from('pacientes')
         .select('id')
-        .ilike('telefono', `%${cleanTel.slice(-9)}%`)
+        .ilike('telefono', `%${digits.slice(-8)}%`)
         .limit(1);
       if (existenteTel && existenteTel.length > 0) pacienteId = existenteTel[0].id;
     }
 
-    if (!pacienteId && cleanName) {
+    if (!pacienteId && cleanName && cleanName !== 'Paciente Reserva Web') {
       const { data: existenteNom } = await supabase
         .from('pacientes')
         .select('id')
@@ -160,9 +164,9 @@ export async function POST(request: NextRequest) {
     // REGLA ESTRICTA ANTI-FANTASMAS:
     // NUNCA autogenerar pacientes vacíos en sincronizaciones/webhooks.
     // Si no existe coincidencia, pacienteId queda como null y los datos de contacto se preservan en motivo y notas de la cita.
-    const motivoFinal = motivo_consulta?.trim()
-      ? motivo_consulta.trim()
-      : (cleanName ? `Atención Kinésica - ${cleanName}` : 'Evaluación Kinésica Inicial (Web)');
+    const motivoFinal = datos.motivo && datos.motivo !== 'Reserva Online Google Calendar'
+      ? datos.motivo
+      : (motivo_consulta?.trim() || (cleanName ? `Atención Kinésica - ${cleanName}` : 'Evaluación Kinésica Inicial (Web)'));
 
     const notasDetalle = !pacienteId && cleanName
       ? `Paciente externo (sin ficha): ${cleanName}${cleanTel ? ` • Tel: ${cleanTel}` : ''}${cleanEmail ? ` • Email: ${cleanEmail}` : ''}`

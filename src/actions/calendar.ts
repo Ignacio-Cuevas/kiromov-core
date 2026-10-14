@@ -9,6 +9,7 @@ import {
 export async function crearEventoGoogleCalendar(params: {
   pacienteNombre: string;
   pacienteTelefono?: string | null;
+  pacientePrevision?: string | null;
   fecha: string;
   hora: string;
   motivo?: string | null;
@@ -20,7 +21,17 @@ export async function eliminarEventoGoogleCalendar(googleEventId: string) {
   return await eliminarEventoGoogleCalendarUtil(googleEventId);
 }
 
-export async function modificarEventoGoogleCalendar(googleEventId: string, params: { fecha: string; hora: string; }) {
+export async function modificarEventoGoogleCalendar(
+  googleEventId: string, 
+  params: { 
+    fecha: string; 
+    hora: string; 
+    pacienteNombre?: string;
+    pacienteTelefono?: string | null;
+    pacientePrevision?: string | null;
+    motivo?: string | null;
+  }
+) {
   return await modificarEventoGoogleCalendarUtil(googleEventId, params);
 }
 
@@ -32,6 +43,7 @@ export async function syncEventToGoogleCalendar(payload: {
   hora?: string;
   paciente_nombre?: string;
   paciente_telefono?: string | null;
+  paciente_prevision?: string | null;
   motivo_consulta?: string;
 }) {
   try {
@@ -43,6 +55,7 @@ export async function syncEventToGoogleCalendar(payload: {
       const eventId = await crearEventoGoogleCalendarUtil({
         pacienteNombre: payload.paciente_nombre || 'Paciente Kiromov',
         pacienteTelefono: payload.paciente_telefono,
+        pacientePrevision: payload.paciente_prevision || 'Particular',
         fecha: payload.fecha,
         hora: payload.hora,
         motivo: payload.motivo_consulta,
@@ -67,7 +80,11 @@ export async function syncEventToGoogleCalendar(payload: {
       if (payload.google_event_id && payload.fecha && payload.hora) {
         const modificado = await modificarEventoGoogleCalendarUtil(payload.google_event_id, {
           fecha: payload.fecha,
-          hora: payload.hora
+          hora: payload.hora,
+          pacienteNombre: payload.paciente_nombre,
+          pacienteTelefono: payload.paciente_telefono,
+          pacientePrevision: payload.paciente_prevision,
+          motivo: payload.motivo_consulta,
         });
         if (modificado) {
           return { success: true, google_event_id: payload.google_event_id };
@@ -77,6 +94,7 @@ export async function syncEventToGoogleCalendar(payload: {
         const nuevoEventId = await crearEventoGoogleCalendarUtil({
           pacienteNombre: payload.paciente_nombre || 'Paciente Kiromov',
           pacienteTelefono: payload.paciente_telefono,
+          pacientePrevision: payload.paciente_prevision || 'Particular',
           fecha: payload.fecha,
           hora: payload.hora,
           motivo: payload.motivo_consulta,

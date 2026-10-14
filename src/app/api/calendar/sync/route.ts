@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { getGoogleCalendarClient } from '@/utils/google-calendar';
+import { getGoogleCalendarClient, extraerDatosPacienteDeGoogleEvent } from '@/utils/google-calendar';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +34,6 @@ export async function POST() {
       if (!ge.start?.dateTime || ge.status === 'cancelled') continue;
       
       const gId = ge.id!;
-      const fechaHora = new Date(ge.start.dateTime);
       const fechaStr = ge.start.dateTime.split('T')[0];
       const horaStr = ge.start.dateTime.split('T')[1].slice(0, 8);
 
@@ -46,17 +45,42 @@ export async function POST() {
         .maybeSingle();
 
       if (!existe) {
-        // Extraer nombre del paciente del título
-        const summary = ge.summary || '';
-        let nombre = summary.replace(/^(Cita:|Kiromov\s*-\s*Chillán\s*\(?|Kiromov\s*-\s*)/i, '').replace(/\)$/, '').trim();
-        if (!nombre || nombre.toLowerCase().includes('sin titulo')) continue; // Ignorar bloqueos falsos
+        // Extraer datos robustos del paciente desde Google Event
+        const { nombre, email, telefono, motivo } = extraerDatosPacienteDeGoogleEvent(ge);
+        if (!nombre || nombre.toLowerCase().includes('sin titulo') || nombre.includes('BLOQUEO')) continue;
 
-        // Buscar o crear paciente
-        let { data: pac } = await supabase
-          .from('pacientes')
-          .select('id')
-          .ilike('nombre_completo', `%${nombre}%`)
-          .maybeSingle();
+        // Buscar o crear paciente (prioridad: email -> teléfono -> nombre)
+        let pac = null;
+
+        if (email) {
+          const { data: pEmail } = await supabase
+            .from('pacientes')
+            .select('id')
+            .eq('email', email.toLowerCase())
+            .maybeSingle();
+          if (pEmail) pac = pEmail;
+        }
+
+        if (!pac && telefono) {
+          const digits = telefono.replace(/\D/g, '');
+          if (digits.length >= 8) {
+            const { data: pTel } = await supabase
+              .from('pacientes')
+              .select('id')
+              .ilike('telefono', `%${digits.slice(-8)}%`)
+              .maybeSingle();
+            if (pTel) pac = pTel;
+          }
+        }
+
+        if (!pac && nombre && nombre !== 'Paciente Reserva Web') {
+          const { data: pNom } = await supabase
+            .from('pacientes')
+            .select('id')
+            .ilike('nombre_completo', `%${nombre}%`)
+            .maybeSingle();
+          if (pNom) pac = pNom;
+        }
 
         if (!pac) {
           const nextCode = `KIR-${Math.floor(10000 + Math.random() * 90000)}`;
@@ -64,6 +88,8 @@ export async function POST() {
             .from('pacientes')
             .insert([{ 
               nombre_completo: nombre, 
+              email: email || null,
+              telefono: telefono || null,
               estado: 'activo',
               codigo_paciente: nextCode 
             }])
@@ -78,7 +104,7 @@ export async function POST() {
             fecha: fechaStr,
             hora: horaStr,
             estado: 'confirmada',
-            motivo_consulta: 'Reserva Online Google Calendar',
+            motivo_consulta: motivo,
             google_event_id: gId,
             profesional: 'Klgo. Ignacio Cuevas Silva',
             notas: 'Generada desde Google Calendar Sync'
@@ -108,11 +134,17 @@ export async function POST() {
           const endH = String(Math.floor(totalMinutes / 60) % 24).padStart(2, '0');
           const endM = String(totalMinutes % 60).padStart(2, '0');
 
+          const pacObj = c.pacientes as any;
+          const pacNombre = pacObj?.nombre_completo || 'Paciente';
+          const pacTel = pacObj?.telefono || 'Sin teléfono';
+          const pacPrev = pacObj?.prevision || 'Particular';
+          const pacMotivo = c.motivo_consulta || 'Atención Kinésica TMO';
+
           const inserted = await calendar.events.insert({
             calendarId,
             requestBody: {
-              summary: `Cita: ${c.pacientes?.nombre_completo || 'Paciente'}`,
-              description: `Previsión: ${c.pacientes?.prevision || 'Particular'} · Tel: ${c.pacientes?.telefono || ''}`,
+              summary: `${pacNombre} · Kinesiología TMO`,
+              description: `Paciente: ${pacNombre}\nTeléfono: ${pacTel}\nPrevisión: ${pacPrev}\nMotivo: ${pacMotivo}`,
               start: { dateTime: `${c.fecha}T${horaLimpia}:00-03:00`, timeZone: 'America/Santiago' },
               end: { dateTime: `${c.fecha}T${endH}:${endM}:00-03:00`, timeZone: 'America/Santiago' },
             },

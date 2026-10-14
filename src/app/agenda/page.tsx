@@ -623,6 +623,7 @@ function AgendaContent() {
             hora: editForm.hora,
             paciente_nombre: editingCita.pacientes?.nombre_completo,
             paciente_telefono: editingCita.pacientes?.telefono,
+            paciente_prevision: editingCita.pacientes?.prevision,
             motivo_consulta: editForm.motivo
           });
           if (syncRes?.google_event_id && syncRes.google_event_id !== editingCita.google_event_id) {

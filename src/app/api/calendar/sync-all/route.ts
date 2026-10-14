@@ -20,7 +20,7 @@ export async function POST() {
   // Buscar citas futuras sin sincronizar con Google Calendar
   const { data: citas, error } = await supabase
     .from('citas_atenciones')
-    .select('id, fecha, hora, motivo_consulta, paciente_id, pacientes:paciente_id(nombre_completo, telefono)')
+    .select('id, fecha, hora, motivo_consulta, paciente_id, pacientes:paciente_id(nombre_completo, telefono, prevision)')
     .gte('fecha', hoyStr)
     .in('estado', ['pendiente', 'confirmada'])
     .is('google_event_id', null);
@@ -38,7 +38,7 @@ export async function POST() {
     if (!paciente && cita.paciente_id) {
       const { data: pacData } = await supabase
         .from('pacientes')
-        .select('nombre_completo, telefono')
+        .select('nombre_completo, telefono, prevision')
         .eq('id', cita.paciente_id)
         .maybeSingle();
       if (pacData) paciente = pacData;
@@ -49,6 +49,7 @@ export async function POST() {
     const eventId = await crearEventoGoogleCalendar({
       pacienteNombre: paciente.nombre_completo,
       pacienteTelefono: paciente.telefono,
+      pacientePrevision: paciente.prevision || 'Particular',
       fecha: cita.fecha,
       hora: cita.hora,
       motivo: cita.motivo_consulta
