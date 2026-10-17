@@ -43,8 +43,8 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
 
-  // No renderizar en la vista de login
-  if (pathname === '/login') return null;
+  // No renderizar en la vista de login ni en portal de agendamiento
+  if (pathname === '/login' || pathname.startsWith('/agendar')) return null;
 
   const isActive = (href: string) => {
     if (href === '/pacientes') {

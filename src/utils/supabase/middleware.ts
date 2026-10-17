@@ -14,7 +14,9 @@ export async function updateSession(request: NextRequest) {
 
   if (!supabaseUrl || !supabaseKey || supabaseUrl.includes("tu_supabase_url")) {
     const isLoginPage = request.nextUrl.pathname.startsWith('/login');
-    const isPublic = isLoginPage || request.nextUrl.pathname.startsWith('/api/webhooks');
+    const isAgendarPage = request.nextUrl.pathname.startsWith('/agendar');
+    const isPublicApi = request.nextUrl.pathname.startsWith('/api/public');
+    const isPublic = isLoginPage || isAgendarPage || isPublicApi || request.nextUrl.pathname.startsWith('/api/webhooks');
     if (!isPublic) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
@@ -48,8 +50,12 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginPage = request.nextUrl.pathname.startsWith('/login');
+  const isAgendarPage = request.nextUrl.pathname.startsWith('/agendar');
+  const isPublicApi = request.nextUrl.pathname.startsWith('/api/public');
   const isPublicPath =
     isLoginPage ||
+    isAgendarPage ||
+    isPublicApi ||
     request.nextUrl.pathname.startsWith('/api/webhooks') ||
     request.nextUrl.pathname.startsWith('/_next') ||
     request.nextUrl.pathname.startsWith('/static') ||

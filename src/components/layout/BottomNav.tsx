@@ -14,8 +14,8 @@ export function BottomNav() {
     { label: 'Aranceles', href: '/planes', icon: '🏷️' },
   ];
 
-  // No mostrar la barra en la pantalla de login
-  if (pathname === '/login') return null;
+  // No mostrar la barra en la pantalla de login ni agendamiento público
+  if (pathname === '/login' || pathname.startsWith('/agendar')) return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-hairline md:hidden pb-[env(safe-area-inset-bottom,8px)] shadow-calendly-lg print:hidden">
