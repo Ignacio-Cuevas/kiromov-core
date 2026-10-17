@@ -324,8 +324,9 @@ export function ReimbursementCertificate({
 
                 <div className="text-right text-[11px] font-sans text-slate-600">
                   <p className="font-semibold text-slate-800">Fecha: {new Date().toLocaleDateString('es-CL')}</p>
-                  <p className="text-xs text-slate-600">ignacio@kiromov.cl</p>
-                  <p>+56 9 8276 2103</p>
+                  <p className="text-xs text-slate-600">
+                    ignacio@kiromov.cl · +56 9 3949 9906
+                  </p>
                 </div>
               </div>
 

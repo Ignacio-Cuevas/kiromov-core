@@ -38,6 +38,8 @@ export function DischargeReportModal({
   const [condicionEgreso, setCondicionEgreso] = useState(
     'Alta Kinésica con Reintegro Funcional Completo. Paciente asintomático, sin restricciones en actividades de la vida diaria ni deportivas.'
   );
+  const [logroDolor, setLogroDolor] = useState('↓ Reducción de 5 a 0 pts (Alivio 100%)');
+  const [logroMovilidad, setLogroMovilidad] = useState('✓ Movilidad 100% Recuperada');
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const logoSrc = "/branding/logo.png";
@@ -121,6 +123,8 @@ export function DischargeReportModal({
         }
         setDolorAlta(ultimoDolor);
 
+        setLogroDolor(`↓ Reducción de ${primerDolor} a ${ultimoDolor} pts (Alivio 100%)`);
+
       } catch (err) {
         console.error('Error cargando datos para informe de alta:', err);
       } finally {
@@ -143,7 +147,10 @@ export function DischargeReportModal({
     clon.querySelectorAll('input, textarea').forEach(input => {
       const span = document.createElement('span');
       span.textContent = (input as HTMLInputElement | HTMLTextAreaElement).value;
-      span.className = 'font-bold text-slate-900';
+      const isTextarea = input.tagName.toLowerCase() === 'textarea';
+      span.className = isTextarea
+        ? 'font-medium text-slate-900 leading-relaxed block whitespace-pre-wrap break-words text-xs'
+        : 'font-bold text-slate-900';
       if (input.parentNode) {
         input.parentNode.replaceChild(span, input);
       }
@@ -291,7 +298,9 @@ export function DischargeReportModal({
                 <div className="text-right text-[10px] text-slate-600">
                   <p className="font-bold text-slate-800 text-xs">INFORME DE ALTA</p>
                   <p>Fecha emisión: {new Date().toLocaleDateString('es-CL')}</p>
-                  <p>contacto@kiromov.cl • +56 9 8276 2103</p>
+                  <p className="text-xs text-slate-600">
+                    ignacio@kiromov.cl · +56 9 3949 9906
+                  </p>
                 </div>
               </div>
 
@@ -385,7 +394,12 @@ export function DischargeReportModal({
                         </div>
                       </td>
                       <td className="p-2 border border-slate-200 text-center font-bold text-emerald-700">
-                        ↓ Reducción {Math.max(0, dolorIngreso - dolorAlta)} pts (Alivio 100%)
+                        <input
+                          type="text"
+                          value={logroDolor}
+                          onChange={(e) => setLogroDolor(e.target.value)}
+                          className="w-full text-xs font-semibold text-emerald-800 bg-transparent border-b border-dashed border-slate-300 hover:border-slate-400 focus:border-emerald-600 focus:outline-none print:border-none print:p-0"
+                        />
                       </td>
                     </tr>
                     <tr>
@@ -422,7 +436,12 @@ export function DischargeReportModal({
                         Rango completo sin dolor
                       </td>
                       <td className="p-2 border border-slate-200 text-center font-semibold text-emerald-700">
-                        ✓ Movilidad 100% Recuperada
+                        <input
+                          type="text"
+                          value={logroMovilidad}
+                          onChange={(e) => setLogroMovilidad(e.target.value)}
+                          className="w-full text-xs font-semibold text-emerald-800 bg-transparent border-b border-dashed border-slate-300 hover:border-slate-400 focus:border-emerald-600 focus:outline-none print:border-none print:p-0"
+                        />
                       </td>
                     </tr>
                   </tbody>
@@ -444,15 +463,15 @@ export function DischargeReportModal({
 
               {/* Condición de Egreso y Pauta Domiciliaria */}
               <div className="mb-3 space-y-2">
-                <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg">
-                  <span className="font-bold text-emerald-950 text-[11px] block mb-0.5">
+                <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-xl">
+                  <label className="text-[11px] font-bold text-emerald-950 uppercase tracking-wider block mb-1">
                     Condición de Egreso:
-                  </span>
-                  <input
-                    type="text"
+                  </label>
+                  <textarea
+                    rows={2}
                     value={condicionEgreso}
                     onChange={(e) => setCondicionEgreso(e.target.value)}
-                    className="w-full bg-transparent border-b border-emerald-300 text-emerald-900 font-bold text-[11px] outline-none"
+                    className="w-full text-xs font-medium text-emerald-950 bg-transparent border-none p-0 focus:ring-0 focus:outline-none resize-none leading-relaxed whitespace-pre-wrap break-words print:text-black"
                   />
                 </div>
 
