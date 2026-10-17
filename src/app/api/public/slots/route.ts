@@ -9,27 +9,60 @@ export async function GET(req: Request) {
     const fecha = searchParams.get('fecha'); // 'YYYY-MM-DD'
     if (!fecha) return NextResponse.json({ error: 'Fecha requerida' }, { status: 400 });
 
+    // 1. REGLA: Máximo 8 días hacia adelante (evaluado en horario de Chile)
+    const ahoraChile = new Intl.DateTimeFormat('es-CL', {
+      timeZone: 'America/Santiago',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date());
+
+    const partes = ahoraChile.split(', ');
+    const [dHoy, mHoy, yHoy] = partes[0].split('-').map(Number);
+    const hoyChile = `${yHoy}-${String(mHoy).padStart(2, '0')}-${String(dHoy).padStart(2, '0')}`;
+    const horaActual = partes[1] || '00:00';
+
+    const hoy = new Date(yHoy, mHoy - 1, dHoy, 0, 0, 0, 0);
+    const [año, mes, día] = fecha.split('-').map(Number);
+    const fechaObj = new Date(año, mes - 1, día, 0, 0, 0, 0);
+    const diffDias = Math.round((fechaObj.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDias < 0 || diffDias > 8) {
+      return NextResponse.json({ slots: [], mensaje: 'Solo reservas hasta 8 días por adelantado' });
+    }
+
+    // 2. TURNOS REALES DE BOX CHILLÁN
+    const diaSemana = fechaObj.getDay(); // 0: Dom, 1: Lun, 2: Mar, 3: Mié, 4: Jue, 5: Vie, 6: Sáb
+    let slotsBase: string[] = [];
+
+    if (diaSemana === 1 || diaSemana === 3 || diaSemana === 5) {
+      // Lunes, Miércoles, Viernes (15:00 a 20:00 hrs)
+      slotsBase = ['15:00', '16:00', '17:00', '18:00', '19:00'];
+    } else if (diaSemana === 4 || diaSemana === 6) {
+      // Jueves y Sábado (10:00 a 15:00 hrs)
+      slotsBase = ['10:00', '11:00', '12:00', '13:00', '14:00'];
+    } else {
+      // Martes y Domingo cerrado
+      return NextResponse.json({ slots: [] });
+    }
+
     const supabase = await createClient();
-    if (!supabase) return NextResponse.json({ error: 'Error de conexión con la base de datos' }, { status: 500 });
+    if (!supabase) {
+      return NextResponse.json({ error: 'Error de conexión con la base de datos' }, { status: 500 });
+    }
 
-    // 1. Horarios base de atención en box (ej. Lunes a Viernes 10:00 a 20:00, Sábados 10:00 a 14:00)
-    const diaSemana = new Date(fecha + 'T12:00:00').getDay(); // 0: Dom, 6: Sáb
-    if (diaSemana === 0) return NextResponse.json({ slots: [] }); // Cerrado domingo
-
-    // Bloques estándar de inicio de atención
-    const slotsBase = diaSemana === 6 
-      ? ['10:00', '11:00', '12:00', '13:00']
-      : ['10:00', '11:00', '12:00', '13:00', '16:00', '17:00', '18:00', '19:00'];
-
-    // 2. Consultar citas ocupadas en Supabase
-    const { data: citasOcupadas, error } = await supabase
+    // 3. CONSULTAR CITAS OCUPADAS EN SUPABASE
+    const { data: citasOcupadas, error: errCitas } = await supabase
       .from('citas_atenciones')
       .select('hora')
       .eq('fecha', fecha)
       .not('estado', 'in', '("cancelada","no_asistio")');
 
-    if (error) {
-      console.error('Error consultando citas ocupadas:', error);
+    if (errCitas) {
+      console.error('Error consultando citas ocupadas:', errCitas);
     }
 
     const horasOcupadas = (citasOcupadas || []).map((c: any) => c.hora.slice(0, 5));
@@ -59,30 +92,53 @@ export async function GET(req: Request) {
       // Ignorar fallo de bloqueos opcionales
     }
 
-    // Si la fecha es hoy en horario de Chile, descartar horas pasadas
-    const ahoraChile = new Intl.DateTimeFormat('es-CL', {
-      timeZone: 'America/Santiago',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(new Date());
-
-    const partes = ahoraChile.split(', ');
-    const [d, m, y] = partes[0].split('-');
-    const hoyChile = `${y}-${m}-${d}`;
-    const horaActual = partes[1] || '00:00';
-
-    // 3. Filtrar slots libres
+    // Filtrar todos los slots efectivamente libres (excluyendo horas pasadas si es hoy)
     const slotsLibres = slotsBase.filter((slot) => {
       if (horasOcupadas.includes(slot) || horasBloqueadas.includes(slot)) return false;
       if (fecha === hoyChile && slot <= horaActual) return false;
       return true;
     });
 
-    return NextResponse.json({ slots: slotsLibres });
+    if (slotsLibres.length === 0) {
+      return NextResponse.json({ slots: [] });
+    }
+
+    // 4. ALGORITMO DE PRIORIZACIÓN DE HUECOS (COMPACTACIÓN DE BOX)
+    // Ponderar cada slot libre: mayor puntaje si está adyacente a una cita ocupada o entre dos citas
+    const scoredSlots = slotsLibres.map((slot) => {
+      let score = 0;
+      const index = slotsBase.indexOf(slot);
+
+      // Verificar si el slot anterior o posterior está ocupado
+      const prevSlot = slotsBase[index - 1];
+      const nextSlot = slotsBase[index + 1];
+      const prevOcupado = prevSlot && horasOcupadas.includes(prevSlot);
+      const nextOcupado = nextSlot && horasOcupadas.includes(nextSlot);
+
+      if (prevOcupado && nextOcupado) {
+        score += 10; // Prioridad máxima: hueco vacío entre dos pacientes
+      } else if (prevOcupado || nextOcupado) {
+        score += 5;  // Prioridad media: contiguo a un paciente para trabajar de corrido
+      } else {
+        score += 1;  // Prioridad baja: hora aislada
+      }
+
+      return { slot, score };
+    });
+
+    // Ordenar por score descendente (los mejores huecos primero)
+    scoredSlots.sort((a, b) => b.score - a.score);
+
+    // 5. REGLA DE ESCASEZ: Mostrar MÁXIMO 3 cupos disponibles por día
+    const slotsEstrategicos = scoredSlots.slice(0, 3).map((item) => item.slot);
+
+    // Reordenar cronológicamente para el usuario
+    slotsEstrategicos.sort();
+
+    return NextResponse.json({
+      slots: slotsEstrategicos,
+      totalDisponibles: slotsEstrategicos.length,
+    });
   } catch (error: any) {
     console.error('Error en /api/public/slots:', error);
     return NextResponse.json({ error: error?.message || 'Error interno' }, { status: 500 });

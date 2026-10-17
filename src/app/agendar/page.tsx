@@ -84,6 +84,18 @@ export default function AgendarOnlinePage() {
   const [loadingSlots, setLoadingSlots] = useState<boolean>(false);
   const [horaSeleccionada, setHoraSeleccionada] = useState<string>('');
 
+  // Fechas límites: min = hoy, max = 8 días hacia adelante
+  const { minDate, maxDate } = React.useMemo(() => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const min = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    const maxD = new Date();
+    maxD.setDate(maxD.getDate() + 8);
+    const max = `${maxD.getFullYear()}-${pad(maxD.getMonth() + 1)}-${pad(maxD.getDate())}`;
+    return { minDate: min, maxDate: max };
+  }, []);
+
   // Formulario de Paciente
   const [nombre, setNombre] = useState('');
   const [rut, setRut] = useState('');
@@ -288,16 +300,14 @@ export default function AgendarOnlinePage() {
         
         {/* Cabecera Institucional */}
         <header className="text-center mb-8 sm:mb-10">
-          <div className="inline-flex items-center justify-center p-3 bg-white/10 rounded-2xl backdrop-blur-md mb-4 border border-white/15 shadow-xl">
-            <Image
-              src="/branding/logo.png"
-              alt="Kiromov Centro Clínico"
-              width={180}
-              height={60}
-              className="h-12 w-auto object-contain brightness-105"
-              priority
-            />
-          </div>
+          <Image
+            src="/branding/logo.png"
+            alt="Kiromov Centro Clínico"
+            width={240}
+            height={70}
+            className="w-52 md:w-60 h-auto object-contain mx-auto mb-3"
+            priority
+          />
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
             Reserva de Hora Online
           </h1>
@@ -478,7 +488,8 @@ export default function AgendarOnlinePage() {
                 <input
                   type="date"
                   value={fecha}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={minDate}
+                  max={maxDate}
                   onChange={(e) => setFecha(e.target.value)}
                   className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-2.5 text-white font-medium text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
                 />
@@ -494,6 +505,12 @@ export default function AgendarOnlinePage() {
                   Horarios disponibles en box para este día:
                 </label>
 
+                {slots.length > 0 && (
+                  <div className="flex items-center gap-1.5 mb-3 text-xs text-amber-300 font-semibold bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg w-fit">
+                    <span>⚡ Alta demanda: Solo {slots.length} {slots.length === 1 ? 'cupo disponible' : 'cupos disponibles'} para esta fecha</span>
+                  </div>
+                )}
+
                 {loadingSlots ? (
                   <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
                     <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
@@ -504,7 +521,7 @@ export default function AgendarOnlinePage() {
                     <AlertCircle className="w-8 h-8 text-amber-400 mx-auto opacity-90" />
                     <p className="text-sm font-semibold text-white">No hay horas disponibles para este día</p>
                     <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                      Los domingos el centro permanece cerrado o todos los cupos han sido completados. Por favor selecciona otra fecha.
+                      Martes y domingos el centro permanece cerrado o todos los cupos han sido completados. Por favor selecciona otra fecha dentro de los próximos 8 días.
                     </p>
                   </div>
                 ) : (
