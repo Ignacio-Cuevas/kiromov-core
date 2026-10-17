@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { getGoogleCalendarClient, extraerDatosPacienteDeGoogleEvent } from '@/utils/google-calendar';
+import { getGoogleCalendarClient, obtenerDatosReservaGoogle } from '@/utils/google-calendar';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,8 +28,9 @@ export async function POST() {
     const gEvents = gEventsRes.data.items || [];
     let importadas = 0;
     let exportadas = 0;
+    let actualizadas = 0;
 
-    // 1. IMPORTAR CITAS DE GOOGLE CALENDAR A SUPABASE
+    // 1. IMPORTAR Y RECONCILIAR CITAS DE GOOGLE CALENDAR A SUPABASE
     for (const ge of gEvents) {
       if (!ge.start?.dateTime || ge.status === 'cancelled') continue;
       
@@ -40,13 +41,63 @@ export async function POST() {
       // Verificar si ya existe en Supabase
       const { data: existe } = await supabase
         .from('citas_atenciones')
-        .select('id')
+        .select('id, fecha, hora, paciente_id, pacientes(id, nombre_completo, email, telefono)')
         .eq('google_event_id', gId)
         .maybeSingle();
 
-      if (!existe) {
-        // Extraer datos robustos del paciente desde Google Event
-        const { nombre, email, telefono, motivo } = extraerDatosPacienteDeGoogleEvent(ge);
+      if (existe) {
+        // Reconciliar horario si cambió en Google Calendar
+        const horaG = horaStr.slice(0, 5);
+        const horaS = (existe.hora || '').slice(0, 5);
+        if (existe.fecha !== fechaStr || horaS !== horaG) {
+          await supabase
+            .from('citas_atenciones')
+            .update({
+              fecha: fechaStr,
+              hora: horaStr,
+            })
+            .eq('id', existe.id);
+          actualizadas++;
+        }
+
+        // Sanear nombre si quedó previamente guardado como "Motivo de Consulta"
+        if (existe.pacientes) {
+          const pacObj = existe.pacientes as any;
+          const pacNombreActual = (pacObj?.nombre_completo || '').toLowerCase();
+          if (
+            pacNombreActual.includes('motivo') ||
+            pacNombreActual.includes('consulta') ||
+            pacNombreActual.includes('sin titulo') ||
+            pacNombreActual.includes('paciente reserva web')
+          ) {
+            const { nombre: realName, email: realEmail, telefono: realTel, motivo: realMotivo } = obtenerDatosReservaGoogle(ge);
+            if (
+              realName &&
+              !realName.toLowerCase().includes('motivo') &&
+              !realName.toLowerCase().includes('consulta') &&
+              realName !== 'Paciente Reserva Web'
+            ) {
+              await supabase
+                .from('pacientes')
+                .update({
+                  nombre_completo: realName,
+                  ...(realEmail ? { email: realEmail } : {}),
+                  ...(realTel ? { telefono: realTel } : {}),
+                })
+                .eq('id', pacObj.id);
+
+              if (realMotivo && realMotivo !== 'Reserva Online Google Calendar') {
+                await supabase
+                  .from('citas_atenciones')
+                  .update({ motivo_consulta: realMotivo })
+                  .eq('id', existe.id);
+              }
+            }
+          }
+        }
+      } else {
+        // Extraer datos infalibles del paciente desde Google Event (attendees first)
+        const { nombre, email, telefono, motivo } = obtenerDatosReservaGoogle(ge);
         if (!nombre || nombre.toLowerCase().includes('sin titulo') || nombre.includes('BLOQUEO')) continue;
 
         // Buscar o crear paciente (prioridad: email -> teléfono -> nombre)
@@ -165,8 +216,9 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: `Sincronización completa: ${importadas} citas importadas de Google, ${exportadas} citas enviadas a Google.`,
+      message: `Sincronización completa: ${importadas} citas importadas de Google, ${actualizadas} citas actualizadas, ${exportadas} citas enviadas a Google.`,
       importadas,
+      actualizadas,
       exportadas,
     });
   } catch (error: any) {

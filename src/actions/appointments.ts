@@ -126,6 +126,7 @@ export async function markAppointmentNoShow(citaId: string, pacienteId: string) 
 import { scheduleAppointmentSchema, ScheduleAppointmentFormValues, ScheduleAppointmentResult } from '@/types/schedule';
 import { formatRut } from '@/lib/utils';
 import { crearEventoGoogleCalendar } from '@/actions/calendar';
+import { getGoogleCalendarClient } from '@/utils/google-calendar';
 
 export async function createScheduleAppointmentAction(
   values: ScheduleAppointmentFormValues
@@ -339,11 +340,11 @@ export async function createScheduleAppointmentAction(
   }
 }
 
-export async function updateScheduleAppointmentAction(params: {
+export async function updateAppointment(params: {
   citaId: string;
   fecha: string;
   hora: string;
-  motivo_consulta: string;
+  motivo_consulta?: string;
   profesional?: string;
   box?: string;
 }) {
@@ -351,11 +352,13 @@ export async function updateScheduleAppointmentAction(params: {
   if (!supabase) return { success: false, error: 'No se pudo inicializar la base de datos' };
 
   try {
+    const nuevaFecha = params.fecha;
+    const nuevaHora = params.hora.slice(0, 5);
     const horaNormalizada = params.hora.length === 5 ? `${params.hora}:00` : params.hora;
 
     const { data: citaActual, error: errCita } = await supabase
       .from('citas_atenciones')
-      .select('id, google_event_id, paciente_id, pacientes(nombre_completo, telefono, prevision)')
+      .select('id, google_event_id, fecha, hora, motivo_consulta, paciente_id, pacientes(nombre_completo, telefono, prevision)')
       .eq('id', params.citaId)
       .single();
 
@@ -366,9 +369,9 @@ export async function updateScheduleAppointmentAction(params: {
     const { error: errUpdate } = await supabase
       .from('citas_atenciones')
       .update({
-        fecha: params.fecha,
+        fecha: nuevaFecha,
         hora: horaNormalizada,
-        motivo_consulta: params.motivo_consulta,
+        motivo_consulta: params.motivo_consulta ?? citaActual.motivo_consulta,
         profesional: params.profesional || 'Klgo. Ignacio Cuevas Silva',
         notas: params.box ? `Box: ${params.box}` : undefined,
       })
@@ -378,23 +381,41 @@ export async function updateScheduleAppointmentAction(params: {
       return { success: false, error: errUpdate.message };
     }
 
+    // Si la cita tiene google_event_id, sincronizar inmediatamente en Google Calendar
     if (citaActual.google_event_id) {
-      const pacObj = citaActual.pacientes as any;
-      const { modificarEventoGoogleCalendar } = await import('@/actions/calendar');
-      await modificarEventoGoogleCalendar(citaActual.google_event_id, {
-        fecha: params.fecha,
-        hora: params.hora.slice(0, 5),
-        pacienteNombre: pacObj?.nombre_completo,
-        pacienteTelefono: pacObj?.telefono,
-        pacientePrevision: pacObj?.prevision || 'Particular',
-        motivo: params.motivo_consulta,
-      });
+      try {
+        const { calendar, calendarId } = getGoogleCalendarClient();
+        
+        const duracionMin = (params.motivo_consulta || citaActual.motivo_consulta || '').toLowerCase().includes('60 min') ? 60 : 45;
+        const [hStr, mStr] = nuevaHora.split(':');
+        const h = parseInt(hStr, 10) || 0;
+        const m = parseInt(mStr, 10) || 0;
+        const totalMinutes = h * 60 + m + duracionMin;
+        const endH = String(Math.floor(totalMinutes / 60) % 24).padStart(2, '0');
+        const endM = String(totalMinutes % 60).padStart(2, '0');
+        const nuevaHoraFin = `${endH}:${endM}`;
+
+        await calendar.events.patch({
+          calendarId,
+          eventId: citaActual.google_event_id,
+          requestBody: {
+            start: { dateTime: `${nuevaFecha}T${nuevaHora}:00`, timeZone: 'America/Santiago' },
+            end: { dateTime: `${nuevaFecha}T${nuevaHoraFin}:00`, timeZone: 'America/Santiago' },
+          },
+        });
+      } catch (calError: any) {
+        console.error('[Google Calendar Patch] Error actualizando evento:', calError?.message || calError);
+      }
     }
 
     revalidatePath('/agenda');
     revalidatePath('/pacientes');
+    revalidatePath('/');
     return { success: true };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    console.error('Error en updateAppointment:', error);
+    return { success: false, error: error?.message || 'Error al actualizar cita' };
   }
 }
+
+export const updateScheduleAppointmentAction = updateAppointment;

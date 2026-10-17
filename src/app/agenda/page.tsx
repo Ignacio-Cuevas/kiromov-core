@@ -604,41 +604,27 @@ function AgendaContent() {
   };
 
   const handleUpdateCita = async () => {
-    if (!supabase || !editingCita) return;
+    if (!editingCita) return;
     setSavingEdit(true);
     try {
-      const { error } = await supabase.from('citas_atenciones').update({
-        fecha: editForm.fecha, hora: editForm.hora, motivo_consulta: editForm.motivo, profesional: editForm.profesional
-      }).eq('id', editingCita.id);
-      if (error) throw error;
+      const { updateAppointment } = await import('@/actions/appointments');
+      const res = await updateAppointment({
+        citaId: editingCita.id,
+        fecha: editForm.fecha,
+        hora: editForm.hora,
+        motivo_consulta: editForm.motivo,
+        profesional: editForm.profesional,
+      });
 
-      if (editingCita.google_event_id) {
-        try {
-          const { syncEventToGoogleCalendar } = await import('@/actions/calendar');
-          const syncRes = await syncEventToGoogleCalendar({
-            action: 'update_event',
-            cita_id: editingCita.id,
-            google_event_id: editingCita.google_event_id,
-            fecha: editForm.fecha,
-            hora: editForm.hora,
-            paciente_nombre: editingCita.pacientes?.nombre_completo,
-            paciente_telefono: editingCita.pacientes?.telefono,
-            paciente_prevision: editingCita.pacientes?.prevision,
-            motivo_consulta: editForm.motivo
-          });
-          if (syncRes?.google_event_id && syncRes.google_event_id !== editingCita.google_event_id) {
-            await supabase.from('citas_atenciones').update({ google_event_id: syncRes.google_event_id }).eq('id', editingCita.id);
-          }
-        } catch (syncErr) {
-          console.error('Error al actualizar Google Calendar:', syncErr);
-        }
+      if (!res.success) {
+        throw new Error(res.error || 'Error al actualizar cita');
       }
 
       toast.success('Cita actualizada');
       setEditingCita(null);
       loadAgenda();
-    } catch (err) {
-      toast.error('Error al actualizar cita');
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al actualizar cita');
     } finally {
       setSavingEdit(false);
     }

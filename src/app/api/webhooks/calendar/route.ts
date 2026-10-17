@@ -73,11 +73,20 @@ export async function POST(request: NextRequest) {
     // 0.1 Verificar duplicados por google_event_id con limit(1)
     const { data: citasPorGoogle } = await supabase
       .from('citas_atenciones')
-      .select('id')
+      .select('id, fecha, hora')
       .eq('google_event_id', google_event_id)
       .limit(1);
 
     if (citasPorGoogle && citasPorGoogle.length > 0) {
+      const existente = citasPorGoogle[0];
+      const horaNormalizada = hora ? (hora.length === 5 ? `${hora}:00` : hora) : existente.hora;
+      if (fecha && hora && (existente.fecha !== fecha || (existente.hora || '').slice(0, 5) !== hora.slice(0, 5))) {
+        await supabase
+          .from('citas_atenciones')
+          .update({ fecha, hora: horaNormalizada })
+          .eq('id', existente.id);
+        return NextResponse.json({ message: 'Horario de cita actualizado vía webhook' }, { status: 200 });
+      }
       return NextResponse.json({ message: 'Evento ya registrado previamente' }, { status: 200 });
     }
 

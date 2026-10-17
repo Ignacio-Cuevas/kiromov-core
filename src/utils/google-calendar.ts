@@ -39,99 +39,74 @@ export const getGoogleCalendarClient = () => {
 
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'ignacio.kiromov@gmail.com';
 
-// 1. EXTRACCIÓN ROBUSTA DE DATOS DEL EVENTO DE GOOGLE
-export function extraerDatosPacienteDeGoogleEvent(gEvent: any) {
+// 1. EXTRACCIÓN INFALIBLE DE DATOS DEL EVENTO DE GOOGLE (ATTENDEES FIRST)
+export function obtenerDatosReservaGoogle(gEvent: any) {
   let nombre = '';
   let email = '';
   let telefono = '';
   let motivo = 'Reserva Online Google Calendar';
 
-  // 1. Extraer nombre desde los asistentes (attendees) o paréntesis del título
-  const attendee = gEvent.attendees?.find((a: any) => !a.self);
-  if (attendee?.displayName) {
-    nombre = attendee.displayName.trim();
-  }
-  if (attendee?.email) {
-    email = attendee.email.trim();
+  // 1. PRIORIDAD ABSOLUTA: Extraer del objeto attendees de Google (El que reserva)
+  const asistente = gEvent.attendees?.find((a: any) => !a.self);
+  if (asistente) {
+    if (asistente.displayName && asistente.displayName.trim().length > 0) {
+      nombre = asistente.displayName.trim();
+    }
+    if (asistente.email && asistente.email.includes('@')) {
+      email = asistente.email.trim();
+    }
   }
 
-  // Si no vino en attendees, extraer del título: "Kiromov - Chillán (Nombre Apellido)"
+  // 2. Si no vino en attendees, extraer de los paréntesis del título: "Kiromov - Chillán (Nombre Apellido)"
   if (!nombre && gEvent.summary) {
     const matchParentesis = gEvent.summary.match(/\(([^)]+)\)$/);
     if (matchParentesis && matchParentesis[1]) {
-      const candidato = matchParentesis[1].trim();
-      if (!candidato.toLowerCase().includes('motivo') && !candidato.toLowerCase().includes('consulta')) {
-        nombre = candidato;
+      const posibleNombre = matchParentesis[1].trim();
+      if (!posibleNombre.toLowerCase().includes('motivo') && !posibleNombre.toLowerCase().includes('kiromov')) {
+        nombre = posibleNombre;
       }
     }
   }
 
-  // 2. Extraer teléfono, email y motivo desde la descripción del formulario de Google
+  // 3. Extraer teléfono y motivo desde la descripción del evento
   const descripcion = gEvent.description || '';
   const lineas = descripcion.split('\n');
 
-  for (const linea of lineas) {
-    const l = linea.trim();
+  for (const l of lineas) {
+    const linea = l.trim();
     
-    // Si no teníamos nombre aún: "Reservado por: Juan Pérez" o "Nombre: Juan Pérez"
-    if ((!nombre || nombre.toLowerCase().includes('motivo') || nombre.toLowerCase().includes('consulta')) &&
-        (l.toLowerCase().startsWith('reservado por:') || l.toLowerCase().startsWith('nombre:') || l.toLowerCase().startsWith('paciente:'))) {
-      nombre = l.split(':')[1]?.trim() || '';
+    // Teléfono
+    if (!telefono && (linea.toLowerCase().includes('teléfono') || linea.toLowerCase().includes('phone') || linea.toLowerCase().includes('whatsapp'))) {
+      const match = linea.match(/(\+?56\s?9\s?\d{4}\s?\d{4}|\d{8,9})/);
+      if (match) telefono = match[0].replace(/\s+/g, '');
     }
 
-    // Teléfono: "Número de teléfono: +569..." o "Teléfono: ..."
-    if (!telefono && (l.toLowerCase().includes('teléfono') || l.toLowerCase().includes('phone') || l.toLowerCase().includes('whatsapp'))) {
-      const matchTel = l.match(/(\+?56\s?9\s?\d{4}\s?\d{4}|\d{8,9})/);
-      if (matchTel) {
-        telefono = matchTel[0].replace(/\s+/g, '');
-      } else {
-        telefono = l.split(':')[1]?.trim() || '';
-      }
-    }
-
-    // Email
-    if (!email && l.toLowerCase().includes('@')) {
-      const matchEmail = l.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-      if (matchEmail) {
-        email = matchEmail[0].trim();
-      }
-    }
-
-    // Motivo de Consulta
-    if (l.toLowerCase().includes('motivo') || l.toLowerCase().includes('molestia') || l.toLowerCase().includes('dolor')) {
-      const textoMotivo = l.split(':')[1]?.trim();
-      if (textoMotivo && textoMotivo.length > 2) {
-        motivo = textoMotivo;
+    // Motivo de Consulta real (guardarlo en MOTIVO, NUNCA en el nombre)
+    if (linea.toLowerCase().includes('motivo') || linea.toLowerCase().includes('molestia') || linea.toLowerCase().includes('dolor')) {
+      const partes = linea.split(':');
+      if (partes.length > 1 && partes[1].trim().length > 1) {
+        motivo = partes.slice(1).join(':').trim();
       }
     }
   }
 
-  // Si el motivo aún es genérico y el título tenía paréntesis con etiqueta de motivo
-  if (motivo === 'Reserva Online Google Calendar' && gEvent.summary) {
-    const matchParentesis = gEvent.summary.match(/\(([^)]+)\)$/);
-    if (matchParentesis && matchParentesis[1]) {
-      const candidato = matchParentesis[1].trim();
-      if (candidato.toLowerCase().includes('motivo') || candidato.toLowerCase().includes('dolor') || candidato.toLowerCase().includes('molestia')) {
-        motivo = candidato.replace(/^motivo(\s*de\s*consulta)?\s*[:\/-]?\s*/i, '').trim() || motivo;
-      }
-    }
-  }
-
-  // 3. REGLA ESTRICTA DE SEGURIDAD:
-  // Si el nombre contiene palabras de etiquetas ("motivo", "consulta", "sin titulo"), descartarlo
+  // 4. FILTRO DE SEGURIDAD ABSOLUTO:
+  // Si por cualquier motivo el nombre contiene "motivo", "consulta" o "chillán", DESCARTARLO
   if (
     !nombre ||
     nombre.toLowerCase().includes('motivo de consulta') ||
-    nombre.toLowerCase().includes('motivo') ||
-    nombre.toLowerCase().includes('consulta') ||
-    nombre.toLowerCase().includes('sin titulo') ||
-    nombre.toLowerCase().includes('kiromov - chillán')
+    nombre.toLowerCase().includes('kiromov - chillán') ||
+    nombre.toLowerCase().includes('sin titulo')
   ) {
-    // Fallback: usar el email si no hay nombre
-    nombre = email ? email.split('@')[0] : 'Paciente Reserva Web';
+    // Si tenemos email, usar la parte antes del @ como nombre temporal
+    nombre = email ? email.split('@')[0].replace(/[._]/g, ' ') : 'Paciente Reserva Web';
   }
 
   return { nombre, email, telefono, motivo };
+}
+
+export function extraerDatosPacienteDeGoogleEvent(gEvent: any) {
+  return obtenerDatosReservaGoogle(gEvent);
 }
 
 // A. CREAR EVENTO EN GOOGLE CALENDAR
@@ -218,22 +193,21 @@ export async function modificarEventoGoogleCalendar(googleEventId: string, param
 }): Promise<boolean> {
   try {
     if (!googleEventId) return false;
-    const { calendar } = getGoogleCalendarClient();
+    const { calendar, calendarId } = getGoogleCalendarClient();
     
     const horaLimpia = (params.hora || '09:00').slice(0, 5);
-    const startDateTime = `${params.fecha}T${horaLimpia}:00-03:00`;
-    
     const [hStr, mStr] = horaLimpia.split(':');
     const h = parseInt(hStr, 10) || 0;
     const m = parseInt(mStr, 10) || 0;
-    const totalMinutes = h * 60 + m + 45;
+    const duracionMin = (params.motivo || '').toLowerCase().includes('60 min') ? 60 : 45;
+    const totalMinutes = h * 60 + m + duracionMin;
     const endH = String(Math.floor(totalMinutes / 60) % 24).padStart(2, '0');
     const endM = String(totalMinutes % 60).padStart(2, '0');
-    const endDateTime = `${params.fecha}T${endH}:${endM}:00-03:00`;
+    const nuevaHoraFin = `${endH}:${endM}`;
 
     const patchBody: any = {
-      start: { dateTime: startDateTime, timeZone: 'America/Santiago' },
-      end: { dateTime: endDateTime, timeZone: 'America/Santiago' },
+      start: { dateTime: `${params.fecha}T${horaLimpia}:00`, timeZone: 'America/Santiago' },
+      end: { dateTime: `${params.fecha}T${nuevaHoraFin}:00`, timeZone: 'America/Santiago' },
     };
 
     if (params.pacienteNombre) {
@@ -248,7 +222,7 @@ export async function modificarEventoGoogleCalendar(googleEventId: string, param
     }
 
     await calendar.events.patch({
-      calendarId: CALENDAR_ID,
+      calendarId,
       eventId: googleEventId,
       requestBody: patchBody,
     });
