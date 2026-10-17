@@ -216,6 +216,29 @@ export default function AgendarOnlinePage() {
     }
   };
 
+  // Generador de enlace a WhatsApp para guardar comprobante
+  const generarEnlaceWhatsAppPaciente = () => {
+    if (!reservaExitosa) return '#';
+    const fechaLegible = formatFechaLegible(reservaExitosa.fecha);
+
+    const mensaje = 
+      `*Comprobante de Reserva · KIROMOV Centro Clínico*\n\n` +
+      `¡Hola *${reservaExitosa.nombre}*! Tu cita ha sido agendada con éxito:\n\n` +
+      `📋 *Servicio:* ${reservaExitosa.servicio}\n` +
+      `📅 *Fecha:* ${fechaLegible}\n` +
+      `⏰ *Horario:* ${reservaExitosa.hora} hrs\n` +
+      `👨‍⚕️ *Profesional:* Klgo. Ignacio Cuevas Silva\n\n` +
+      `*Indicaciones importantes para tu atención presencial:*\n` +
+      `📍 *Ubicación:* Edificio Aranjuez / Piso 7, Of. 75 (Bulnes 470, Chillán)\n` +
+      `⏰ *Puntualidad:* Llegar 5-10 min antes\n` +
+      `👟 *Vestimenta:* Ropa cómoda o deportiva\n` +
+      `📑 *Exámenes:* Traer radiografías o resonancias si tienes\n` +
+      `⏳ *Cancelaciones:* Con al menos 24 hrs de anticipación\n\n` +
+      `¡Te esperamos! ✨`;
+
+    return `https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`;
+  };
+
   // Generador de enlace a Google Calendar
   const getGoogleCalendarUrl = () => {
     if (!reservaExitosa) return '#';
@@ -231,9 +254,17 @@ export default function AgendarOnlinePage() {
 
     const title = encodeURIComponent(`Kiromov: ${reservaExitosa.servicio}`);
     const details = encodeURIComponent(
-      `Cita confirmada en Kiromov Centro Clínico.\nProfesional: Klgo. Ignacio Cuevas Silva\nPaciente: ${reservaExitosa.nombre}\nServicio: ${reservaExitosa.servicio}\nUbicación: Bulnes 470, Of. 75 (Edificio Aranjuez), Chillán.`
+      `Cita confirmada en Kiromov Centro Clínico.\n` +
+      `Profesional: Klgo. Ignacio Cuevas Silva\n` +
+      `Paciente: ${reservaExitosa.nombre}\n` +
+      `Servicio: ${reservaExitosa.servicio}\n\n` +
+      `📍 Ubicación: Edificio Aranjuez / Piso 7, Of. 75 (Bulnes 470, Chillán)\n` +
+      `⏰ Puntualidad: Llegar 5-10 min antes\n` +
+      `👟 Vestimenta: Ropa cómoda o deportiva\n` +
+      `📑 Exámenes: Traer radiografías o resonancias si tienes\n` +
+      `⏳ Cancelaciones: Con al menos 24 hrs de anticipación`
     );
-    const location = encodeURIComponent('Bulnes 470, Of. 75, Chillán, Región de Ñuble');
+    const location = encodeURIComponent('Bulnes 470, Piso 7, Of. 75 (Edificio Aranjuez), Chillán');
     const dates = `${cleanFecha}T${cleanHora}00/${cleanFecha}T${cleanEndHora}00`;
 
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}&location=${location}`;
@@ -260,8 +291,8 @@ export default function AgendarOnlinePage() {
       `DTSTART:${cleanFecha}T${cleanHora}00`,
       `DTEND:${cleanFecha}T${cleanEndHora}00`,
       `SUMMARY:Kiromov: ${reservaExitosa.servicio}`,
-      `DESCRIPTION:Atención Kinésica y TMO con Klgo. Ignacio Cuevas Silva\\nPaciente: ${reservaExitosa.nombre}\\nLugar: Bulnes 470, Of. 75, Chillán`,
-      'LOCATION:Bulnes 470, Of. 75, Edificio Aranjuez, Chillán',
+      `DESCRIPTION:Atención Kinésica y TMO con Klgo. Ignacio Cuevas Silva\\nPaciente: ${reservaExitosa.nombre}\\nServicio: ${reservaExitosa.servicio}\\n\\n📍 Ubicación: Edificio Aranjuez / Piso 7, Of. 75 (Bulnes 470, Chillán)\\n⏰ Puntualidad: Llegar 5-10 min antes\\n👟 Vestimenta: Ropa cómoda o deportiva\\n📑 Exámenes: Traer radiografías o resonancias si tienes\\n⏳ Cancelaciones: Con al menos 24 hrs de anticipación`,
+      'LOCATION:Bulnes 470, Piso 7, Of. 75, Edificio Aranjuez, Chillán',
       'STATUS:CONFIRMED',
       'END:VEVENT',
       'END:VCALENDAR',
@@ -803,31 +834,82 @@ export default function AgendarOnlinePage() {
                     Ubicación del Centro
                   </span>
                   <p className="text-sm text-slate-200">
-                    Bulnes 470, Of. 75 (Edificio Aranjuez), Chillán
+                    Edificio Aranjuez / Piso 7, Of. 75 (Bulnes 470, Chillán)
                   </p>
                 </div>
               </div>
 
-              {/* Botones de Calendario y Confirmación */}
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2 max-w-lg mx-auto">
+              {/* Tarjeta de Información Importante */}
+              <div className="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 md:p-6 text-left space-y-4 my-6 shadow-xl max-w-lg mx-auto">
+                <div>
+                  <h4 className="text-sm font-bold text-emerald-400 flex items-center gap-2 mb-2">
+                    📍 Información importante para tu cita presencial:
+                  </h4>
+                  <ul className="text-xs text-slate-300 space-y-2 list-none pl-1">
+                    <li className="flex items-start gap-2">
+                      <span className="text-slate-400">•</span>
+                      <span><strong className="text-white">Ubicación:</strong> Edificio Aranjuez / Piso 7, Of. 75 (Bulnes 470, Chillán).</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-slate-400">•</span>
+                      <span><strong className="text-white">Puntualidad:</strong> Te solicitamos llegar con 5 a 10 minutos de anticipación para iniciar a la hora programada y aprovechar al máximo tu tiempo de atención.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-slate-400">•</span>
+                      <span><strong className="text-white">Vestimenta:</strong> Asiste con ropa cómoda o deportiva que permita evaluar y trabajar fácilmente la zona a tratar.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-slate-400">•</span>
+                      <span><strong className="text-white">Exámenes previos:</strong> Si cuentas con radiografías, ecografías, resonancias u otros exámenes médicos recientes, por favor tráelos a la consulta.</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="pt-3 border-t border-slate-700/60">
+                  <h4 className="text-xs font-bold text-amber-300 flex items-center gap-2 mb-1.5">
+                    ⏳ Políticas de cambio y cancelación:
+                  </h4>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Si necesitas cancelar o reprogramar tu sesión, por favor hazlo con al menos <strong className="text-white">24 horas de anticipación</strong> para liberar el cupo a otro paciente que lo requiera.
+                  </p>
+                </div>
+
+                <p className="text-xs font-semibold text-center text-emerald-400 pt-2 border-t border-slate-700/60">
+                  ¡Nos vemos en la consulta!
+                </p>
+              </div>
+
+              {/* Botones de Acción: WhatsApp y Calendario */}
+              <div className="space-y-3 max-w-lg mx-auto pt-2">
                 <a
-                  href={getGoogleCalendarUrl()}
+                  href={generarEnlaceWhatsAppPaciente()}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full sm:flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md transition-all w-full cursor-pointer active:scale-95"
                 >
-                  <ExternalLink className="w-4 h-4" />
-                  Guardar en Google Calendar
+                  <span>💬 Guardar Comprobante en mi WhatsApp</span>
                 </a>
 
-                <button
-                  type="button"
-                  onClick={handleDownloadIcs}
-                  className="w-full sm:flex-1 py-3 px-4 bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs rounded-xl transition-all border border-slate-600 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Download className="w-4 h-4" />
-                  Descargar (.ics)
-                </button>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <a
+                    href={getGoogleCalendarUrl()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full sm:flex-1 py-3 px-4 bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs rounded-xl transition-all border border-slate-600 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <ExternalLink className="w-4 h-4 text-emerald-400" />
+                    Guardar en Google Calendar
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadIcs}
+                    className="w-full sm:flex-1 py-3 px-4 bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs rounded-xl transition-all border border-slate-600 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Download className="w-4 h-4 text-emerald-400" />
+                    Descargar (.ics)
+                  </button>
+                </div>
               </div>
 
               <div className="pt-4">
