@@ -431,8 +431,9 @@ export default function AgendarOnlinePage() {
                       </div>
 
                       <div className="mt-3 pt-3 border-t border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
-                        <span className="flex items-center gap-1 text-emerald-400">
-                          <ShieldCheck className="w-3.5 h-3.5" /> Reembolsable Fonasa / Isapre
+                        <span className="text-xs text-emerald-400 font-medium flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                          Reembolsable Isapre / Seguros Complementarios
                         </span>
                         <span className="font-semibold text-white flex items-center gap-1">
                           {seleccionado ? '✓ Seleccionado' : 'Elegir'}
