@@ -73,7 +73,7 @@ export default function AgendarOnlinePage() {
 
   // Fecha y Slots
   const [fecha, setFecha] = useState<string>(() => {
-    // Inicializar con la fecha de hoy o mañana si ya es tarde
+    // Inicializar con la fecha de hoy
     const now = new Date();
     const y = now.getFullYear();
     const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -128,7 +128,6 @@ export default function AgendarOnlinePage() {
         if (!isMounted) return;
         if (data.slots && Array.isArray(data.slots)) {
           setSlots(data.slots);
-          // Si el slot previamente seleccionado sigue disponible, mantenerlo; sino dejar vacío
         } else {
           setSlots([]);
         }
@@ -171,22 +170,23 @@ export default function AgendarOnlinePage() {
       return;
     }
     if (!fecha || !horaSeleccionada) {
-      toast.error('Por favor selecciona una fecha y horario disponible');
+      toast.error('Por favor selecciona una fecha y hora disponible');
       return;
     }
 
     setSubmitting(true);
+
     try {
       const res = await fetch('/api/public/book', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nombre: nombre.trim(),
-          rut: rut.trim() || null,
+          rut: rut.trim() || undefined,
           telefono: telefono.trim(),
-          email: email.trim().toLowerCase() || null,
+          email: email.trim() || undefined,
           prevision,
-          motivo: motivo.trim() || servicioSeleccionado.title,
+          motivo: `${servicioSeleccionado.title} (${servicioSeleccionado.duration})${motivo ? ` - ${motivo.trim()}` : ''}`,
           fecha,
           hora: horaSeleccionada,
           tipo_motivo: servicioSeleccionado.id,
@@ -325,86 +325,92 @@ export default function AgendarOnlinePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-800 antialiased flex flex-col justify-between selection:bg-orange-600 selection:text-white">
       {/* Contenedor Principal */}
       <div className="w-full max-w-2xl mx-auto px-4 py-8 sm:py-12">
         
-        {/* Cabecera Institucional */}
+        {/* Cabecera Institucional (Luminosa) */}
         <header className="text-center mb-8 sm:mb-10">
           <Image
             src="/branding/logo.png"
             alt="Kiromov Centro Clínico"
             width={240}
             height={70}
-            className="w-52 md:w-60 h-auto object-contain mx-auto mb-3"
+            className="w-52 h-auto object-contain mx-auto mb-2"
             priority
           />
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">
             Reserva de Hora Online
           </h1>
-          <p className="text-sm sm:text-base text-slate-300 font-medium max-w-md mx-auto">
+          <p className="text-xs font-semibold text-slate-600 max-w-md mx-auto">
             Quiropraxia y Terapia Manual de Alta Especialización
           </p>
-          <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-400 mt-2 font-medium">
-            <MapPin className="w-3.5 h-3.5 shrink-0" />
-            <span>Bulnes 470, Of. 75 (Edificio Aranjuez) · Chillán</span>
+          <div className="flex items-center justify-center gap-1 text-xs font-medium text-slate-500 mt-2">
+            <MapPin className="w-3.5 h-3.5 text-[#c2410c] shrink-0" />
+            <span>Bulnes 470, Of. 75, Chillán</span>
           </div>
         </header>
 
-        {/* Indicador de Pasos (Si no está en Éxito) */}
+        {/* Indicador de Pasos (1 - 2 - 3) */}
         {paso < 4 && (
-          <div className="flex items-center justify-between mb-8 px-2 max-w-md mx-auto">
+          <div className="flex items-center justify-between mb-8 px-4 max-w-md mx-auto">
             <div className="flex flex-col items-center">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                   paso === 1
-                    ? 'bg-emerald-500 text-slate-950 ring-4 ring-emerald-500/20 shadow-lg shadow-emerald-500/30'
+                    ? 'bg-slate-900 text-white ring-4 ring-slate-900/10 shadow-sm'
                     : paso > 1
-                    ? 'bg-emerald-500 text-slate-950'
-                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-200 text-slate-500 border border-slate-300'
                 }`}
               >
                 1
               </div>
-              <span className="text-[11px] font-medium text-slate-400 mt-1.5">Servicio</span>
+              <span className={`text-[11px] mt-1.5 ${paso === 1 ? 'font-bold text-slate-900' : 'font-medium text-slate-500'}`}>
+                Servicio
+              </span>
             </div>
             
-            <div className={`flex-1 h-0.5 mx-2 ${paso > 1 ? 'bg-emerald-500' : 'bg-slate-800'}`} />
+            <div className={`flex-1 h-0.5 mx-2.5 ${paso > 1 ? 'bg-slate-900' : 'bg-slate-200'}`} />
 
             <div className="flex flex-col items-center">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                   paso === 2
-                    ? 'bg-emerald-500 text-slate-950 ring-4 ring-emerald-500/20 shadow-lg shadow-emerald-500/30'
+                    ? 'bg-slate-900 text-white ring-4 ring-slate-900/10 shadow-sm'
                     : paso > 2
-                    ? 'bg-emerald-500 text-slate-950'
-                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-200 text-slate-500 border border-slate-300'
                 }`}
               >
                 2
               </div>
-              <span className="text-[11px] font-medium text-slate-400 mt-1.5">Horario</span>
+              <span className={`text-[11px] mt-1.5 ${paso === 2 ? 'font-bold text-slate-900' : 'font-medium text-slate-500'}`}>
+                Horario
+              </span>
             </div>
 
-            <div className={`flex-1 h-0.5 mx-2 ${paso > 2 ? 'bg-emerald-500' : 'bg-slate-800'}`} />
+            <div className={`flex-1 h-0.5 mx-2.5 ${paso > 2 ? 'bg-slate-900' : 'bg-slate-200'}`} />
 
             <div className="flex flex-col items-center">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                   paso === 3
-                    ? 'bg-emerald-500 text-slate-950 ring-4 ring-emerald-500/20 shadow-lg shadow-emerald-500/30'
-                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                    ? 'bg-slate-900 text-white ring-4 ring-slate-900/10 shadow-sm'
+                    : 'bg-slate-200 text-slate-500 border border-slate-300'
                 }`}
               >
                 3
               </div>
-              <span className="text-[11px] font-medium text-slate-400 mt-1.5">Tus Datos</span>
+              <span className={`text-[11px] mt-1.5 ${paso === 3 ? 'font-bold text-slate-900' : 'font-medium text-slate-500'}`}>
+                Tus Datos
+              </span>
             </div>
           </div>
         )}
 
-        {/* Tarjeta Contenedora del Flujo */}
-        <div className="bg-slate-800/80 border border-slate-700/80 rounded-3xl p-5 sm:p-8 backdrop-blur-xl shadow-2xl">
+        {/* Tarjeta Contenedora Central del Flujo (Luminosa) */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl shadow-xl p-6 md:p-8 max-w-2xl mx-auto">
           
           {/* ======================================================== */}
           {/* PASO 1: SELECCIÓN DE SERVICIO                            */}
@@ -412,10 +418,10 @@ export default function AgendarOnlinePage() {
           {paso === 1 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-lg sm:text-xl font-bold text-white mb-1">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-1">
                   Paso 1: Selecciona el Tipo de Atención
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-400">
+                <p className="text-xs sm:text-sm text-slate-500">
                   Ambas prestaciones son realizadas por el Klgo. Ignacio Cuevas Silva (Registro SIS N° 396889).
                 </p>
               </div>
@@ -427,46 +433,46 @@ export default function AgendarOnlinePage() {
                     <div
                       key={servicio.id}
                       onClick={() => setServicioSeleccionado(servicio)}
-                      className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative ${
+                      className={`rounded-2xl p-5 cursor-pointer transition-all relative ${
                         seleccionado
-                          ? 'border-emerald-500 bg-emerald-950/30 shadow-lg shadow-emerald-950/50'
-                          : 'border-slate-700 hover:border-slate-600 bg-slate-900/40 hover:bg-slate-900/60'
+                          ? 'bg-slate-50/80 border-2 border-slate-900 shadow-md'
+                          : 'bg-white border border-slate-200 hover:border-slate-300 shadow-xs'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <h3 className="text-base font-bold text-white">
+                            <h3 className="text-base font-bold text-slate-900">
                               {servicio.title}
                             </h3>
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                               {servicio.duration}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-400 font-medium">
+                          <p className="text-xs text-slate-500 font-medium">
                             {servicio.subtitle}
                           </p>
-                          <p className="text-xs text-slate-300/90 pt-1 leading-relaxed">
+                          <p className="text-xs text-slate-600 pt-1 leading-relaxed">
                             {servicio.description}
                           </p>
                         </div>
 
                         <div className="text-right shrink-0">
-                          <span className="text-lg sm:text-xl font-extrabold text-white">
+                          <span className="text-xl font-bold text-slate-900 font-mono">
                             {servicio.price}
                           </span>
-                          <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                          <span className="block text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
                             CLP
                           </span>
                         </div>
                       </div>
 
-                      <div className="mt-3 pt-3 border-t border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
-                        <span className="text-xs text-emerald-400 font-medium flex items-center gap-1.5">
-                          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <div className="mt-3.5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                           Reembolsable Isapre / Seguros Complementarios
                         </span>
-                        <span className="font-semibold text-white flex items-center gap-1">
+                        <span className={`text-xs font-semibold ${seleccionado ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
                           {seleccionado ? '✓ Seleccionado' : 'Elegir'}
                         </span>
                       </div>
@@ -479,7 +485,7 @@ export default function AgendarOnlinePage() {
                 <button
                   type="button"
                   onClick={() => setPaso(2)}
-                  className="w-full sm:w-auto px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  className="w-full sm:w-auto bg-[#c2410c] hover:bg-[#9a3412] text-white font-bold py-3.5 px-6 rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 text-sm"
                 >
                   Continuar a Selección de Fecha
                   <ChevronRight className="w-4 h-4" />
@@ -495,26 +501,26 @@ export default function AgendarOnlinePage() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg sm:text-xl font-bold text-white mb-1">
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-1">
                     Paso 2: Fecha y Bloque Horario
                   </h2>
-                  <p className="text-xs text-slate-400">
-                    Servicio: <strong className="text-emerald-400">{servicioSeleccionado.title}</strong>
+                  <p className="text-xs text-slate-500">
+                    Servicio: <strong className="text-slate-900">{servicioSeleccionado.title}</strong>
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setPaso(1)}
-                  className="p-2 text-slate-400 hover:text-white rounded-lg border border-slate-700 hover:border-slate-600 transition-colors flex items-center gap-1 text-xs"
+                  className="p-2 text-slate-600 hover:text-slate-900 rounded-lg border border-slate-200 hover:border-slate-300 bg-white transition-colors flex items-center gap-1 text-xs font-medium cursor-pointer"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Volver
                 </button>
               </div>
 
               {/* Selector de Fecha */}
-              <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-700 space-y-2">
-                <label className="text-xs font-bold text-slate-300 block flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-emerald-400" />
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+                <label className="text-xs font-bold text-slate-700 block flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-[#c2410c]" />
                   Selecciona el día de tu atención:
                 </label>
                 <input
@@ -523,36 +529,36 @@ export default function AgendarOnlinePage() {
                   min={minDate}
                   max={maxDate}
                   onChange={(e) => setFecha(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-2.5 text-white font-medium text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-slate-900 font-medium text-sm focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900 cursor-pointer shadow-xs"
                 />
-                <p className="text-[11px] text-slate-400 capitalize">
+                <p className="text-[11px] text-slate-500 capitalize">
                   {fecha ? formatFechaLegible(fecha) : ''}
                 </p>
               </div>
 
               {/* Bloques Horarios Disponibles */}
               <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-300 block flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-emerald-400" />
+                <label className="text-xs font-bold text-slate-700 block flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-[#c2410c]" />
                   Horarios disponibles en box para este día:
                 </label>
 
                 {slots.length > 0 && (
-                  <div className="flex items-center gap-1.5 mb-3 text-xs text-amber-300 font-semibold bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg w-fit">
+                  <div className="bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 mb-3 w-fit">
                     <span>⚡ Alta demanda: Solo {slots.length} {slots.length === 1 ? 'cupo disponible' : 'cupos disponibles'} para esta fecha</span>
                   </div>
                 )}
 
                 {loadingSlots ? (
-                  <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
-                    <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+                  <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-500">
+                    <Loader2 className="w-6 h-6 animate-spin text-[#c2410c]" />
                     <span className="text-xs font-medium">Consultando agenda en tiempo real...</span>
                   </div>
                 ) : slots.length === 0 ? (
-                  <div className="py-10 px-4 text-center bg-slate-900/40 rounded-2xl border border-dashed border-slate-700 space-y-2">
-                    <AlertCircle className="w-8 h-8 text-amber-400 mx-auto opacity-90" />
-                    <p className="text-sm font-semibold text-white">No hay horas disponibles para este día</p>
-                    <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  <div className="py-10 px-4 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-2">
+                    <AlertCircle className="w-8 h-8 text-amber-600 mx-auto opacity-90" />
+                    <p className="text-sm font-semibold text-slate-800">No hay horas disponibles para este día</p>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
                       Martes y domingos el centro permanece cerrado o todos los cupos han sido completados. Por favor selecciona otra fecha dentro de los próximos 8 días.
                     </p>
                   </div>
@@ -565,14 +571,14 @@ export default function AgendarOnlinePage() {
                           key={s}
                           type="button"
                           onClick={() => setHoraSeleccionada(s)}
-                          className={`py-3 px-3 rounded-xl font-bold text-sm border transition-all text-center flex flex-col items-center justify-center cursor-pointer ${
+                          className={`py-3 px-3 rounded-xl font-mono font-bold text-sm border transition-all text-center flex flex-col items-center justify-center cursor-pointer ${
                             seleccionado
-                              ? 'bg-emerald-500 text-slate-950 border-emerald-400 ring-2 ring-emerald-500/30 shadow-md shadow-emerald-500/20'
-                              : 'bg-slate-900/70 border-slate-700 hover:border-emerald-500/50 hover:bg-slate-800 text-white'
+                              ? 'bg-slate-900 text-white border-slate-900 font-bold shadow-md'
+                              : 'bg-white border border-slate-200 hover:border-slate-900 hover:text-slate-900 text-slate-800 shadow-xs'
                           }`}
                         >
                           <span>{s} hrs</span>
-                          <span className={`text-[10px] font-normal ${seleccionado ? 'text-slate-900' : 'text-slate-400'}`}>
+                          <span className={`text-[10px] font-normal ${seleccionado ? 'text-slate-300' : 'text-slate-500'}`}>
                             Disponible
                           </span>
                         </button>
@@ -582,12 +588,12 @@ export default function AgendarOnlinePage() {
                 )}
               </div>
 
-              {/* Botón Siguiente */}
+              {/* Botones de Navegación */}
               <div className="pt-4 flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => setPaso(1)}
-                  className="px-4 py-2.5 text-xs text-slate-400 hover:text-white transition-colors"
+                  className="px-4 py-2.5 text-xs text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
                 >
                   ← Cambiar Servicio
                 </button>
@@ -596,7 +602,7 @@ export default function AgendarOnlinePage() {
                   type="button"
                   onClick={() => setPaso(3)}
                   disabled={!horaSeleccionada}
-                  className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:pointer-events-none text-slate-950 font-bold text-sm rounded-xl transition-all shadow-lg shadow-emerald-600/30 flex items-center gap-2 cursor-pointer active:scale-95"
+                  className="bg-[#c2410c] hover:bg-[#9a3412] disabled:opacity-40 disabled:pointer-events-none text-white font-bold py-3.5 px-6 rounded-2xl shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95 text-sm"
                 >
                   Continuar con Mis Datos
                   <ChevronRight className="w-4 h-4" />
@@ -612,37 +618,37 @@ export default function AgendarOnlinePage() {
             <form onSubmit={handleReservar} className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg sm:text-xl font-bold text-white mb-1">
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-1">
                     Paso 3: Tus Datos de Contacto
                   </h2>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     Necesarios para registrar tu ficha clínica oficial y enviarte la confirmación.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setPaso(2)}
-                  className="p-2 text-slate-400 hover:text-white rounded-lg border border-slate-700 hover:border-slate-600 transition-colors flex items-center gap-1 text-xs"
+                  className="p-2 text-slate-600 hover:text-slate-900 rounded-lg border border-slate-200 hover:border-slate-300 bg-white transition-colors flex items-center gap-1 text-xs font-medium cursor-pointer"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Volver
                 </button>
               </div>
 
               {/* Resumen del Horario Escogido */}
-              <div className="p-3.5 bg-emerald-950/30 border border-emerald-500/30 rounded-2xl flex items-center justify-between text-xs">
+              <div className="p-4 bg-orange-50 border border-orange-200/80 rounded-2xl flex items-center justify-between text-xs">
                 <div className="space-y-0.5">
-                  <span className="font-bold text-white block capitalize">
+                  <span className="font-bold text-slate-900 block capitalize">
                     📅 {formatFechaLegible(fecha)}
                   </span>
-                  <span className="text-emerald-400 font-semibold block">
+                  <span className="text-[#c2410c] font-semibold block">
                     ⏰ {horaSeleccionada} hrs · {servicioSeleccionado.title}
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-base font-extrabold text-white block">
+                  <span className="text-base font-extrabold text-slate-900 font-mono block">
                     {servicioSeleccionado.price}
                   </span>
-                  <span className="text-[10px] text-slate-400">Pago en consulta</span>
+                  <span className="text-[10px] text-slate-500">Pago en consulta</span>
                 </div>
               </div>
 
@@ -650,8 +656,8 @@ export default function AgendarOnlinePage() {
               <div className="space-y-4">
                 {/* Nombre Completo */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1">
-                    <User className="w-3.5 h-3.5 text-emerald-400" />
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                    <User className="w-3.5 h-3.5 text-[#c2410c]" />
                     Nombre y Apellidos *
                   </label>
                   <input
@@ -660,14 +666,14 @@ export default function AgendarOnlinePage() {
                     placeholder="Ej. Jorge Bustamante Silva"
                     value={nombre}
                     onChange={(e) => setNombre(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:border-emerald-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 text-slate-900 rounded-xl px-4 py-2.5 text-sm placeholder:text-slate-400 shadow-xs"
                   />
                 </div>
 
                 {/* RUT y Previsión */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
                       RUT (Cédula de Identidad)
                     </label>
                     <input
@@ -675,18 +681,18 @@ export default function AgendarOnlinePage() {
                       placeholder="Ej. 12.345.678-9"
                       value={rut}
                       onChange={handleRutChange}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:border-emerald-500 focus:outline-none"
+                      className="w-full bg-white border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 text-slate-900 rounded-xl px-4 py-2.5 text-sm placeholder:text-slate-400 shadow-xs"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
                       Previsión de Salud *
                     </label>
                     <select
                       value={prevision}
                       onChange={(e) => setPrevision(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:border-emerald-500 focus:outline-none h-[42px]"
+                      className="w-full bg-white border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 text-slate-900 rounded-xl px-4 py-2.5 text-sm shadow-xs h-[42px]"
                     >
                       {PREVISIONES.map((p) => (
                         <option key={p} value={p}>
@@ -700,8 +706,8 @@ export default function AgendarOnlinePage() {
                 {/* Teléfono / WhatsApp y Email */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1">
-                      <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                      <Phone className="w-3.5 h-3.5 text-[#c2410c]" />
                       Teléfono / WhatsApp *
                     </label>
                     <input
@@ -710,13 +716,13 @@ export default function AgendarOnlinePage() {
                       placeholder="+56 9 8276 2103"
                       value={telefono}
                       onChange={(e) => setTelefono(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:border-emerald-500 focus:outline-none"
+                      className="w-full bg-white border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 text-slate-900 rounded-xl px-4 py-2.5 text-sm placeholder:text-slate-400 shadow-xs"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1">
-                      <Mail className="w-3.5 h-3.5 text-emerald-400" />
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                      <Mail className="w-3.5 h-3.5 text-[#c2410c]" />
                       Correo Electrónico (Opcional)
                     </label>
                     <input
@@ -724,15 +730,15 @@ export default function AgendarOnlinePage() {
                       placeholder="nombre@gmail.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:border-emerald-500 focus:outline-none"
+                      className="w-full bg-white border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 text-slate-900 rounded-xl px-4 py-2.5 text-sm placeholder:text-slate-400 shadow-xs"
                     />
                   </div>
                 </div>
 
                 {/* Motivo o Síntomas */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1">
-                    <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                    <FileText className="w-3.5 h-3.5 text-[#c2410c]" />
                     Motivo de Consulta o Molestia Principal
                   </label>
                   <textarea
@@ -740,7 +746,7 @@ export default function AgendarOnlinePage() {
                     placeholder="Ej. Dolor lumbar agudo hace 3 días, molestia en cuello o rodilla..."
                     value={motivo}
                     onChange={(e) => setMotivo(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:border-emerald-500 focus:outline-none resize-none leading-relaxed"
+                    className="w-full bg-white border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 text-slate-900 rounded-xl px-4 py-2.5 text-sm placeholder:text-slate-400 shadow-xs resize-none leading-relaxed"
                   />
                 </div>
               </div>
@@ -750,7 +756,7 @@ export default function AgendarOnlinePage() {
                 <button
                   type="button"
                   onClick={() => setPaso(2)}
-                  className="px-4 py-2.5 text-xs text-slate-400 hover:text-white transition-colors"
+                  className="px-4 py-2.5 text-xs text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
                 >
                   ← Cambiar Horario
                 </button>
@@ -758,7 +764,7 @@ export default function AgendarOnlinePage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 sm:flex-none px-8 py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-slate-950 font-extrabold text-sm rounded-xl transition-all shadow-xl shadow-emerald-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  className="bg-[#c2410c] hover:bg-[#9a3412] text-white font-bold py-3.5 px-8 rounded-2xl shadow-md w-full sm:w-auto transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50 text-sm"
                 >
                   {submitting ? (
                     <>
@@ -780,101 +786,101 @@ export default function AgendarOnlinePage() {
           {/* PANTALLA DE ÉXITO                                        */}
           {/* ======================================================== */}
           {paso === 4 && reservaExitosa && (
-            <div className="text-center py-4 sm:py-6 space-y-6">
-              <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400 flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/20">
+            <div className="text-center py-2 sm:py-4 space-y-6">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 border-2 border-emerald-500 text-emerald-700 flex items-center justify-center mx-auto shadow-sm">
                 <CheckCircle2 className="w-10 h-10" />
               </div>
 
               <div>
-                <h2 className="text-2xl font-black text-white mb-1">
+                <h2 className="text-2xl font-black text-slate-900 mb-1">
                   ¡Tu cita ha sido reservada con éxito!
                 </h2>
-                <p className="text-sm text-slate-300">
+                <p className="text-sm text-slate-600">
                   Hemos agendado tu atención clínica en Kiromov Centro Clínico.
                 </p>
               </div>
 
               {/* Tarjeta de Resumen Final */}
-              <div className="bg-slate-900 p-5 rounded-2xl border border-slate-700 text-left space-y-3 max-w-lg mx-auto">
-                <div className="border-b border-slate-800 pb-3">
-                  <span className="text-[11px] text-slate-400 uppercase tracking-wider block font-bold">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-left space-y-3 max-w-lg mx-auto shadow-xs">
+                <div className="border-b border-slate-200 pb-3">
+                  <span className="text-[11px] text-slate-500 uppercase tracking-wider block font-bold">
                     Paciente
                   </span>
-                  <p className="text-base font-bold text-white">{reservaExitosa.nombre}</p>
+                  <p className="text-base font-bold text-slate-900">{reservaExitosa.nombre}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 border-b border-slate-800 pb-3">
+                <div className="grid grid-cols-2 gap-4 border-b border-slate-200 pb-3">
                   <div>
-                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block font-bold">
+                    <span className="text-[11px] text-slate-500 uppercase tracking-wider block font-bold">
                       Fecha
                     </span>
-                    <p className="text-sm font-semibold text-white capitalize">
+                    <p className="text-sm font-semibold text-slate-800 capitalize">
                       {formatFechaLegible(reservaExitosa.fecha)}
                     </p>
                   </div>
                   <div>
-                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block font-bold">
+                    <span className="text-[11px] text-slate-500 uppercase tracking-wider block font-bold">
                       Horario
                     </span>
-                    <p className="text-sm font-bold text-emerald-400">
+                    <p className="text-sm font-bold text-[#c2410c]">
                       {reservaExitosa.hora} hrs
                     </p>
                   </div>
                 </div>
 
-                <div className="border-b border-slate-800 pb-3">
-                  <span className="text-[11px] text-slate-400 uppercase tracking-wider block font-bold">
+                <div className="border-b border-slate-200 pb-3">
+                  <span className="text-[11px] text-slate-500 uppercase tracking-wider block font-bold">
                     Servicio
                   </span>
-                  <p className="text-sm font-semibold text-white">{reservaExitosa.servicio}</p>
+                  <p className="text-sm font-semibold text-slate-900">{reservaExitosa.servicio}</p>
                 </div>
 
                 <div>
-                  <span className="text-[11px] text-slate-400 uppercase tracking-wider block font-bold">
+                  <span className="text-[11px] text-slate-500 uppercase tracking-wider block font-bold">
                     Ubicación del Centro
                   </span>
-                  <p className="text-sm text-slate-200">
+                  <p className="text-sm text-slate-700">
                     Edificio Aranjuez / Piso 7, Of. 75 (Bulnes 470, Chillán)
                   </p>
                 </div>
               </div>
 
-              {/* Tarjeta de Información Importante */}
-              <div className="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 md:p-6 text-left space-y-4 my-6 shadow-xl max-w-lg mx-auto">
+              {/* Tarjeta de Información Importante y Políticas */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-slate-800 shadow-sm max-w-lg mx-auto text-left space-y-4">
                 <div>
-                  <h4 className="text-sm font-bold text-emerald-400 flex items-center gap-2 mb-2">
+                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-2">
                     📍 Información importante para tu cita presencial:
                   </h4>
-                  <ul className="text-xs text-slate-300 space-y-2 list-none pl-1">
+                  <ul className="text-xs text-slate-600 space-y-2 list-none pl-1">
                     <li className="flex items-start gap-2">
                       <span className="text-slate-400">•</span>
-                      <span><strong className="text-white">Ubicación:</strong> Edificio Aranjuez / Piso 7, Of. 75 (Bulnes 470, Chillán).</span>
+                      <span><strong className="text-slate-900">Ubicación:</strong> Edificio Aranjuez / Piso 7, Of. 75 (Bulnes 470, Chillán).</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-slate-400">•</span>
-                      <span><strong className="text-white">Puntualidad:</strong> Te solicitamos llegar con 5 a 10 minutos de anticipación para iniciar a la hora programada y aprovechar al máximo tu tiempo de atención.</span>
+                      <span><strong className="text-slate-900">Puntualidad:</strong> Te solicitamos llegar con 5 a 10 minutos de anticipación para iniciar a la hora programada y aprovechar al máximo tu tiempo de atención.</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-slate-400">•</span>
-                      <span><strong className="text-white">Vestimenta:</strong> Asiste con ropa cómoda o deportiva que permita evaluar y trabajar fácilmente la zona a tratar.</span>
+                      <span><strong className="text-slate-900">Vestimenta:</strong> Asiste con ropa cómoda o deportiva que permita evaluar y trabajar fácilmente la zona a tratar.</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-slate-400">•</span>
-                      <span><strong className="text-white">Exámenes previos:</strong> Si cuentas con radiografías, ecografías, resonancias u otros exámenes médicos recientes, por favor tráelos a la consulta.</span>
+                      <span><strong className="text-slate-900">Exámenes previos:</strong> Si cuentas con radiografías, ecografías, resonancias u otros exámenes médicos recientes, por favor tráelos a la consulta.</span>
                     </li>
                   </ul>
                 </div>
 
-                <div className="pt-3 border-t border-slate-700/60">
-                  <h4 className="text-xs font-bold text-amber-300 flex items-center gap-2 mb-1.5">
+                <div className="pt-3 border-t border-slate-200">
+                  <h4 className="text-xs font-bold text-amber-800 flex items-center gap-2 mb-1.5">
                     ⏳ Políticas de cambio y cancelación:
                   </h4>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Si necesitas cancelar o reprogramar tu sesión, por favor hazlo con al menos <strong className="text-white">24 horas de anticipación</strong> para liberar el cupo a otro paciente que lo requiera.
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Si necesitas cancelar o reprogramar tu sesión, por favor hazlo con al menos <strong className="text-slate-900">24 horas de anticipación</strong> para liberar el cupo a otro paciente que lo requiera.
                   </p>
                 </div>
 
-                <p className="text-xs font-semibold text-center text-emerald-400 pt-2 border-t border-slate-700/60">
+                <p className="text-xs font-semibold text-center text-slate-800 pt-2 border-t border-slate-200">
                   ¡Nos vemos en la consulta!
                 </p>
               </div>
@@ -895,18 +901,18 @@ export default function AgendarOnlinePage() {
                     href={getGoogleCalendarUrl()}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full sm:flex-1 py-3 px-4 bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs rounded-xl transition-all border border-slate-600 flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full sm:flex-1 py-3 px-4 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-xl transition-all border border-slate-300 shadow-xs flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <ExternalLink className="w-4 h-4 text-emerald-400" />
+                    <ExternalLink className="w-4 h-4 text-[#c2410c]" />
                     Guardar en Google Calendar
                   </a>
 
                   <button
                     type="button"
                     onClick={handleDownloadIcs}
-                    className="w-full sm:flex-1 py-3 px-4 bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs rounded-xl transition-all border border-slate-600 flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full sm:flex-1 py-3 px-4 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-xl transition-all border border-slate-300 shadow-xs flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Download className="w-4 h-4 text-emerald-400" />
+                    <Download className="w-4 h-4 text-[#c2410c]" />
                     Descargar (.ics)
                   </button>
                 </div>
@@ -924,7 +930,7 @@ export default function AgendarOnlinePage() {
                     setEmail('');
                     setMotivo('');
                   }}
-                  className="text-xs text-slate-400 hover:text-white underline underline-offset-4 transition-colors"
+                  className="text-xs text-slate-500 hover:text-slate-900 underline underline-offset-4 transition-colors cursor-pointer"
                 >
                   Agendar otra cita
                 </button>
@@ -943,7 +949,7 @@ export default function AgendarOnlinePage() {
               href="https://wa.me/56939499906"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-emerald-400 hover:underline"
+              className="text-[#c2410c] hover:underline font-medium"
             >
               +56 9 3949 9906
             </a>
