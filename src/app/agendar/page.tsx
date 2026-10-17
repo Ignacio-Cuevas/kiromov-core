@@ -663,7 +663,7 @@ export default function AgendarOnlinePage() {
                   <input
                     type="text"
                     required
-                    placeholder="Ej. Jorge Bustamante Silva"
+                    placeholder="Ej. Juan Pérez González"
                     value={nombre}
                     onChange={(e) => setNombre(e.target.value)}
                     className="w-full bg-white border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 text-slate-900 rounded-xl px-4 py-2.5 text-sm placeholder:text-slate-400 shadow-xs"
@@ -713,7 +713,7 @@ export default function AgendarOnlinePage() {
                     <input
                       type="tel"
                       required
-                      placeholder="+56 9 8276 2103"
+                      placeholder="+56 9 1234 5678"
                       value={telefono}
                       onChange={(e) => setTelefono(e.target.value)}
                       className="w-full bg-white border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 text-slate-900 rounded-xl px-4 py-2.5 text-sm placeholder:text-slate-400 shadow-xs"
