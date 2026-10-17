@@ -1969,6 +1969,7 @@ export function ClinicalRecordView({
           patient={paciente}
           evoluciones={historialSOAP}
           numeroBoleta={planActivo?.numero_boleta || null}
+          planActivo={planActivo}
           onClose={() => setAbrirCertificadoModal(false)}
         />
       )}

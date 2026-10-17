@@ -12,6 +12,7 @@ interface ReimbursementCertificateProps {
   evoluciones?: any;
   citas?: any;
   numeroBoleta?: any;
+  planActivo?: any;
 }
 
 interface SesionImprimible {
@@ -26,6 +27,7 @@ export function ReimbursementCertificate({
   isOpen,
   onClose,
   patient,
+  planActivo,
 }: ReimbursementCertificateProps) {
   const [planInfo, setPlanInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -34,7 +36,10 @@ export function ReimbursementCertificate({
   const [sesionesCertificado, setSesionesCertificado] = useState<SesionImprimible[]>([]);
   const [boleta1, setBoleta1] = useState('');
   const [boleta2, setBoleta2] = useState('');
-  const [montoTotal, setMontoTotal] = useState('');
+  const [montoReferencial, setMontoReferencial] = useState<string>(() => {
+    const montoNum = planActivo?.valor_total || planActivo?.monto_clp || 75000;
+    return `$${Number(montoNum).toLocaleString('es-CL')} CLP`;
+  });
   const [medicoDerivador, setMedicoDerivador] = useState('');
   const [diagnosticoEditable, setDiagnosticoEditable] = useState('');
   const [planNombreEditable, setPlanNombreEditable] = useState('');
@@ -111,7 +116,8 @@ export function ReimbursementCertificate({
           setPlanInfo(planData);
           setPlanNombreEditable(planData.nombre_plan || 'Tratamiento Kinésico Integral');
           setBoleta2(planData.numero_boleta || '');
-          setMontoTotal(`${planData.valor_total ? planData.valor_total.toLocaleString('es-CL') : '0'} CLP`);
+          const montoNum = planData.valor_total || planActivo?.valor_total || planActivo?.monto_clp || 75000;
+          setMontoReferencial(`$${Number(montoNum).toLocaleString('es-CL')} CLP`);
         } else {
           setPlanNombreEditable('Tratamiento Kinésico Integral');
         }
@@ -126,7 +132,7 @@ export function ReimbursementCertificate({
     };
 
     fetchData();
-  }, [isOpen, patient]);
+  }, [isOpen, patient, planActivo]);
 
   // --- Funciones de Edición Local ---
   const handleAgregarSesion = () => {
@@ -176,7 +182,10 @@ export function ReimbursementCertificate({
     clon.querySelectorAll('input').forEach(input => {
       const span = document.createElement('span');
       span.textContent = (input as HTMLInputElement).value;
-      span.className = 'font-bold text-slate-800 text-xs text-center min-w-[60px] inline-block';
+      const isCentered = input.classList.contains('text-center');
+      span.className = isCentered
+        ? 'font-bold text-slate-800 text-xs text-center min-w-[60px] inline-block'
+        : 'font-medium text-slate-800 text-xs inline-block';
       if (input.parentNode) {
         input.parentNode.replaceChild(span, input);
       }
@@ -315,7 +324,7 @@ export function ReimbursementCertificate({
 
                 <div className="text-right text-[11px] font-sans text-slate-600">
                   <p className="font-semibold text-slate-800">Fecha: {new Date().toLocaleDateString('es-CL')}</p>
-                  <p>contacto@kiromov.cl</p>
+                  <p className="text-xs text-slate-600">ignacio@kiromov.cl</p>
                   <p>+56 9 8276 2103</p>
                 </div>
               </div>
@@ -359,7 +368,18 @@ export function ReimbursementCertificate({
                     />
                   </div>
 
-                  <p><strong>Monto Total Referencial del Tratamiento:</strong> ${(planInfo?.valor_total || 0).toLocaleString('es-CL')} CLP</p>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-800">
+                    <span className="font-semibold text-slate-900 shrink-0">
+                      Monto Total Referencial del Tratamiento:
+                    </span>
+                    <input
+                      type="text"
+                      value={montoReferencial}
+                      onChange={(e) => setMontoReferencial(e.target.value)}
+                      className="flex-1 px-1.5 py-0.5 font-medium text-slate-800 bg-transparent border-b border-dashed border-slate-300 hover:border-slate-400 focus:border-emerald-600 focus:outline-none print:border-none print:p-0 print:text-black"
+                      title="Haz clic para editar el monto total referencial si es necesario"
+                    />
+                  </div>
                 </div>
 
                 <p>
@@ -453,7 +473,7 @@ export function ReimbursementCertificate({
                 
                 <div className="flex flex-col sm:flex-row gap-4 mb-2">
                   <div className="flex-1 flex gap-2 items-center">
-                    <span className="font-medium text-slate-600">Boleta(s) de Honorarios: N°</span>
+                    <span>Boleta: N°</span>
                     <input
                       type="text"
                       placeholder="Ej: 1459"
