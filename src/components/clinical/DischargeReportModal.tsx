@@ -357,7 +357,7 @@ export function DischargeReportModal({
                       <th className="p-2 border border-slate-200">Parámetro Clínico</th>
                       <th className="p-2 border border-slate-200 text-center w-36">Estado de Ingreso</th>
                       <th className="p-2 border border-slate-200 text-center w-36 bg-emerald-50 text-emerald-900 font-bold">Estado al Alta</th>
-                      <th className="p-2 border border-slate-200 text-center w-36">Variación / Logro</th>
+                      <th className="p-2 border border-slate-200 text-center min-w-[140px] align-top">Variación / Logro</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -393,12 +393,13 @@ export function DischargeReportModal({
                           <span>/ 10</span>
                         </div>
                       </td>
-                      <td className="p-2 border border-slate-200 text-center font-bold text-emerald-700">
-                        <input
-                          type="text"
+                      <td className="p-2.5 border border-slate-200 align-top min-w-[140px] whitespace-normal">
+                        <textarea
+                          rows={2}
                           value={logroDolor}
                           onChange={(e) => setLogroDolor(e.target.value)}
-                          className="w-full text-xs font-semibold text-emerald-800 bg-transparent border-b border-dashed border-slate-300 hover:border-slate-400 focus:border-emerald-600 focus:outline-none print:border-none print:p-0"
+                          className="w-full text-xs font-semibold text-emerald-800 bg-transparent border-b border-dashed border-slate-300 hover:border-slate-400 focus:border-emerald-600 focus:outline-none resize-none leading-snug whitespace-pre-wrap break-words print:border-none print:p-0 print:resize-none"
+                          title="Haz clic para editar la variación de dolor en 2 renglones"
                         />
                       </td>
                     </tr>
@@ -421,7 +422,7 @@ export function DischargeReportModal({
                           <span>sesiones totales</span>
                         </div>
                       </td>
-                      <td className="p-2 border border-slate-200 text-center font-semibold text-slate-700">
+                      <td className="p-2.5 border border-slate-200 text-center font-semibold text-slate-700 align-top min-w-[140px] whitespace-normal">
                         Fecha Alta: {fechaAlta}
                       </td>
                     </tr>
@@ -435,12 +436,13 @@ export function DischargeReportModal({
                       <td className="p-2 border border-slate-200 text-center font-bold text-emerald-800 bg-emerald-50/50">
                         Rango completo sin dolor
                       </td>
-                      <td className="p-2 border border-slate-200 text-center font-semibold text-emerald-700">
-                        <input
-                          type="text"
+                      <td className="p-2.5 border border-slate-200 align-top min-w-[140px] whitespace-normal">
+                        <textarea
+                          rows={2}
                           value={logroMovilidad}
                           onChange={(e) => setLogroMovilidad(e.target.value)}
-                          className="w-full text-xs font-semibold text-emerald-800 bg-transparent border-b border-dashed border-slate-300 hover:border-slate-400 focus:border-emerald-600 focus:outline-none print:border-none print:p-0"
+                          className="w-full text-xs font-semibold text-emerald-800 bg-transparent border-b border-dashed border-slate-300 hover:border-slate-400 focus:border-emerald-600 focus:outline-none resize-none leading-snug whitespace-pre-wrap break-words print:border-none print:p-0 print:resize-none"
+                          title="Haz clic para editar el logro de movilidad en 2 renglones"
                         />
                       </td>
                     </tr>
