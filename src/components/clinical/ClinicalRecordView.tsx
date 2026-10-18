@@ -1847,7 +1847,7 @@ export function ClinicalRecordView({
         {/* PESTAÑA 5: CUENTA CORRIENTE                                        */}
         {/* ================================================================== */}
         {tabActiva === 'cuenta_corriente' && (
-          <CuentaCorrienteTab pacienteId={pacienteId} />
+          <CuentaCorrienteTab pacienteId={pacienteId} recargarFicha={cargarDatos} />
         )}
 
       </div>

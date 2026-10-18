@@ -27,6 +27,7 @@ export function ReimbursementCertificate({
   isOpen,
   onClose,
   patient,
+  numeroBoleta,
   planActivo,
 }: ReimbursementCertificateProps) {
   const [planInfo, setPlanInfo] = useState<any>(null);
@@ -34,7 +35,7 @@ export function ReimbursementCertificate({
 
   // Estados Locales Editables
   const [sesionesCertificado, setSesionesCertificado] = useState<SesionImprimible[]>([]);
-  const [boleta1, setBoleta1] = useState('');
+  const [boleta1, setBoleta1] = useState(() => numeroBoleta || planActivo?.numero_boleta || '');
   const [boleta2, setBoleta2] = useState('');
   const [montoReferencial, setMontoReferencial] = useState<string>(() => {
     const montoNum = planActivo?.valor_total || planActivo?.monto_clp || 75000;
@@ -103,23 +104,48 @@ export function ReimbursementCertificate({
           }]);
         }
 
-        // 2. Plan y Boleta
+        // 2. Pagos del paciente para autocompletar boleta
+        const { data: pagosData } = await supabase
+          .from('pagos_pacientes')
+          .select('id, fecha, monto, metodo_pago, numero_boleta')
+          .eq('paciente_id', patient.id)
+          .order('fecha', { ascending: false });
+
+        const boletaSugerida = pagosData?.find((p: any) => p.numero_boleta || p.n_boleta)?.numero_boleta || '';
+
+        // 3. Plan contratado
         const { data: planData } = await supabase
           .from('compras_planes')
           .select('nombre_plan, numero_boleta, valor_total, metodo_pago, created_at')
           .eq('paciente_id', patient.id)
           .order('id', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
         
         if (planData) {
           setPlanInfo(planData);
           setPlanNombreEditable(planData.nombre_plan || 'Tratamiento Kinésico Integral');
-          setBoleta2(planData.numero_boleta || '');
           const montoNum = planData.valor_total || planActivo?.valor_total || planActivo?.monto_clp || 75000;
           setMontoReferencial(`$${Number(montoNum).toLocaleString('es-CL')} CLP`);
         } else {
           setPlanNombreEditable('Tratamiento Kinésico Integral');
+        }
+
+        // Asignar boleta sugerida del último pago o del plan
+        const boletaFinal1 = boletaSugerida || planData?.numero_boleta || numeroBoleta || planActivo?.numero_boleta || '';
+        if (boletaFinal1) {
+          setBoleta1(boletaFinal1);
+        }
+
+        // Asignar segunda boleta si hay otro pago o el plan tiene otra boleta
+        const pagosConBoletaAdicional = (pagosData || []).filter(
+          (p: any) => (p.numero_boleta || (p as any).n_boleta) && (p.numero_boleta || (p as any).n_boleta) !== boletaFinal1
+        );
+        const boletaFinal2 = pagosConBoletaAdicional.length > 0
+          ? (pagosConBoletaAdicional[0].numero_boleta || (pagosConBoletaAdicional[0] as any).n_boleta)
+          : (planData?.numero_boleta && planData.numero_boleta !== boletaFinal1 ? planData.numero_boleta : '');
+        if (boletaFinal2) {
+          setBoleta2(boletaFinal2);
         }
 
         // Eliminado para usar el autocompletado CIE-10
