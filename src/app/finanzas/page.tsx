@@ -101,8 +101,8 @@ function FinanzasContent() {
       const [resCitas, resCompras, resEgresos, resPagos] = await Promise.all([
         supabase.from('citas_atenciones')
           .select('*, pacientes(nombre_completo, rut, telefono)')
-          .eq('estado', 'asistio')
-          .order('fecha', { ascending: false }),
+          .in('estado', ['asistio', 'asistió', 'confirmada', 'Confirmada'])
+          .order('fecha', { ascending: true }),
         supabase.from('compras_planes')
           .select('*, pacientes(nombre_completo, rut, telefono)')
           .order('fecha_compra', { ascending: false }),
@@ -248,73 +248,112 @@ function FinanzasContent() {
   
   const hoyStr = new Date().toISOString().split('T')[0];
 
-  // Agrupación de Deudores Consolidados por Paciente Único (Fase 4)
+  // Agrupación de Deudores Consolidados por Paciente Único (Eliminando cobro doble por citas cubiertas por planes)
   const deudoresConsolidados = useMemo<DeudorConsolidado[]>(() => {
     const map = new Map<string, DeudorConsolidado>();
 
-    // 1. Planes pendientes de pago
-    compras.forEach(t => {
-      if (t.estado !== 'activo') return;
-      const deuda = Number(t.saldo_pendiente ?? t.valor_total) || 0;
-      if (deuda <= 0) return;
-      if (t.estado_pago !== 'pendiente' && !t.saldo_pendiente) return;
+    // Obtener todos los IDs de pacientes únicos involucrados en compras o citas
+    const pacienteIds = Array.from(
+      new Set([
+        ...compras.map(p => p.paciente_id),
+        ...citas.map(c => c.paciente_id)
+      ])
+    ).filter(Boolean) as string[];
 
-      const pacId = t.paciente_id;
-      if (!pacId) return;
+    pacienteIds.forEach(pacId => {
+      // 1. Obtener sus planes en compras_planes (excluyendo cancelados)
+      const planesPaciente = compras.filter(p => {
+        if (p.paciente_id !== pacId) return false;
+        const stPago = String(p.estado_pago || '').toLowerCase().trim();
+        const stEstado = String(p.estado || '').toLowerCase().trim();
+        return stPago !== 'cancelado' && stEstado !== 'cancelado';
+      });
 
-      const paciente = t.pacientes || { id: pacId, nombre_completo: 'Paciente sin registrar' };
+      // Saldo adeudado por concepto de planes y desglose de planes
+      const desglose: DesgloseDeuda[] = [];
+      let deudaPlanes = 0;
 
-      if (!map.has(pacId)) {
+      planesPaciente.forEach(p => {
+        const saldo = Number(p.saldo_pendiente ?? (String(p.estado_pago || '').toLowerCase().includes('pend') ? p.valor_total : 0)) || 0;
+        if (saldo > 0) {
+          deudaPlanes += saldo;
+          desglose.push({
+            tipo: 'plan',
+            id: p.id,
+            fecha: p.fecha_compra ? p.fecha_compra.split('T')[0] : '',
+            detalle: p.nombre_plan || 'Plan Kinésico',
+            saldo
+          });
+        }
+      });
+
+      // 2. Obtener sus citas asistidas/confirmadas
+      const citasPaciente = citas
+        .filter(c => {
+          if (c.paciente_id !== pacId) return false;
+          const st = String(c.estado || '').toLowerCase().trim();
+          return ['asistio', 'asistió', 'confirmada', 'atendido', 'atendida'].includes(st);
+        })
+        .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+
+      // Cantidad de sesiones cubiertas por planes comprados
+      const totalSesionesCubiertasPorPlanes = planesPaciente.reduce(
+        (acc, p) => acc + (Number(p.total_sesiones || p.sesiones_totales) || 0),
+        0
+      );
+
+      // Criterio para identificar citas impagas (excluye pagadas, cubiertas por plan, cortesías y citas futuras)
+      const isCitaImpaga = (c: any) => {
+        const stPago = String(c.estado_pago || '').toLowerCase().trim();
+        if (stPago === 'pagado' || stPago === 'cubierto_por_plan' || stPago === 'cortesia' || c.pagada === true) {
+          return false;
+        }
+        if (c.fecha && c.fecha > hoyStr) {
+          return false;
+        }
+        return stPago === 'pendiente_pago' || stPago === 'pendiente' || !c.pagada;
+      };
+
+      // Regla para citas sueltas (fuera de plan):
+      // - Si el paciente NO tiene planes: todas sus citas asistidas con estado_pago === 'pendiente_pago' (o !c.pagada) se consideran citas sueltas impagas.
+      // - Si el paciente TIENE planes: SOLO las citas que excedan la cantidad total de sesiones cubiertas por sus planes se consideran citas sueltas:
+      const citasCandidatasImpagas = planesPaciente.length === 0
+        ? citasPaciente
+        : citasPaciente.slice(totalSesionesCubiertasPorPlanes);
+
+      const citasSueltasImpagas = citasCandidatasImpagas.filter(isCitaImpaga);
+
+      let deudaCitas = 0;
+      citasSueltasImpagas.forEach(c => {
+        const arancel = getArancel(c.pacientes?.categoria_tarifa);
+        const montoCita = Number(c.monto_cobrado) || arancel?.sesion_individual || 28000;
+        deudaCitas += montoCita;
+        desglose.push({
+          tipo: 'cita',
+          id: c.id,
+          fecha: c.fecha || '',
+          detalle: c.motivo_consulta || (planesPaciente.length > 0 ? 'Sesión Kinésica TMO (Excedente)' : 'Sesión Kinésica TMO'),
+          saldo: montoCita
+        });
+      });
+
+      // Deuda total del paciente:
+      const deudaTotalPaciente = deudaPlanes + deudaCitas;
+
+      // Solo si deudaTotalPaciente > 0 se agrega a deudoresConsolidados
+      if (deudaTotalPaciente > 0) {
+        const pacienteData =
+          compras.find(p => p.paciente_id === pacId)?.pacientes ||
+          citas.find(c => c.paciente_id === pacId)?.pacientes ||
+          { id: pacId, nombre_completo: 'Paciente sin registrar', rut: '', telefono: '' };
+
         map.set(pacId, {
           pacienteId: pacId,
-          paciente: { ...paciente, id: pacId },
-          totalDeuda: 0,
-          desglose: []
+          paciente: { ...pacienteData, id: pacId },
+          totalDeuda: deudaTotalPaciente,
+          desglose
         });
       }
-
-      const item = map.get(pacId)!;
-      item.totalDeuda += deuda;
-      item.desglose.push({
-        tipo: 'plan',
-        id: t.id,
-        fecha: t.fecha_compra ? t.fecha_compra.split('T')[0] : '',
-        detalle: t.nombre_plan || 'Plan Kinésico',
-        saldo: deuda
-      });
-    });
-
-    // 2. Citas pendientes de pago
-    citas.forEach(c => {
-      if (c.estado_pago !== 'pendiente_pago') return;
-      if (c.plan_id) return;
-      if (!c.fecha || c.fecha > hoyStr) return;
-
-      const pacId = c.paciente_id;
-      if (!pacId) return;
-
-      const arancel = getArancel(c.pacientes?.categoria_tarifa);
-      const deuda = Number(c.monto_cobrado) || arancel.sesion_individual;
-      const paciente = c.pacientes || { id: pacId, nombre_completo: 'Paciente sin registrar' };
-
-      if (!map.has(pacId)) {
-        map.set(pacId, {
-          pacienteId: pacId,
-          paciente: { ...paciente, id: pacId },
-          totalDeuda: 0,
-          desglose: []
-        });
-      }
-
-      const item = map.get(pacId)!;
-      item.totalDeuda += deuda;
-      item.desglose.push({
-        tipo: 'cita',
-        id: c.id,
-        fecha: c.fecha,
-        detalle: c.motivo_consulta || 'Sesión Kinésica TMO',
-        saldo: deuda
-      });
     });
 
     return Array.from(map.values()).sort((a, b) => b.totalDeuda - a.totalDeuda);
