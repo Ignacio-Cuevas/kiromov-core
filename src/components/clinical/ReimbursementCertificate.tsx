@@ -267,7 +267,23 @@ export function ReimbursementCertificate({
 
     // Clonar el contenido y remover los elementos no imprimibles (botones de edición, inputs auxiliares)
     const clon = contenido.cloneNode(true) as HTMLElement;
-    clon.querySelectorAll('.print-hide, button').forEach(el => el.remove());
+    clon.querySelectorAll('.print-hide, .print\\:hidden, button').forEach(el => el.remove());
+
+    // Mostrar spans de impresión que estaban ocultos con print:block
+    clon.querySelectorAll('.hidden.print\\:block, [class*="hidden print:block"]').forEach(el => {
+      el.classList.remove('hidden');
+      (el as HTMLElement).style.display = 'block';
+    });
+
+    // Convertir cualquier textarea remanente a span
+    clon.querySelectorAll('textarea').forEach(ta => {
+      const span = document.createElement('span');
+      span.textContent = (ta as HTMLTextAreaElement).value;
+      span.className = 'text-xs sm:text-sm text-slate-900 leading-snug break-words whitespace-normal block';
+      if (ta.parentNode) {
+        ta.parentNode.replaceChild(span, ta);
+      }
+    });
 
     // Convertir los inputs a texto plano para impresión nítida
     clon.querySelectorAll('input').forEach(input => {
@@ -298,7 +314,7 @@ export function ReimbursementCertificate({
     });
 
     // Abrir ventana limpia de impresión
-    const ventanaImpresion = window.open('', '_blank', 'width=850,height=1000');
+    const ventanaImpresion = window.open('', '_blank', 'width=900,height=1000');
     if (!ventanaImpresion) {
       window.print(); // Fallback si el navegador bloquea popups
       return;
@@ -338,6 +354,8 @@ export function ReimbursementCertificate({
               border: 1px solid #cbd5e1;
               padding: 6px 8px;
               font-size: 11px;
+              word-break: break-word;
+              overflow-wrap: break-word;
             }
             thead th {
               background-color: #0f172a !important;
@@ -355,11 +373,13 @@ export function ReimbursementCertificate({
             .text-center { text-align: center !important; }
             .text-right { text-align: right !important; }
             .text-left { text-align: left !important; }
+            .break-words { word-break: break-word !important; }
+            .whitespace-normal { white-space: normal !important; }
           </style>
           <script src="https://cdn.tailwindcss.com"></script>
         </head>
         <body>
-          <div style="width: 100%; max-width: 750px; margin: 0 auto; background: white; padding: 20px;">
+          <div style="width: 100%; max-width: 820px; margin: 0 auto; background: white; padding: 20px;">
             ${clon.innerHTML}
           </div>
           <script>
@@ -379,14 +399,14 @@ export function ReimbursementCertificate({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/70 backdrop-blur-sm overflow-hidden">
-      <div className="relative w-full max-w-4xl max-h-[94vh] flex flex-col bg-slate-100 rounded-2xl shadow-2xl border border-slate-300 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/70 backdrop-blur-sm overflow-hidden">
+      <div className="relative w-full w-[95vw] lg:max-w-5xl max-h-[94vh] flex flex-col bg-slate-100 rounded-2xl shadow-2xl border border-slate-300 overflow-hidden">
         
         {/* Barra de Controles Superior Fija (No se imprime) */}
         <div className="flex items-center justify-between px-6 py-3.5 bg-white border-b border-slate-200 sticky top-0 z-20">
           <div>
             <h3 className="font-bold text-slate-900 text-sm">Vista Previa: Certificado de Reembolso</h3>
-            <p className="text-xs text-slate-500">Puedes editar montos unitarios, fechas y boletas antes de imprimir (cambios locales)</p>
+            <p className="text-xs text-slate-500">Puedes editar montos unitarios, prestaciones, fechas y boletas antes de imprimir</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -410,7 +430,7 @@ export function ReimbursementCertificate({
         </div>
 
         {/* Cuerpo Scrolleable con Hoja A4 / Carta Centrada */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6 md:p-8">
           
           {loading ? (
             <div className="py-20 text-center text-slate-500 text-sm font-semibold animate-pulse">
@@ -418,7 +438,7 @@ export function ReimbursementCertificate({
             </div>
           ) : (
             /* Hoja de Certificado Oficial */
-            <div id="documento-imprimible" className="bg-white p-8 sm:p-12 max-w-3xl mx-auto shadow-sm border border-slate-200 font-serif text-slate-900">
+            <div id="documento-imprimible" className="bg-white p-6 sm:p-10 max-w-4xl w-full mx-auto shadow-sm border border-slate-200 font-serif text-slate-900">
               
               {/* Encabezado con Logo Oficial */}
               <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
@@ -518,37 +538,37 @@ export function ReimbursementCertificate({
                   >
                     <tr>
                       <th
-                        className="p-2.5 border-r border-slate-800 text-center w-12"
-                        style={{ width: '48px', textAlign: 'center', backgroundColor: '#0f172a', color: '#ffffff' }}
+                        className="p-2.5 border-r border-slate-800 text-center w-10 shrink-0"
+                        style={{ width: '40px', textAlign: 'center', backgroundColor: '#0f172a', color: '#ffffff' }}
                       >
                         N°
                       </th>
                       <th
-                        className="p-2.5 border-r border-slate-800 text-center w-28"
+                        className="p-2.5 border-r border-slate-800 text-center w-28 shrink-0"
                         style={{ width: '110px', textAlign: 'center', backgroundColor: '#0f172a', color: '#ffffff' }}
                       >
                         Fecha
                       </th>
                       <th
-                        className="p-2.5 border-r border-slate-800 text-center w-24"
+                        className="p-2.5 border-r border-slate-800 text-center w-24 shrink-0"
                         style={{ width: '90px', textAlign: 'center', backgroundColor: '#0f172a', color: '#ffffff' }}
                       >
                         Hora
                       </th>
                       <th
-                        className="p-2.5 border-r border-slate-800 text-left"
-                        style={{ textAlign: 'left', backgroundColor: '#0f172a', color: '#ffffff' }}
+                        className="p-2.5 border-r border-slate-800 text-left w-auto min-w-[340px] whitespace-normal break-words"
+                        style={{ minWidth: '340px', textAlign: 'left', backgroundColor: '#0f172a', color: '#ffffff' }}
                       >
                         Prestación / Tratamiento
                       </th>
                       <th
-                        className="p-2.5 border-r border-slate-800 text-right w-32"
+                        className="p-2.5 border-r border-slate-800 text-right w-32 shrink-0"
                         style={{ width: '130px', textAlign: 'right', backgroundColor: '#0f172a', color: '#ffffff' }}
                       >
                         Valor Unitario
                       </th>
                       <th
-                        className="p-2.5 print-hide w-8 text-center border-none"
+                        className="p-2.5 print-hide print:hidden w-8 text-center border-none shrink-0"
                         style={{ width: '32px', backgroundColor: '#0f172a', color: '#ffffff' }}
                       ></th>
                     </tr>
@@ -560,16 +580,16 @@ export function ReimbursementCertificate({
                       <tr key={s.id} className="hover:bg-slate-50/50 border-b border-slate-200">
                         {/* 1. N° */}
                         <td
-                          className="p-2 border-r border-slate-200 text-center font-bold text-slate-700 tabular-nums"
-                          style={{ textAlign: 'center' }}
+                          className="p-2 border-r border-slate-200 text-center font-bold text-slate-700 tabular-nums w-10 align-top pt-2.5"
+                          style={{ width: '40px', textAlign: 'center' }}
                         >
                           {s.numero}
                         </td>
                         
                         {/* 2. Fecha */}
                         <td
-                          className="p-2 border-r border-slate-200 text-center tabular-nums"
-                          style={{ textAlign: 'center' }}
+                          className="p-2 border-r border-slate-200 text-center tabular-nums w-28 align-top pt-2.5"
+                          style={{ width: '110px', textAlign: 'center' }}
                         >
                           <input
                             type="date"
@@ -581,8 +601,8 @@ export function ReimbursementCertificate({
 
                         {/* 3. Hora */}
                         <td
-                          className="p-2 border-r border-slate-200 text-center tabular-nums"
-                          style={{ textAlign: 'center' }}
+                          className="p-2 border-r border-slate-200 text-center tabular-nums w-24 align-top pt-2.5"
+                          style={{ width: '90px', textAlign: 'center' }}
                         >
                           <input
                             type="time"
@@ -592,20 +612,24 @@ export function ReimbursementCertificate({
                           />
                         </td>
 
-                        {/* 4. Prestación / Tratamiento */}
-                        <td className="p-2 border-r border-slate-200 text-left">
-                          <input
-                            type="text"
+                        {/* 4. Prestación / Tratamiento (Multilínea con Textarea) */}
+                        <td className="p-2 border-r border-slate-200 text-left w-auto min-w-[340px] whitespace-normal break-words align-top">
+                          <textarea
+                            rows={2}
                             value={s.prestacion}
                             onChange={(e) => handleEditarSesion(s.id, 'prestacion', e.target.value)}
-                            className="w-full border-none p-0 bg-transparent text-[11px] sm:text-xs text-slate-900 focus:ring-1 focus:ring-blue-500 rounded"
+                            className="w-full text-xs sm:text-sm bg-transparent border-0 hover:bg-slate-100/70 focus:bg-white focus:ring-1 focus:ring-slate-400 rounded px-1.5 py-1 leading-snug resize-none overflow-hidden text-slate-800 font-normal transition-colors print:hidden"
                           />
+                          {/* Renderizado exclusivo para impresión limpia sin cajas de formulario */}
+                          <span className="hidden print:block text-xs sm:text-sm text-slate-900 leading-snug break-words">
+                            {s.prestacion}
+                          </span>
                         </td>
 
                         {/* 5. Valor Unitario Editable */}
                         <td
-                          className="p-2 border-r border-slate-200 text-right tabular-nums"
-                          style={{ textAlign: 'right' }}
+                          className="p-2 border-r border-slate-200 text-right tabular-nums w-32 align-top pt-2.5"
+                          style={{ width: '130px', textAlign: 'right' }}
                         >
                           <input
                             type="text"
@@ -630,7 +654,7 @@ export function ReimbursementCertificate({
                         </td>
 
                         {/* Botón Borrar (No se imprime) */}
-                        <td className="p-2 text-center print-hide">
+                        <td className="p-2 text-center print-hide print:hidden w-8 align-top pt-2.5" style={{ width: '32px' }}>
                           <button
                             type="button"
                             onClick={() => handleEliminarSesion(s.id)}
@@ -657,18 +681,18 @@ export function ReimbursementCertificate({
                     <tr>
                       <td
                         colSpan={4}
-                        className="p-2.5 text-right font-bold text-slate-800 border-r border-slate-200 text-xs sm:text-sm"
+                        className="p-2.5 text-right font-bold text-slate-800 border-r border-slate-200 text-xs sm:text-sm whitespace-normal"
                         style={{ textAlign: 'right', backgroundColor: '#f1f5f9' }}
                       >
                         Total Tratamiento ({sesionesCertificado.length} Sesiones):
                       </td>
                       <td
-                        className="p-2.5 text-right font-bold font-mono text-slate-900 border-r border-slate-200 tabular-nums whitespace-nowrap text-xs sm:text-sm"
-                        style={{ textAlign: 'right', backgroundColor: '#f1f5f9' }}
+                        className="p-2.5 text-right font-bold font-mono text-slate-900 border-r border-slate-200 tabular-nums whitespace-nowrap text-xs sm:text-sm w-32"
+                        style={{ width: '130px', textAlign: 'right', backgroundColor: '#f1f5f9' }}
                       >
                         {formatMonedaCLP(montoTotalCalculado)}
                       </td>
-                      <td className="p-2 print-hide border-none" style={{ backgroundColor: '#f1f5f9' }}></td>
+                      <td className="p-2 print-hide print:hidden border-none w-8" style={{ width: '32px', backgroundColor: '#f1f5f9' }}></td>
                     </tr>
                   </tfoot>
                 </table>
