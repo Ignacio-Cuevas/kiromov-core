@@ -186,12 +186,12 @@ function FinanzasContent() {
       const [resCitas, resCompras, resEgresos, resPagos] = await Promise.all([
         supabase
           .from('citas_atenciones')
-          .select('*, pacientes(nombre_completo, rut, telefono)')
+          .select('*, pacientes(id, nombre_completo, rut, telefono, prevision, prevision_salud)')
           .in('estado', ['asistio', 'asistió', 'Asistió', 'atendido', 'atendida'])
           .order('fecha', { ascending: true }),
         supabase
           .from('compras_planes')
-          .select('*, pacientes(nombre_completo, rut, telefono)')
+          .select('*, pacientes(id, nombre_completo, rut, telefono, prevision, prevision_salud)')
           .order('fecha_compra', { ascending: false }),
         supabase
           .from('egresos_caja')
@@ -199,7 +199,7 @@ function FinanzasContent() {
           .order('fecha', { ascending: false }),
         supabase
           .from('pagos_pacientes')
-          .select('*, pacientes(nombre_completo, rut, telefono)')
+          .select('*, pacientes(id, nombre_completo, rut, telefono, prevision, prevision_salud)')
           .order('fecha', { ascending: false })
       ]);
 
@@ -321,58 +321,52 @@ function FinanzasContent() {
         })
         .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 
-      // 3. Regla estricta de cargos por planes vs citas
-      let deudaCitas = 0;
-      let citasImpagasDetalle: any[] = [];
-      let abonosCitas = 0;
+      // Cantidad de sesiones cubiertas por planes contratados
+      const totalSesionesCubiertasPorPlanes = planesPaciente.reduce(
+        (acc, p) => acc + (Number(p.total_sesiones || p.sesiones_totales || p.cantidad_sesiones_totales) || 0),
+        0
+      );
 
-      if (planesPaciente.length === 0) {
-        // Paciente sin plan: total pagado por el paciente desde septiembre
-        const pagosPaciente = pagos.filter((pp) => {
-          if (pp.paciente_id !== pacId) return false;
-          const fPago = (pp.fecha_pago || pp.fecha || pp.created_at)
-            ? String(pp.fecha_pago || pp.fecha || pp.created_at).split('T')[0]
-            : '';
-          return fPago >= FECHA_CORTE_OPERACIONAL;
-        });
+      // Citas particulares que exceden los planes (o todas si no tiene plan)
+      const numCitasParticulares =
+        planesPaciente.length === 0
+          ? citasAsistidasValidas.length
+          : Math.max(0, citasAsistidasValidas.length - totalSesionesCubiertasPorPlanes);
 
-        const totalPagado = pagosPaciente.reduce((acc, pp) => acc + (Number(pp.monto) || 0), 0);
-        const totalCargosCitas = citasAsistidasValidas.length * 28000;
-        deudaCitas = Math.max(0, totalCargosCitas - totalPagado);
-        abonosCitas = totalPagado;
-        citasImpagasDetalle = citasAsistidasValidas;
-      } else {
-        // Si el paciente tiene un plan que cubre sus sesiones, la deuda de citas es $0
-        const sesionesCubiertas = planesPaciente.reduce(
-          (acc, p) => acc + (Number(p.total_sesiones || p.sesiones_totales) || 0),
-          0
-        );
+      // 3. Pagos realizados por el paciente para citas particulares (Desde septiembre a la fecha)
+      const pagosCitasPaciente = pagos.filter((pp) => {
+        if (pp.paciente_id !== pacId) return false;
+        const fPago = (pp.fecha_pago || pp.fecha || pp.created_at)
+          ? String(pp.fecha_pago || pp.fecha || pp.created_at).split('T')[0]
+          : '';
+        if (fPago && fPago < FECHA_CORTE_OPERACIONAL) return false;
 
-        const citasExcedentes = citasAsistidasValidas.slice(sesionesCubiertas);
-        if (citasExcedentes.length > 0) {
-          const pagosPaciente = pagos.filter((pp) => {
-            if (pp.paciente_id !== pacId) return false;
-            const fPago = (pp.fecha_pago || pp.fecha || pp.created_at)
-              ? String(pp.fecha_pago || pp.fecha || pp.created_at).split('T')[0]
-              : '';
-            return fPago >= FECHA_CORTE_OPERACIONAL;
-          });
-
-          const totalPagado = pagosPaciente.reduce((acc, pp) => acc + (Number(pp.monto) || 0), 0);
-          const totalPagadoPlanes = planesPaciente.reduce((acc, p) => {
-            const pagado = p.monto_pagado != null
-              ? Number(p.monto_pagado)
-              : Math.max(0, (Number(p.valor_total) || 0) - (Number(p.saldo_pendiente) || 0));
-            return acc + (Number(pagado) || 0);
-          }, 0);
-
-          abonosCitas = Math.max(0, totalPagado - totalPagadoPlanes);
-          deudaCitas = Math.max(0, (citasExcedentes.length * 28000) - abonosCitas);
-          citasImpagasDetalle = citasExcedentes;
+        // Si el paciente tiene plan, descartar pagos asociados a planes (abonos o venta de plan)
+        if (planesPaciente.length > 0) {
+          if (pp.tipo_concepto === 'venta_plan' || pp.tipo_concepto === 'abono_plan') return false;
+          if (pp.plan_id && !pp.cita_id && pp.tipo_concepto !== 'sesion_individual') return false;
         }
-      }
+        return true;
+      });
 
-      // Deuda consolidada total
+      const numPagosRealizados = pagosCitasPaciente.length;
+
+      // 4. Balance de sesiones (Regla 1 a 1: 1 cita asistida queda saldada con 1 pago individual)
+      const sesionesImpagas = Math.max(0, numCitasParticulares - numPagosRealizados);
+
+      // Datos del paciente para arancel y ficha clínica
+      const pacienteData =
+        compras.find((p) => p.paciente_id === pacId)?.pacientes ||
+        citas.find((c) => c.paciente_id === pacId)?.pacientes ||
+        pagos.find((pp) => pp.paciente_id === pacId)?.pacientes ||
+        { id: pacId, nombre_completo: 'Paciente sin registrar', rut: '', telefono: '' };
+
+      // Arancel base por sesión impaga según previsión/convenio ($25.000 convenio, $28.000 particular/otros)
+      const prevStr = String(pacienteData.prevision || pacienteData.prevision_salud || '').toLowerCase();
+      const arancelSugerido = prevStr.includes('convenio') ? 25000 : 28000;
+      const deudaCitas = sesionesImpagas * arancelSugerido;
+
+      // 5. Deuda total consolidada
       const deudaTotal = deudaPlanes + deudaCitas;
 
       // Solo si deudaTotal > 0 es un deudor legítimo
@@ -397,22 +391,22 @@ function FinanzasContent() {
 
         // Detalle de citas particulares impagas
         if (deudaCitas > 0) {
-          let abonoRestante = abonosCitas;
+          const citasParticularesList = planesPaciente.length === 0
+            ? citasAsistidasValidas
+            : citasAsistidasValidas.slice(totalSesionesCubiertasPorPlanes);
+
+          const citasImpagasDetalle = sesionesImpagas > 0
+            ? citasParticularesList.slice(-sesionesImpagas)
+            : [];
+
           citasImpagasDetalle.forEach((c) => {
-            const montoCita = 28000;
-            if (abonoRestante >= montoCita) {
-              abonoRestante -= montoCita;
-            } else {
-              const saldoPendienteCita = montoCita - abonoRestante;
-              abonoRestante = 0;
-              desglose.push({
-                tipo: 'cita',
-                id: c.id,
-                fecha: c.fecha || '',
-                detalle: c.motivo_consulta || (planesPaciente.length > 0 ? 'Sesión Kinésica TMO (Excedente)' : 'Sesión Kinésica TMO'),
-                saldo: saldoPendienteCita
-              });
-            }
+            desglose.push({
+              tipo: 'cita',
+              id: c.id,
+              fecha: c.fecha || '',
+              detalle: c.motivo_consulta || (planesPaciente.length > 0 ? 'Sesión Kinésica TMO (Excedente)' : 'Sesión Kinésica TMO'),
+              saldo: arancelSugerido
+            });
           });
 
           if (desglose.filter((x) => x.tipo === 'cita').length === 0) {
@@ -444,12 +438,6 @@ function FinanzasContent() {
           agingCategory = 'por_gestionar';
           agingLabel = `Por Gestionar (${diasAntiguedad}d)`;
         }
-
-        const pacienteData =
-          compras.find((p) => p.paciente_id === pacId)?.pacientes ||
-          citas.find((c) => c.paciente_id === pacId)?.pacientes ||
-          pagos.find((pp) => pp.paciente_id === pacId)?.pacientes ||
-          { id: pacId, nombre_completo: 'Paciente sin registrar', rut: '', telefono: '' };
 
         map.set(pacId, {
           pacienteId: pacId,
