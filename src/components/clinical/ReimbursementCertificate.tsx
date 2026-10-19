@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Printer } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getChileanDate } from '@/lib/utils';
 
-interface ReimbursementCertificateProps {
+export interface ReimbursementCertificateProps {
   isOpen?: boolean;
   onClose?: () => void;
   patient: any;
@@ -15,12 +15,25 @@ interface ReimbursementCertificateProps {
   planActivo?: any;
 }
 
-interface SesionImprimible {
+export interface SesionImprimible {
   id: string;
   numero: number;
   fecha: string;
   hora: string;
   prestacion: string;
+  valorUnitario: number;
+}
+
+function parseMonto(val: string | number): number {
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  if (!val) return 0;
+  const clean = String(val).replace(/[^0-9]/g, '');
+  const num = parseInt(clean, 10);
+  return isNaN(num) ? 0 : num;
+}
+
+function formatMonedaCLP(num: number): string {
+  return `$${Number(num || 0).toLocaleString('es-CL')} CLP`;
 }
 
 export function ReimbursementCertificate({
@@ -39,11 +52,20 @@ export function ReimbursementCertificate({
   const [boleta2, setBoleta2] = useState('');
   const [montoReferencial, setMontoReferencial] = useState<string>(() => {
     const montoNum = planActivo?.valor_total || planActivo?.monto_clp || 75000;
-    return `$${Number(montoNum).toLocaleString('es-CL')} CLP`;
+    return formatMonedaCLP(montoNum);
   });
   const [medicoDerivador, setMedicoDerivador] = useState('');
   const [diagnosticoEditable, setDiagnosticoEditable] = useState('');
   const [planNombreEditable, setPlanNombreEditable] = useState('');
+
+  // Control de edición en celda de Valor Unitario
+  const [editingUnitarioId, setEditingUnitarioId] = useState<string | null>(null);
+  const [unitarioInputText, setUnitarioInputText] = useState<string>('');
+
+  // Total acumulado sincronizado en tiempo real
+  const montoTotalCalculado = useMemo(() => {
+    return sesionesCertificado.reduce((acc, s) => acc + (s.valorUnitario || 0), 0);
+  }, [sesionesCertificado]);
 
   // Helper de URL de imágenes
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -57,6 +79,7 @@ export function ReimbursementCertificate({
       if (!supabase) return;
       setLoading(true);
       try {
+        // 1. Diagnóstico CIE-10 / Hipótesis Kinésica
         const { data: evalData } = await supabase
           .from('evaluaciones_iniciales_tmo')
           .select('cie10_codigo, cie10_glosa, diagnostico_tmo')
@@ -75,7 +98,26 @@ export function ReimbursementCertificate({
            setDiagnosticoEditable(diagStr);
         }
 
-        // 1. Asistencias
+        // 2. Plan contratado (determina valor total y nombre del plan)
+        const { data: planData } = await supabase
+          .from('compras_planes')
+          .select('nombre_plan, numero_boleta, valor_total, metodo_pago, created_at')
+          .eq('paciente_id', patient.id)
+          .order('id', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const montoTotalInicial = planData?.valor_total || planActivo?.valor_total || planActivo?.monto_clp || 75000;
+        setMontoReferencial(formatMonedaCLP(montoTotalInicial));
+
+        if (planData) {
+          setPlanInfo(planData);
+          setPlanNombreEditable(planData.nombre_plan || 'Tratamiento Kinésico Integral');
+        } else {
+          setPlanNombreEditable('Tratamiento Kinésico Integral');
+        }
+
+        // 3. Asistencias para la tabla de atenciones
         const { data: citasData } = await supabase
           .from('citas_atenciones')
           .select('fecha, hora, motivo_consulta')
@@ -84,27 +126,30 @@ export function ReimbursementCertificate({
           .order('fecha', { ascending: true });
         
         if (citasData && citasData.length > 0) {
+          const valorUnitarioBase = Math.round(montoTotalInicial / citasData.length);
           setSesionesCertificado(
             citasData.map((a, idx) => ({
               id: `sesion-${idx + 1}`,
               numero: idx + 1,
               fecha: a.fecha,
               hora: a.hora?.slice(0, 5) || '16:00',
-              prestacion: 'Atención Kinesiológica Integral Ambulatoria (Código Fonasa 06-01-105)'
+              prestacion: 'Atención Kinesiológica Integral Ambulatoria (Código Fonasa 06-01-105)',
+              valorUnitario: valorUnitarioBase,
             }))
           );
         } else {
-          // Si no hay asistencias previas, generar 1 fila de ejemplo
+          // Si no hay asistencias previas, generar 1 fila inicial
           setSesionesCertificado([{
             id: 'sesion-1',
             numero: 1,
             fecha: getChileanDate(),
             hora: '16:00',
-            prestacion: 'Atención Kinesiológica Integral Ambulatoria (Código Fonasa 06-01-105)'
+            prestacion: 'Atención Kinesiológica Integral Ambulatoria (Código Fonasa 06-01-105)',
+            valorUnitario: montoTotalInicial,
           }]);
         }
 
-        // 2. Pagos del paciente para autocompletar boleta
+        // 4. Pagos del paciente para autocompletar boleta
         const { data: pagosData } = await supabase
           .from('pagos_pacientes')
           .select('id, fecha, monto, metodo_pago, numero_boleta')
@@ -112,24 +157,6 @@ export function ReimbursementCertificate({
           .order('fecha', { ascending: false });
 
         const boletaSugerida = pagosData?.find((p: any) => p.numero_boleta || p.n_boleta)?.numero_boleta || '';
-
-        // 3. Plan contratado
-        const { data: planData } = await supabase
-          .from('compras_planes')
-          .select('nombre_plan, numero_boleta, valor_total, metodo_pago, created_at')
-          .eq('paciente_id', patient.id)
-          .order('id', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (planData) {
-          setPlanInfo(planData);
-          setPlanNombreEditable(planData.nombre_plan || 'Tratamiento Kinésico Integral');
-          const montoNum = planData.valor_total || planActivo?.valor_total || planActivo?.monto_clp || 75000;
-          setMontoReferencial(`$${Number(montoNum).toLocaleString('es-CL')} CLP`);
-        } else {
-          setPlanNombreEditable('Tratamiento Kinésico Integral');
-        }
 
         // Asignar boleta sugerida del último pago o del plan
         const boletaFinal1 = boletaSugerida || planData?.numero_boleta || numeroBoleta || planActivo?.numero_boleta || '';
@@ -148,8 +175,6 @@ export function ReimbursementCertificate({
           setBoleta2(boletaFinal2);
         }
 
-        // Eliminado para usar el autocompletado CIE-10
-
       } catch (err) {
         console.error("Error cargando datos para certificado", err);
       } finally {
@@ -158,27 +183,62 @@ export function ReimbursementCertificate({
     };
 
     fetchData();
-  }, [isOpen, patient, planActivo]);
+  }, [isOpen, patient, planActivo, numeroBoleta]);
 
-  // --- Funciones de Edición Local ---
+  // --- Funciones de Prorrateo y Edición Bidireccional ---
+  const handleMontoTotalChange = (nuevoTexto: string) => {
+    setMontoReferencial(nuevoTexto);
+    const nuevoTotal = parseMonto(nuevoTexto);
+    if (sesionesCertificado.length > 0) {
+      const unitarioBase = Math.round(nuevoTotal / sesionesCertificado.length);
+      setSesionesCertificado(prev =>
+        prev.map(s => ({
+          ...s,
+          valorUnitario: unitarioBase
+        }))
+      );
+    }
+  };
+
+  const handleMontoTotalBlur = () => {
+    const total = parseMonto(montoReferencial);
+    setMontoReferencial(formatMonedaCLP(total));
+  };
+
+  const handleEditarSesionValorUnitario = (id: string, nuevoUnitario: number) => {
+    setSesionesCertificado(prev => {
+      const updated = prev.map(s => (s.id === id ? { ...s, valorUnitario: nuevoUnitario } : s));
+      const nuevoTotal = updated.reduce((acc, s) => acc + (s.valorUnitario || 0), 0);
+      setMontoReferencial(formatMonedaCLP(nuevoTotal));
+      return updated;
+    });
+  };
+
   const handleAgregarSesion = () => {
     const ultimoNumero = sesionesCertificado.length;
     const nuevaFecha = new Date();
     nuevaFecha.setDate(nuevaFecha.getDate() + ultimoNumero * 2);
 
+    const fechaStr = new Intl.DateTimeFormat('es-CL', {
+      timeZone: 'America/Santiago',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(nuevaFecha).split('-').reverse().join('-');
+
+    const montoTotalNum = parseMonto(montoReferencial);
+    const nuevoTotalSesiones = ultimoNumero + 1;
+    const nuevoValorUnitario = nuevoTotalSesiones > 0 ? Math.round(montoTotalNum / nuevoTotalSesiones) : 0;
+
     setSesionesCertificado(prev => [
-      ...prev,
+      ...prev.map(s => ({ ...s, valorUnitario: nuevoValorUnitario })),
       {
         id: `sesion-${Date.now()}`,
-        numero: ultimoNumero + 1,
-        fecha: new Intl.DateTimeFormat('es-CL', {
-          timeZone: 'America/Santiago',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        }).format(nuevaFecha).split('-').reverse().join('-'),
+        numero: nuevoTotalSesiones,
+        fecha: fechaStr,
         hora: '16:00',
-        prestacion: 'Tratamiento Kinésico y Terapia Manual Ortopédica'
+        prestacion: 'Atención Kinesiológica Integral Ambulatoria (Código Fonasa 06-01-105)',
+        valorUnitario: nuevoValorUnitario
       }
     ]);
   };
@@ -190,28 +250,48 @@ export function ReimbursementCertificate({
   };
 
   const handleEliminarSesion = (id: string) => {
-    setSesionesCertificado(prev => 
-      prev.filter(s => s.id !== id).map((s, idx) => ({ ...s, numero: idx + 1 }))
-    );
+    setSesionesCertificado(prev => {
+      const filtradas = prev.filter(s => s.id !== id).map((s, idx) => ({ ...s, numero: idx + 1 }));
+      const nuevoTotal = filtradas.reduce((acc, s) => acc + (s.valorUnitario || 0), 0);
+      setMontoReferencial(formatMonedaCLP(nuevoTotal));
+      return filtradas;
+    });
   };
 
-  // --- Función de Impresión Aislada ---
+  // --- Función de Impresión Aislada con Preservación de Colores ---
   const handleImprimir = () => {
     const contenido = document.getElementById('documento-imprimible');
     if (!contenido) return;
 
-    // Clonar el contenido y remover los elementos no imprimibles (botones de edición, inputs)
+    setEditingUnitarioId(null);
+
+    // Clonar el contenido y remover los elementos no imprimibles (botones de edición, inputs auxiliares)
     const clon = contenido.cloneNode(true) as HTMLElement;
     clon.querySelectorAll('.print-hide, button').forEach(el => el.remove());
 
-    // Convertir los inputs de fecha y hora a texto plano para impresión
+    // Convertir los inputs a texto plano para impresión nítida
     clon.querySelectorAll('input').forEach(input => {
       const span = document.createElement('span');
-      span.textContent = (input as HTMLInputElement).value;
+      const isValor = input.getAttribute('data-field') === 'valor-unitario';
+      const valText = isValor
+        ? (input.getAttribute('data-formatted') || input.value)
+        : input.value;
+      span.textContent = valText;
+
       const isCentered = input.classList.contains('text-center');
-      span.className = isCentered
-        ? 'font-bold text-slate-800 text-xs text-center min-w-[60px] inline-block'
-        : 'font-medium text-slate-800 text-xs inline-block';
+      const isRight = input.classList.contains('text-right');
+      if (isRight) {
+        span.className = 'font-bold font-mono text-slate-900 text-xs text-right block w-full tabular-nums';
+        span.style.textAlign = 'right';
+        span.style.display = 'block';
+        span.style.width = '100%';
+      } else if (isCentered) {
+        span.className = 'font-bold text-slate-800 text-xs text-center min-w-[60px] inline-block';
+        span.style.textAlign = 'center';
+      } else {
+        span.className = 'font-medium text-slate-800 text-xs inline-block';
+      }
+
       if (input.parentNode) {
         input.parentNode.replaceChild(span, input);
       }
@@ -237,6 +317,8 @@ export function ReimbursementCertificate({
             }
             * {
               box-sizing: border-box;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
             body {
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -244,8 +326,8 @@ export function ReimbursementCertificate({
               padding: 0;
               color: #0f172a;
               background: #ffffff;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
             table {
               width: 100%;
@@ -256,13 +338,23 @@ export function ReimbursementCertificate({
               border: 1px solid #cbd5e1;
               padding: 6px 8px;
               font-size: 11px;
-              text-align: left;
             }
-            th {
-              background-color: #f8fafc;
-              font-weight: 600;
-              color: #334155;
+            thead th {
+              background-color: #0f172a !important;
+              color: #ffffff !important;
+              font-weight: 600 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
+            tfoot tr td {
+              background-color: #f1f5f9 !important;
+              font-weight: 700 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .text-center { text-align: center !important; }
+            .text-right { text-align: right !important; }
+            .text-left { text-align: left !important; }
           </style>
           <script src="https://cdn.tailwindcss.com"></script>
         </head>
@@ -294,7 +386,7 @@ export function ReimbursementCertificate({
         <div className="flex items-center justify-between px-6 py-3.5 bg-white border-b border-slate-200 sticky top-0 z-20">
           <div>
             <h3 className="font-bold text-slate-900 text-sm">Vista Previa: Certificado de Reembolso</h3>
-            <p className="text-xs text-slate-500">Puedes editar fechas y boletas antes de imprimir (cambios locales)</p>
+            <p className="text-xs text-slate-500">Puedes editar montos unitarios, fechas y boletas antes de imprimir (cambios locales)</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -302,7 +394,7 @@ export function ReimbursementCertificate({
               type="button"
               onClick={handleImprimir}
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               Imprimir / Guardar en PDF
@@ -310,7 +402,7 @@ export function ReimbursementCertificate({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 rounded-lg text-sm font-bold transition-colors"
+              className="p-2 text-slate-400 hover:text-slate-600 rounded-lg text-sm font-bold transition-colors cursor-pointer"
             >
               ✕
             </button>
@@ -328,7 +420,7 @@ export function ReimbursementCertificate({
             /* Hoja de Certificado Oficial */
             <div id="documento-imprimible" className="bg-white p-8 sm:p-12 max-w-3xl mx-auto shadow-sm border border-slate-200 font-serif text-slate-900">
               
-              {/* Encabezado con Logo Oficial de Supabase */}
+              {/* Encabezado con Logo Oficial */}
               <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
                 <div className="flex items-center gap-4">
                   {logoSrc && (
@@ -395,6 +487,7 @@ export function ReimbursementCertificate({
                     />
                   </div>
 
+                  {/* Monto Total Referencial con Prorrateo Automático */}
                   <div className="flex items-center gap-1.5 text-xs text-slate-800">
                     <span className="font-semibold text-slate-900 shrink-0">
                       Monto Total Referencial del Tratamiento:
@@ -402,9 +495,10 @@ export function ReimbursementCertificate({
                     <input
                       type="text"
                       value={montoReferencial}
-                      onChange={(e) => setMontoReferencial(e.target.value)}
-                      className="flex-1 px-1.5 py-0.5 font-medium text-slate-800 bg-transparent border-b border-dashed border-slate-300 hover:border-slate-400 focus:border-emerald-600 focus:outline-none print:border-none print:p-0 print:text-black"
-                      title="Haz clic para editar el monto total referencial si es necesario"
+                      onChange={(e) => handleMontoTotalChange(e.target.value)}
+                      onBlur={handleMontoTotalBlur}
+                      className="flex-1 px-1.5 py-0.5 font-bold font-mono text-slate-900 bg-transparent border-b border-dashed border-slate-300 hover:border-slate-400 focus:border-emerald-600 focus:outline-none print:border-none print:p-0 print:text-black tabular-nums"
+                      title="Haz clic para editar el monto total referencial; se prorrateará automáticamente en las sesiones"
                     />
                   </div>
                 </div>
@@ -414,45 +508,92 @@ export function ReimbursementCertificate({
                 </p>
               </div>
 
-              {/* Tabla de Sesiones Editable en Memoria */}
+              {/* Tabla de Sesiones Editable con Valor Unitario y Total */}
               <div className="my-6">
                 <table className="w-full text-left text-[11px] sm:text-xs border border-slate-300 font-sans">
-                  <thead className="bg-slate-100 border-b border-slate-300 font-semibold text-slate-800">
+                  {/* Encabezado: Fondo Azul Marino Oscuro Institucional (#0f172a) con Texto Blanco en Negrita */}
+                  <thead
+                    className="bg-[#0f172a] text-white font-semibold text-xs sm:text-sm tracking-wide border-b border-slate-900"
+                    style={{ backgroundColor: '#0f172a', color: '#ffffff' }}
+                  >
                     <tr>
-                      <th className="p-2 border-r border-slate-300 text-center w-8">N°</th>
-                      <th className="p-2 border-r border-slate-300 w-28">Fecha</th>
-                      <th className="p-2 border-r border-slate-300 w-16">Hora</th>
-                      <th className="p-2 border-r border-slate-300">Prestación / Tratamiento</th>
-                      <th className="p-2 print-hide w-8 text-center"></th>
+                      <th
+                        className="p-2.5 border-r border-slate-800 text-center w-12"
+                        style={{ width: '48px', textAlign: 'center', backgroundColor: '#0f172a', color: '#ffffff' }}
+                      >
+                        N°
+                      </th>
+                      <th
+                        className="p-2.5 border-r border-slate-800 text-center w-28"
+                        style={{ width: '110px', textAlign: 'center', backgroundColor: '#0f172a', color: '#ffffff' }}
+                      >
+                        Fecha
+                      </th>
+                      <th
+                        className="p-2.5 border-r border-slate-800 text-center w-24"
+                        style={{ width: '90px', textAlign: 'center', backgroundColor: '#0f172a', color: '#ffffff' }}
+                      >
+                        Hora
+                      </th>
+                      <th
+                        className="p-2.5 border-r border-slate-800 text-left"
+                        style={{ textAlign: 'left', backgroundColor: '#0f172a', color: '#ffffff' }}
+                      >
+                        Prestación / Tratamiento
+                      </th>
+                      <th
+                        className="p-2.5 border-r border-slate-800 text-right w-32"
+                        style={{ width: '130px', textAlign: 'right', backgroundColor: '#0f172a', color: '#ffffff' }}
+                      >
+                        Valor Unitario
+                      </th>
+                      <th
+                        className="p-2.5 print-hide w-8 text-center border-none"
+                        style={{ width: '32px', backgroundColor: '#0f172a', color: '#ffffff' }}
+                      ></th>
                     </tr>
                   </thead>
+
+                  {/* Cuerpo de la Tabla */}
                   <tbody className="divide-y divide-slate-200">
                     {sesionesCertificado.map((s) => (
-                      <tr key={s.id} className="hover:bg-slate-50/50">
-                        <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-600">{s.numero}</td>
+                      <tr key={s.id} className="hover:bg-slate-50/50 border-b border-slate-200">
+                        {/* 1. N° */}
+                        <td
+                          className="p-2 border-r border-slate-200 text-center font-bold text-slate-700 tabular-nums"
+                          style={{ textAlign: 'center' }}
+                        >
+                          {s.numero}
+                        </td>
                         
-                        {/* Fecha */}
-                        <td className="p-2 border-r border-slate-200">
+                        {/* 2. Fecha */}
+                        <td
+                          className="p-2 border-r border-slate-200 text-center tabular-nums"
+                          style={{ textAlign: 'center' }}
+                        >
                           <input
                             type="date"
                             value={s.fecha}
                             onChange={(e) => handleEditarSesion(s.id, 'fecha', e.target.value)}
-                            className="w-full border-none p-0 bg-transparent text-[11px] sm:text-xs text-slate-900 focus:ring-1 focus:ring-blue-500 rounded"
+                            className="w-full border-none p-0 bg-transparent text-[11px] sm:text-xs text-slate-900 focus:ring-1 focus:ring-blue-500 rounded text-center font-medium tabular-nums"
                           />
                         </td>
 
-                        {/* Hora */}
-                        <td className="p-2 border-r border-slate-200">
+                        {/* 3. Hora */}
+                        <td
+                          className="p-2 border-r border-slate-200 text-center tabular-nums"
+                          style={{ textAlign: 'center' }}
+                        >
                           <input
                             type="time"
                             value={s.hora}
                             onChange={(e) => handleEditarSesion(s.id, 'hora', e.target.value)}
-                            className="w-full border-none p-0 bg-transparent text-[11px] sm:text-xs text-slate-900 focus:ring-1 focus:ring-blue-500 rounded"
+                            className="w-full border-none p-0 bg-transparent text-[11px] sm:text-xs text-slate-900 focus:ring-1 focus:ring-blue-500 rounded text-center font-medium tabular-nums"
                           />
                         </td>
 
-                        {/* Prestación */}
-                        <td className="p-2 border-r border-slate-200">
+                        {/* 4. Prestación / Tratamiento */}
+                        <td className="p-2 border-r border-slate-200 text-left">
                           <input
                             type="text"
                             value={s.prestacion}
@@ -461,12 +602,39 @@ export function ReimbursementCertificate({
                           />
                         </td>
 
+                        {/* 5. Valor Unitario Editable */}
+                        <td
+                          className="p-2 border-r border-slate-200 text-right tabular-nums"
+                          style={{ textAlign: 'right' }}
+                        >
+                          <input
+                            type="text"
+                            data-field="valor-unitario"
+                            data-formatted={formatMonedaCLP(s.valorUnitario)}
+                            value={editingUnitarioId === s.id ? unitarioInputText : formatMonedaCLP(s.valorUnitario)}
+                            onFocus={() => {
+                              setEditingUnitarioId(s.id);
+                              setUnitarioInputText(s.valorUnitario ? String(s.valorUnitario) : '');
+                            }}
+                            onChange={(e) => {
+                              setUnitarioInputText(e.target.value);
+                              const valNum = parseMonto(e.target.value);
+                              handleEditarSesionValorUnitario(s.id, valNum);
+                            }}
+                            onBlur={() => {
+                              setEditingUnitarioId(null);
+                            }}
+                            className="w-full border-none p-0 bg-transparent text-[11px] sm:text-xs text-slate-900 font-bold font-mono text-right focus:ring-1 focus:ring-blue-500 rounded tabular-nums"
+                            title="Haz clic para editar el valor unitario de esta sesión"
+                          />
+                        </td>
+
                         {/* Botón Borrar (No se imprime) */}
                         <td className="p-2 text-center print-hide">
                           <button
                             type="button"
                             onClick={() => handleEliminarSesion(s.id)}
-                            className="text-slate-400 hover:text-red-600 font-bold px-2 py-0.5"
+                            className="text-slate-400 hover:text-red-600 font-bold px-2 py-0.5 cursor-pointer"
                             title="Quitar sesión"
                           >
                             ✕
@@ -476,10 +644,33 @@ export function ReimbursementCertificate({
                     ))}
                     {sesionesCertificado.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="p-4 text-center text-slate-400 italic font-sans">Ninguna sesión agregada.</td>
+                        <td colSpan={6} className="p-4 text-center text-slate-400 italic font-sans">Ninguna sesión agregada.</td>
                       </tr>
                     )}
                   </tbody>
+
+                  {/* Fila de Cierre / Pie de Tabla (tfoot): Fondo Tenue Distintivo (#f1f5f9) */}
+                  <tfoot
+                    className="bg-slate-50 border-t-2 border-slate-300 font-sans"
+                    style={{ backgroundColor: '#f1f5f9' }}
+                  >
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="p-2.5 text-right font-bold text-slate-800 border-r border-slate-200 text-xs sm:text-sm"
+                        style={{ textAlign: 'right', backgroundColor: '#f1f5f9' }}
+                      >
+                        Total Tratamiento ({sesionesCertificado.length} Sesiones):
+                      </td>
+                      <td
+                        className="p-2.5 text-right font-bold font-mono text-slate-900 border-r border-slate-200 tabular-nums whitespace-nowrap text-xs sm:text-sm"
+                        style={{ textAlign: 'right', backgroundColor: '#f1f5f9' }}
+                      >
+                        {formatMonedaCLP(montoTotalCalculado)}
+                      </td>
+                      <td className="p-2 print-hide border-none" style={{ backgroundColor: '#f1f5f9' }}></td>
+                    </tr>
+                  </tfoot>
                 </table>
 
                 {/* Botón para agregar sesión en pantalla (Oculto al imprimir) */}
@@ -487,7 +678,7 @@ export function ReimbursementCertificate({
                   <button
                     type="button"
                     onClick={handleAgregarSesion}
-                    className="text-[11px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors border border-blue-200"
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors border border-blue-200 cursor-pointer"
                   >
                     + Agregar Fila (Para calzar orden médica)
                   </button>
