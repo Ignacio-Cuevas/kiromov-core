@@ -75,6 +75,9 @@ const CATEGORIAS_EGRESO = [
   'Otros Gastos'
 ];
 
+// Fecha en que comenzó la operación formal de cobros en Kiromov Core
+const FECHA_CORTE_OPERACIONAL = '2026-09-01';
+
 function FinanzasContent() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
@@ -288,12 +291,14 @@ function FinanzasContent() {
     ).filter(Boolean) as string[];
 
     pacienteIds.forEach((pacId) => {
-      // 1. Obligaciones por planes
+      // 1. Obligaciones por planes (solo planes contratados a partir de la fecha de corte operacional)
       const planesPaciente = compras.filter((p) => {
         if (p.paciente_id !== pacId) return false;
         const stPago = String(p.estado_pago || '').toLowerCase().trim();
         const stEstado = String(p.estado || '').toLowerCase().trim();
-        return stPago !== 'cancelado' && stEstado !== 'cancelado';
+        if (stPago === 'cancelado' || stEstado === 'cancelado') return false;
+        const fPlan = (p.fecha_compra ? p.fecha_compra.split('T')[0] : '') || (p.created_at ? p.created_at.split('T')[0] : '');
+        return !fPlan || fPlan >= FECHA_CORTE_OPERACIONAL;
       });
 
       const deudaPlanes = planesPaciente.reduce(
@@ -301,45 +306,71 @@ function FinanzasContent() {
         0
       );
 
-      // 2. Citas efectivamente asistidas (excluye confirmadas y futuras)
-      const citasAsistidas = citas
+      // 2. Citas efectivamente asistidas desde la fecha de corte (ignorar citas de marzo/abril/mayo)
+      const citasAsistidasValidas = citas
         .filter((c) => {
           if (c.paciente_id !== pacId) return false;
           const st = String(c.estado || '').toLowerCase().trim();
           const esAsistio = st === 'asistio' || st === 'asistió' || st === 'atendido' || st === 'atendida';
-          return esAsistio && c.fecha && c.fecha <= hoyStr;
+          return (
+            esAsistio &&
+            c.fecha &&
+            c.fecha >= FECHA_CORTE_OPERACIONAL &&
+            c.fecha <= hoyStr
+          );
         })
         .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 
-      // Cantidad de sesiones cubiertas por planes
-      const sesionesCubiertas = planesPaciente.reduce(
-        (acc, p) => acc + (Number(p.total_sesiones || p.sesiones_totales) || 0),
-        0
-      );
+      // 3. Regla estricta de cargos por planes vs citas
+      let deudaCitas = 0;
+      let citasImpagasDetalle: any[] = [];
+      let abonosCitas = 0;
 
-      // Citas particulares que exceden cobertura del plan
-      const citasParticulares =
-        planesPaciente.length === 0
-          ? citasAsistidas
-          : citasAsistidas.slice(sesionesCubiertas);
+      if (planesPaciente.length === 0) {
+        // Paciente sin plan: total pagado por el paciente desde septiembre
+        const pagosPaciente = pagos.filter((pp) => {
+          if (pp.paciente_id !== pacId) return false;
+          const fPago = (pp.fecha_pago || pp.fecha || pp.created_at)
+            ? String(pp.fecha_pago || pp.fecha || pp.created_at).split('T')[0]
+            : '';
+          return fPago >= FECHA_CORTE_OPERACIONAL;
+        });
 
-      const cargoBrutoCitas = citasParticulares.length * 28000;
+        const totalPagado = pagosPaciente.reduce((acc, pp) => acc + (Number(pp.monto) || 0), 0);
+        const totalCargosCitas = citasAsistidasValidas.length * 28000;
+        deudaCitas = Math.max(0, totalCargosCitas - totalPagado);
+        abonosCitas = totalPagado;
+        citasImpagasDetalle = citasAsistidasValidas;
+      } else {
+        // Si el paciente tiene un plan que cubre sus sesiones, la deuda de citas es $0
+        const sesionesCubiertas = planesPaciente.reduce(
+          (acc, p) => acc + (Number(p.total_sesiones || p.sesiones_totales) || 0),
+          0
+        );
 
-      // 3. Pagos reales registrados para citas particulares
-      const pagosPaciente = pagos.filter((pp) => pp.paciente_id === pacId);
-      const totalPagadoPaciente = pagosPaciente.reduce(
-        (acc, pp) => acc + (Number(pp.monto) || 0),
-        0
-      );
-      const totalPagadoPlanes = planesPaciente.reduce((acc, p) => {
-        const pagado = p.monto_pagado != null
-          ? Number(p.monto_pagado)
-          : Math.max(0, (Number(p.valor_total) || 0) - (Number(p.saldo_pendiente) || 0));
-        return acc + (Number(pagado) || 0);
-      }, 0);
+        const citasExcedentes = citasAsistidasValidas.slice(sesionesCubiertas);
+        if (citasExcedentes.length > 0) {
+          const pagosPaciente = pagos.filter((pp) => {
+            if (pp.paciente_id !== pacId) return false;
+            const fPago = (pp.fecha_pago || pp.fecha || pp.created_at)
+              ? String(pp.fecha_pago || pp.fecha || pp.created_at).split('T')[0]
+              : '';
+            return fPago >= FECHA_CORTE_OPERACIONAL;
+          });
 
-      const abonosCitas = Math.max(0, totalPagadoPaciente - totalPagadoPlanes);
-      const deudaCitas = Math.max(0, cargoBrutoCitas - abonosCitas);
+          const totalPagado = pagosPaciente.reduce((acc, pp) => acc + (Number(pp.monto) || 0), 0);
+          const totalPagadoPlanes = planesPaciente.reduce((acc, p) => {
+            const pagado = p.monto_pagado != null
+              ? Number(p.monto_pagado)
+              : Math.max(0, (Number(p.valor_total) || 0) - (Number(p.saldo_pendiente) || 0));
+            return acc + (Number(pagado) || 0);
+          }, 0);
+
+          abonosCitas = Math.max(0, totalPagado - totalPagadoPlanes);
+          deudaCitas = Math.max(0, (citasExcedentes.length * 28000) - abonosCitas);
+          citasImpagasDetalle = citasExcedentes;
+        }
+      }
 
       // Deuda consolidada total
       const deudaTotal = deudaPlanes + deudaCitas;
@@ -367,7 +398,7 @@ function FinanzasContent() {
         // Detalle de citas particulares impagas
         if (deudaCitas > 0) {
           let abonoRestante = abonosCitas;
-          citasParticulares.forEach((c) => {
+          citasImpagasDetalle.forEach((c) => {
             const montoCita = 28000;
             if (abonoRestante >= montoCita) {
               abonoRestante -= montoCita;
