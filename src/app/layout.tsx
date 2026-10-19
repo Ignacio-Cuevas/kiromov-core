@@ -2,7 +2,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
 import { Inter } from "next/font/google";
 
@@ -15,6 +15,14 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "KIROMOV Core | Centro Clínico",
   description: "Web App interna de gestión clínica y operativa - KIROMOV Centro Clínico",
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
@@ -32,7 +40,7 @@ export default function RootLayout({
           {/* Área de contenido */}
           <div className="flex-1 flex flex-col min-w-0">
             <TopBar />
-            <main className="flex-1 p-4 md:p-6 pb-24 md:pb-8 overflow-y-auto overflow-x-hidden">
+            <main className="flex-1 p-3 sm:p-4 md:p-6 pb-20 md:pb-6 overflow-y-auto overflow-x-hidden">
               {children}
             </main>
           </div>

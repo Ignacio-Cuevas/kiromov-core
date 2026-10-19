@@ -131,7 +131,8 @@ export function PatientsDataGrid({
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
-      <div className="overflow-x-auto">
+      {/* 1. Vista Escritorio: Tabla Densa (>= md) */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left text-xs whitespace-nowrap">
           {/* Cabecera Fija */}
           <thead className="bg-slate-50/90 text-slate-500 font-semibold border-b border-slate-200 text-[11px] uppercase tracking-wider sticky top-0 z-10 backdrop-blur-xs">
@@ -323,6 +324,120 @@ export function PatientsDataGrid({
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* 2. Vista Móvil: Tarjetas Clínicas de Paciente (< md) */}
+      <div className="md:hidden divide-y divide-slate-100">
+        {pacientes.map((p) => {
+          const { tienePlan, sesionesUsadas, sesionesTotales, sesionesRestantes } = getResumenPlan(p);
+          const segmentoKey = detectarSegmentoTMO(p);
+          const segmentoInfo = getSegmentoTMOLabel(segmentoKey);
+          const tieneDeuda = p.estado_pago === 'pendiente' && (p.monto_clp || 0) > 0;
+          const cleanPhone = (p.telefono || '').replace(/\D/g, '');
+
+          return (
+            <div key={p.id} className="p-4 space-y-3 bg-white">
+              {/* Encabezado: Avatar + Nombre + RUT + Previsión */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                    {getInitials(p.nombre_completo)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => onOpenFicha(p.id)}
+                      className="font-bold text-sm text-slate-900 hover:text-emerald-700 truncate block text-left leading-tight cursor-pointer"
+                    >
+                      {p.nombre_completo}
+                    </button>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1 text-xs">
+                      <span className="font-mono text-slate-500 tabular-nums text-[11px]">
+                        {p.rut ? formatRut(p.rut) : 'Sin RUT'}
+                      </span>
+                      <span>·</span>
+                      {getPrevisionBadge(p.prevision || p.prevision_salud)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Badge Segmento TMO / Deuda */}
+                <div className="shrink-0 flex flex-col items-end gap-1">
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${segmentoInfo.colorClass}`}>
+                    {segmentoInfo.shortLabel}
+                  </span>
+                  {tieneDeuda && (
+                    <span className="text-[10px] font-mono font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded">
+                      Debe {formatCLP(p.monto_clp || 0)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Fila Plan & Sesiones */}
+              {tienePlan && (
+                <div className="flex items-center justify-between text-xs bg-slate-50 p-2 rounded-xl border border-slate-100">
+                  <span className="text-slate-600 font-medium truncate max-w-[180px]">
+                    {p.nombre_plan || 'Plan Kinésico'}
+                  </span>
+                  <span className="font-mono text-[11px] font-bold text-slate-800 tabular-nums">
+                    {sesionesUsadas}/{sesionesTotales} ses. <span className={sesionesRestantes === 1 ? 'text-amber-700 font-bold' : 'text-emerald-700'}>({sesionesRestantes} rest.)</span>
+                  </span>
+                </div>
+              )}
+
+              {/* Acciones Rápidas Móviles: WhatsApp + Ver Ficha + Agendar */}
+              <div className="flex items-center gap-2 pt-0.5">
+                {cleanPhone ? (
+                  <a
+                    href={
+                      p.proxima_cita?.fecha
+                        ? generarEnlaceWhatsAppConfirmacion({
+                            paciente_nombre: p.nombre_completo,
+                            paciente_telefono: cleanPhone,
+                            fecha: p.proxima_cita.fecha,
+                            hora: p.proxima_cita.hora || '09:00:00',
+                          })
+                        : getWhatsAppUrl(cleanPhone, p.nombre_completo)
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-colors active:scale-[0.98]"
+                  >
+                    <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>WhatsApp</span>
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onEditar(p)}
+                    className="flex-1 flex items-center justify-center gap-1 py-2.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-xs font-medium cursor-pointer"
+                  >
+                    <span>+ Teléfono</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => onOpenFicha(p.id)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors shadow-xs active:scale-[0.98] cursor-pointer"
+                >
+                  <FileText className="w-4 h-4 shrink-0" />
+                  <span>Ver Ficha</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onAgendar(p)}
+                  className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-colors shrink-0 active:scale-[0.98] cursor-pointer"
+                  title="Nueva Atención / Cita"
+                >
+                  <Calendar className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Pie de tabla con conteo */}

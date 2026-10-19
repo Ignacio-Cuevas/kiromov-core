@@ -41,4 +41,36 @@
   body {
     @apply bg-cloud text-ink-navy antialiased;
   }
+
+  /* Prevenir zoom automático e intrusivo en iOS Safari (mínimo 16px en móviles) */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  @screen sm {
+    input,
+    select,
+    textarea {
+      font-size: 0.875rem; /* 14px */
+    }
+  }
 }
+
+/* Utilidades para Zonas Seguras de iPhone (Safe Areas) */
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+}
+

@@ -1076,12 +1076,12 @@ export function PaymentCheckoutModal({
         </form>
       </DialogBody>
 
-      <DialogFooter className="border-t border-slate-100 pt-3 flex items-center justify-between gap-3">
+      <DialogFooter className="border-t border-slate-100 pt-3 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={onClose}
           disabled={isSubmitting}
-          className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-100 transition-colors cursor-pointer"
+          className="px-3 sm:px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
         >
           Cancelar
         </button>
@@ -1090,7 +1090,7 @@ export function PaymentCheckoutModal({
           type="submit"
           form="checkout-form"
           disabled={isSubmitting}
-          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
+          className="flex-1 sm:flex-initial px-4 sm:px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
         >
           {isSubmitting ? (
             <>

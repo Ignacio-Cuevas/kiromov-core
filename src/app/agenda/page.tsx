@@ -109,6 +109,18 @@ function AgendaContent() {
 
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Detección de pantalla móvil (< 1024px) y día activo móvil
+  const [isMobile, setIsMobile] = useState(false);
+  const [diaSeleccionadoMobile, setDiaSeleccionadoMobile] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Bloqueos de Horario y Configuración de Jornada
   const [checkoutCita, setCheckoutCita] = useState<CitaExtendida | null>(null);
@@ -407,11 +419,8 @@ function AgendaContent() {
     }
   }, [vista, citasFiltradas]);
 
-  const diasAMostrar = useMemo(() => {
-    if (vista === 'dia') {
-      return [fechaBase];
-    }
-    // Vista semana: Lunes a Sábado (6 días estándar, o 7 si Domingo está activo)
+  // Días de la semana completa para el carrusel móvil y vista escritorio
+  const diasSemanaCompleta = useMemo(() => {
     const domingoActivo = semanaConfig[0]?.activo ?? false;
     const count = domingoActivo ? 7 : 6;
     const inicioSemana = getMonday(fechaBase);
@@ -420,7 +429,26 @@ function AgendaContent() {
       d.setDate(d.getDate() + i);
       return d;
     });
-  }, [fechaBase, vista, semanaConfig]);
+  }, [fechaBase, semanaConfig]);
+
+  // Sincronizar día activo móvil con la semana actual
+  useEffect(() => {
+    const todayStr = getFormattedLocalDate(new Date());
+    const isTodayInWeek = diasSemanaCompleta.some((d) => getFormattedLocalDate(d) === todayStr);
+    if (isTodayInWeek) {
+      const todayDate = diasSemanaCompleta.find((d) => getFormattedLocalDate(d) === todayStr);
+      if (todayDate) setDiaSeleccionadoMobile(todayDate);
+    } else {
+      setDiaSeleccionadoMobile(diasSemanaCompleta[0] || fechaBase);
+    }
+  }, [diasSemanaCompleta]);
+
+  const diasAMostrar = useMemo(() => {
+    if (vista === 'dia') {
+      return [fechaBase];
+    }
+    return diasSemanaCompleta;
+  }, [fechaBase, vista, diasSemanaCompleta]);
 
   const changeDate = (dir: number) => {
     const next = new Date(fechaBase);
@@ -760,7 +788,7 @@ function AgendaContent() {
   };
   return (
     <div className="min-h-screen bg-cloud pb-20 font-sans text-ink-navy">
-      <main className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6 sm:space-y-8 print:hidden">
+      <main className="w-full max-w-[1600px] mx-auto px-2 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6 print:hidden">
         {activeTab === 'disponibilidad' ? (
           <BoxScheduleView
             onBackToAgenda={() => setActiveTab('agenda')}
@@ -783,16 +811,79 @@ function AgendaContent() {
                 isSyncing={isSyncing}
               />
 
+              {/* Carrusel Selector de Días Horizontal para Móvil (< lg) */}
+              <div className="lg:hidden w-full bg-white rounded-2xl p-2.5 border border-slate-200/90 shadow-xs">
+                <div className="flex items-center justify-between pb-2 px-1 border-b border-slate-100 text-xs font-bold text-slate-700">
+                  <div className="flex items-center gap-1.5">
+                    <CalendarDays className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Días de la Semana</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-500 capitalize">
+                    {diasSemanaCompleta[0]?.toLocaleDateString('es-CL', { month: 'short' })} {fechaBase.getFullYear()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-2 px-0.5">
+                  {diasSemanaCompleta.map((dia) => {
+                    const diaStr = getFormattedLocalDate(dia);
+                    const isSelected = getFormattedLocalDate(diaSeleccionadoMobile) === diaStr;
+                    const isToday = getFormattedLocalDate(new Date()) === diaStr;
+                    const nombreCorto = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][dia.getDay()];
+                    const diaNum = dia.getDate();
+                    const citasCount = citasFiltradas.filter((c) => c?.fecha === diaStr).length;
+
+                    return (
+                      <button
+                        key={diaStr}
+                        type="button"
+                        onClick={() => {
+                          setDiaSeleccionadoMobile(dia);
+                          if (vista === 'dia') {
+                            setFechaBase(dia);
+                          }
+                        }}
+                        className={`flex-1 min-w-[54px] py-2 px-1 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer active:scale-95 ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/25 ring-2 ring-emerald-600 ring-offset-1'
+                            : isToday
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold'
+                            : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/70'
+                        }`}
+                      >
+                        <span className={`text-[10px] uppercase font-bold tracking-wider ${isSelected ? 'text-emerald-100' : 'text-slate-500'}`}>
+                          {nombreCorto}
+                        </span>
+                        <span className="text-sm font-extrabold tabular-nums mt-0.5">
+                          {diaNum}
+                        </span>
+                        {citasCount > 0 ? (
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full mt-1 ${
+                              isSelected
+                                ? 'bg-white/20 text-white'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}
+                          >
+                            {citasCount}
+                          </span>
+                        ) : (
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-200 mt-2" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {loading ? (
                 <div className="bg-white rounded-2xl p-16 border border-slate-200/90 shadow-sm flex flex-col items-center justify-center min-h-[450px]">
                   <Loader2 className="w-8 h-8 animate-spin mb-3 text-emerald-600" />
                   <p className="text-sm font-semibold text-slate-600">Cargando agenda clínica...</p>
                 </div>
               ) : vista === 'dia' ? (
-                // COCKPIT DE ATENCIÓN (VISTA DÍA)
-                <div className="flex gap-4 h-[calc(100vh-200px)] min-h-[600px]">
-                  {/* Panel Izquierdo: 40% */}
-                  <div className="w-2/5 flex flex-col gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm overflow-y-auto">
+                // COCKPIT DE ATENCIÓN (VISTA DÍA RESPONSIVA)
+                <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[calc(100vh-200px)] min-h-[500px]">
+                  {/* Panel Izquierdo: Lista de citas del día */}
+                  <div className="w-full lg:w-2/5 flex flex-col gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm max-h-[380px] lg:max-h-none overflow-y-auto">
                     <h3 className="text-sm font-bold text-slate-800">Citas del Día</h3>
                     {citasFiltradas.length === 0 ? (
                       <p className="text-sm text-slate-500">No hay citas registradas para hoy.</p>
@@ -809,7 +900,7 @@ function AgendaContent() {
                     )}
                   </div>
                   {/* Panel Derecho: 60% (Mini-Ficha del Box) */}
-                  <div className="w-3/5 bg-white rounded-xl border border-slate-200 shadow-sm overflow-y-auto relative p-6">
+                  <div className="w-full lg:w-3/5 bg-white rounded-xl border border-slate-200 shadow-sm overflow-y-auto relative p-4 sm:p-6">
                     {selectedPatientForDrawer ? (
                       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {/* 1. Tarjeta de Identificación */}
@@ -925,9 +1016,9 @@ function AgendaContent() {
                   </div>
                 </div>
               ) : (
-                // VISTA SEMANA
+                // VISTA SEMANA (o MODO DÍA en móvil)
                 <ClinicalTimeGrid
-                  dias={diasAMostrar}
+                  dias={isMobile ? [diaSeleccionadoMobile] : diasAMostrar}
                   citas={citasFiltradas}
                   bloqueos={bloqueos}
                   semanaConfig={semanaConfig}

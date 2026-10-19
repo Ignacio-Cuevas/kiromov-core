@@ -342,7 +342,7 @@ export function ClinicalTimeGrid({
                       const horaInicio = cita?.hora?.slice(0, 5) || '09:00';
                       const duracionMin = getDurationMinutes(cita, duracionPredeterminada);
                       const topPos = getTopPosition(horaInicio);
-                      const heightPos = Math.round((duracionMin / 60) * HOUR_HEIGHT) - 2;
+                      const heightPos = Math.max(dias.length === 1 ? 52 : 34, Math.round((duracionMin / 60) * HOUR_HEIGHT) - 2);
                       const horaFin = calcularHoraFin(horaInicio, duracionMin);
 
                       const theme = getPastelCardTheme(cita);
@@ -379,9 +379,41 @@ export function ClinicalTimeGrid({
                               left: '2px',
                               right: '2px',
                             }}
-                            className={`absolute z-20 rounded-lg p-1.5 px-2 transition-all cursor-pointer hover:brightness-95 hover:shadow-md active:scale-[0.99] overflow-hidden flex flex-col justify-between ${theme.card}`}
+                            className={`absolute z-20 rounded-lg p-1.5 px-2.5 transition-all cursor-pointer hover:brightness-95 hover:shadow-md active:scale-[0.99] overflow-hidden flex flex-col justify-between ${theme.card}`}
                           >
-                            {duracionMin < 30 ? (
+                            {dias.length === 1 ? (
+                              // MODO DÍA MÓVIL: Tarjeta táctil amplia con jerarquía clínica clara y legible
+                              <div className="min-w-0 flex-1 flex flex-col justify-between py-0.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`font-mono text-xs font-bold ${theme.textSecondary}`}>
+                                      {horaInicio} - {horaFin}
+                                    </span>
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded capitalize ${theme.badgeBg}`}>
+                                      {cita.estado || 'Pendiente'}
+                                    </span>
+                                  </div>
+                                  {sesInfo && (
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded font-mono ${theme.badgeBg}`}>
+                                      {sesInfo} ses.
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-between gap-2 mt-0.5">
+                                  <span className={`text-xs sm:text-sm font-bold leading-tight truncate ${theme.textPrimary}`}>
+                                    {pacienteNombre}
+                                  </span>
+                                  {debePago && (
+                                    <span className="text-[10px] font-mono text-rose-700 font-bold shrink-0 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
+                                      Debe cobro
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] opacity-85 truncate text-slate-600 mt-0.5">
+                                  {motivoTexto}
+                                </div>
+                              </div>
+                            ) : duracionMin < 30 ? (
                               // CITA CORTA (< 30 min): 1 línea ultra compacta
                               <div className="flex items-center gap-1.5 min-w-0 text-[10px] leading-tight">
                                 <span className="font-mono font-bold shrink-0">{horaInicio}</span>

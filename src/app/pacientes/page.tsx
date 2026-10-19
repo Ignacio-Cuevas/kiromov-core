@@ -453,12 +453,12 @@ export default function PacientesPage() {
           </div>
         </div>
 
-        {/* 2. BANDEJA DE FILTROS UNIFICADA DE UN SOLO PISO (Barra de Herramientas Compacta) */}
-        <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+        {/* 2. BANDEJA DE FILTROS UNIFICADA DE UN SOLO PISO (Barra de Herramientas Compacta, Sticky en Móvil) */}
+        <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sticky top-14 sm:static z-20">
           
-          {/* Lado Izquierdo: Buscador con atajo ⌘K + Selector Segmento TMO */}
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="relative flex-1 max-w-sm sm:max-w-md">
+          {/* Lado Izquierdo: Buscador a ancho completo en móvil con atajo ⌘K + Selector Segmento TMO */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 min-w-0">
+            <div className="relative w-full flex-1 sm:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <input
                 id="pacientes-search-input"
@@ -466,29 +466,29 @@ export default function PacientesPage() {
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
                 placeholder="Buscar por nombre, RUT o teléfono..."
-                className="w-full pl-9 pr-14 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-xs text-slate-900 placeholder:text-slate-400 rounded-lg border border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 outline-none transition-all"
+                className="w-full pl-9 pr-14 py-2 sm:py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-base sm:text-xs text-slate-900 placeholder:text-slate-400 rounded-lg border border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 outline-none transition-all"
               />
               {busqueda ? (
                 <button
                   type="button"
                   onClick={() => setBusqueda('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
                 >
                   ✕
                 </button>
               ) : (
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200 pointer-events-none">
+                <span className="hidden sm:inline absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200 pointer-events-none">
                   ⌘K
                 </span>
               )}
             </div>
 
             {/* Selector de Segmento TMO Compacto */}
-            <div className="shrink-0">
+            <div className="shrink-0 w-full sm:w-auto">
               <select
                 value={filtroSegmento}
                 onChange={(e) => setFiltroSegmento(e.target.value)}
-                className="h-8 px-2.5 py-1 bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg focus:outline-none focus:border-emerald-500 cursor-pointer"
+                className="w-full sm:w-auto h-9 sm:h-8 px-2.5 py-1 bg-slate-50 border border-slate-200 text-slate-700 text-base sm:text-xs font-semibold rounded-lg focus:outline-none focus:border-emerald-500 cursor-pointer"
               >
                 <option value="todos">🦴 Segmento TMO: Todos ({pacientes.length})</option>
                 <option value="lumbar">🦴 Lumbar / Pelvis</option>
