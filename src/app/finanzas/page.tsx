@@ -78,6 +78,28 @@ const CATEGORIAS_EGRESO = [
 // Fecha en que comenzó la operación formal de cobros en Kiromov Core
 const FECHA_CORTE_OPERACIONAL = '2026-09-01';
 
+// Estados que NO generan cobro ni deuda
+const ESTADOS_CANCELADOS = [
+  'cancelada',
+  'cancelado',
+  'anulada',
+  'anulado',
+  'no_asiste',
+  'no_asistio',
+  'inasistencia',
+  'reprogramada'
+];
+
+// Estados que corresponden a atenciones efectivamente realizadas
+const ESTADOS_ATENDIDOS = [
+  'asistio',
+  'asistió',
+  'atendido',
+  'atendida',
+  'completada',
+  'completado'
+];
+
 function FinanzasContent() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
@@ -187,7 +209,7 @@ function FinanzasContent() {
         supabase
           .from('citas_atenciones')
           .select('*, pacientes(id, nombre_completo, rut, telefono, prevision, prevision_salud)')
-          .in('estado', ['asistio', 'asistió', 'Asistió', 'atendido', 'atendida'])
+          .not('estado', 'in', '("cancelada","cancelado","anulada","anulado","no_asiste","no_asistio","inasistencia","reprogramada")')
           .order('fecha', { ascending: true }),
         supabase
           .from('compras_planes')
@@ -306,20 +328,31 @@ function FinanzasContent() {
         0
       );
 
-      // 2. Citas efectivamente asistidas desde la fecha de corte (ignorar citas de marzo/abril/mayo)
-      const citasAsistidasValidas = citas
-        .filter((c) => {
-          if (c.paciente_id !== pacId) return false;
-          const st = String(c.estado || '').toLowerCase().trim();
-          const esAsistio = st === 'asistio' || st === 'asistió' || st === 'atendido' || st === 'atendida';
-          return (
-            esAsistio &&
-            c.fecha &&
-            c.fecha >= FECHA_CORTE_OPERACIONAL &&
-            c.fecha <= hoyStr
-          );
-        })
-        .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+      // 2. Citas particulares del paciente desde la fecha de corte hasta hoy
+      const citasPaciente = citas.filter((c) => {
+        if (c.paciente_id !== pacId) return false;
+        return c.fecha && c.fecha >= FECHA_CORTE_OPERACIONAL && c.fecha <= hoyStr;
+      });
+
+      // Filtrado Estricto de Citas Atendidas:
+      // Considerar únicamente aquellas que correspondan a atenciones efectivamente realizadas
+      // y excluir taxativamente cualquier cita cancelada o no asistida
+      const citasEfectivas = citasPaciente.filter((c) => {
+        const estadoNormalizado = (c.estado || '').toLowerCase().trim();
+        const esCancelada = ESTADOS_CANCELADOS.includes(estadoNormalizado);
+
+        // Si la cita está cancelada o anulada, NUNCA genera cobro
+        if (esCancelada) return false;
+
+        // Si existe flag explícito de asistencia, validarlo
+        if (c.asistio === false) return false;
+
+        // Solo considerar citas atendidas/completadas (o con flag asistio explícito)
+        const esAtendida = ESTADOS_ATENDIDOS.includes(estadoNormalizado) || c.asistio === true;
+        if (!esAtendida) return false;
+
+        return true;
+      }).sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 
       // Cantidad de sesiones cubiertas por planes contratados
       const totalSesionesCubiertasPorPlanes = planesPaciente.reduce(
@@ -330,8 +363,8 @@ function FinanzasContent() {
       // Citas particulares que exceden los planes (o todas si no tiene plan)
       const numCitasParticulares =
         planesPaciente.length === 0
-          ? citasAsistidasValidas.length
-          : Math.max(0, citasAsistidasValidas.length - totalSesionesCubiertasPorPlanes);
+          ? citasEfectivas.length
+          : Math.max(0, citasEfectivas.length - totalSesionesCubiertasPorPlanes);
 
       // 3. Pagos realizados por el paciente para citas particulares (Desde septiembre a la fecha)
       const pagosCitasPaciente = pagos.filter((pp) => {
@@ -351,8 +384,11 @@ function FinanzasContent() {
 
       const numPagosRealizados = pagosCitasPaciente.length;
 
-      // 4. Balance de sesiones (Regla 1 a 1: 1 cita asistida queda saldada con 1 pago individual)
-      const sesionesImpagas = Math.max(0, numCitasParticulares - numPagosRealizados);
+      // 4. Balance de sesiones particulares impagas
+      // Si citasEfectivas.length === 0 (como en el caso de Mónica y Jorge, cuya única cita fue cancelada), la deuda particular debe ser estrictamente $0.
+      const sesionesImpagas = citasEfectivas.length === 0
+        ? 0
+        : Math.max(0, numCitasParticulares - numPagosRealizados);
 
       // Datos del paciente para arancel y ficha clínica
       const pacienteData =
@@ -392,8 +428,8 @@ function FinanzasContent() {
         // Detalle de citas particulares impagas
         if (deudaCitas > 0) {
           const citasParticularesList = planesPaciente.length === 0
-            ? citasAsistidasValidas
-            : citasAsistidasValidas.slice(totalSesionesCubiertasPorPlanes);
+            ? citasEfectivas
+            : citasEfectivas.slice(totalSesionesCubiertasPorPlanes);
 
           const citasImpagasDetalle = sesionesImpagas > 0
             ? citasParticularesList.slice(-sesionesImpagas)
