@@ -244,6 +244,46 @@ export interface EvaluacionInicialTMO {
   datos_segmento: any;
   diagnostico_tmo: string;
   plan_tratamiento: string;
+
+  // Campos expandidos de evaluación y trabajo
+  ocupacion_laboral?: string | null;
+  puesto_trabajo_ergonomia?: string | null;
+  habitos_actividad_fisica?: string | null;
+  cirugias_traumatismos?: string | null;
+  farmacos_actuales?: string | null;
+  banderas_rojas_alerta?: string | null;
+  apto_hvla?: boolean;
+
+  // Síntoma
+  motivo_consulta?: string | null;
+  inicio_sintoma_cronologia?: string | null;
+  tiempo_evolucion?: string | null;
+  comportamiento_24h?: string | null;
+  factores_agravantes_aliviantes?: string | null;
+  irritabilidad_tisular?: string | null;
+  dolor_inicial_ena?: number | null;
+
+  // Examen Físico
+  inspeccion_postura?: string | null;
+  movilidad_activa_rom?: string | null;
+  juego_articular_joint_play?: string | null;
+  neurodinamia_basal?: string | null;
+  pruebas_especiales_ortopedicas?: string | null;
+  pruebas_funcionales_control_motor?: string | null;
+  hallazgos_relevantes?: string | null;
+
+  // Diagnósticos y Razonamiento Biomecánico
+  cie10_codigo?: string | null;
+  cie10_glosa?: string | null;
+  cie11_codigo?: string | null;
+  cie11_glosa?: string | null;
+  diagnostico_cif?: string | null;
+  diagnostico_apta?: string | null;
+  diagnostico_tmo_biomecanico?: string | null;
+  razonamiento_clinico?: string | null;
+  objetivos_terapeuticos?: string | null;
+  pronostico_sesiones?: string | null;
+
   created_at?: string;
   updated_at?: string;
 }

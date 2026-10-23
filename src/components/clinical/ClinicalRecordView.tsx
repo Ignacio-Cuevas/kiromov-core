@@ -42,7 +42,9 @@ import {
   Stethoscope,
   Receipt,
   FileCheck2,
-  UserCheck
+  UserCheck,
+  Brain,
+  Sparkles
 } from 'lucide-react';
 
 export interface ClinicalRecordViewProps {
@@ -855,8 +857,16 @@ export function ClinicalRecordView({
                       <p><strong>Control Motor:</strong> {evaluacionInicialTMO?.pruebas_funcionales_control_motor || '-'}</p>
                     </div>
                     
-                    <div className="md:col-span-2 bg-blue-50/50 p-3 rounded-lg border border-blue-100">
-                      <span className="font-bold text-blue-900 block mb-1">Codificación Internacional Completa</span>
+                    <div className="md:col-span-2 bg-blue-50/50 p-3 rounded-lg border border-blue-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-blue-900 block">Codificación Internacional Completa</span>
+                        {(evaluacionInicialTMO?.razonamiento_clinico || evaluacionInicialTMO?.datos_segmento?.razonamiento_clinico) && (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                            <Brain className="w-3 h-3" />
+                            <span>Razonamiento Biomecánico Registrado</span>
+                          </span>
+                        )}
+                      </div>
                       <p><strong>CIE-10:</strong> {evaluacionInicialTMO?.cie10_codigo || '-'} {evaluacionInicialTMO?.cie10_glosa && `— ${evaluacionInicialTMO.cie10_glosa}`}</p>
                       <p><strong>CIE-11:</strong> {evaluacionInicialTMO?.cie11_codigo || '-'} {evaluacionInicialTMO?.cie11_glosa && `— ${evaluacionInicialTMO.cie11_glosa}`}</p>
                       <p><strong>CIF:</strong> {evaluacionInicialTMO?.diagnostico_cif || '-'}</p>
@@ -1415,22 +1425,58 @@ export function ClinicalRecordView({
                   </div>
                 </div>
 
-                {/* Pruebas Físicas (Expansible o directo) */}
+                {/* Pruebas Físicas */}
                 <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
                     2. Pruebas y Segmento
                   </h3>
                   <div className="space-y-2 text-xs">
-                    <p><span className="font-bold text-slate-700 block mb-1">Pruebas Especiales Ortopédicas:</span> <span className="text-slate-800">{evaluacionInicialTMO.pruebas_especiales_ortopedicas || 'Sin pruebas registradas'}</span></p>
+                    <div>
+                      <span className="font-bold text-slate-700 block mb-1">Pruebas Especiales Ortopédicas:</span>
+                      <p className="text-slate-800 whitespace-pre-line bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                        {evaluacionInicialTMO.pruebas_especiales_ortopedicas || 'Sin pruebas registradas'}
+                      </p>
+                    </div>
+
+                    {evaluacionInicialTMO.datos_segmento?.clusters_detectados && (
+                      <div className="mt-2 p-2.5 bg-purple-50/80 border border-purple-200 rounded-lg">
+                        <span className="font-bold text-purple-900 block mb-0.5 text-[11px] uppercase tracking-wide">
+                          🎯 Clusters Clínicos Validados:
+                        </span>
+                        <p className="text-purple-900 font-medium">{evaluacionInicialTMO.datos_segmento.clusters_detectados}</p>
+                      </div>
+                    )}
+
                     <p className="mt-2"><span className="font-bold text-slate-700 block mb-1">Control Motor y Funcional:</span> <span className="text-slate-800">{evaluacionInicialTMO.pruebas_funcionales_control_motor || 'Sin alteraciones funcionales'}</span></p>
                     <p className="mt-2 text-slate-800"><span className="font-bold text-slate-700">Movilidad y Neurodinamia:</span> ROM: {evaluacionInicialTMO.movilidad_activa_rom || 'Completo'} · Neurodinamia: {evaluacionInicialTMO.neurodinamia_basal || 'Normal'}</p>
                   </div>
                 </div>
 
-                {/* Diagnóstico y Plan */}
+                {/* 3. Razonamiento Clínico Biomecánico & Triaje TMO */}
+                {(evaluacionInicialTMO.razonamiento_clinico || evaluacionInicialTMO.datos_segmento?.razonamiento_clinico) && (
+                  <div className="col-span-1 md:col-span-2 bg-gradient-to-br from-white to-blue-50/40 p-5 rounded-xl border border-blue-200 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between border-b border-blue-100 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Brain className="w-4 h-4 text-blue-600" />
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-blue-900">
+                          3. Razonamiento Clínico Biomecánico & Triaje TMO
+                        </h3>
+                      </div>
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                        Motor Biomecánico KIROMOV (APTA / IFOMPT)
+                      </span>
+                    </div>
+
+                    <div className="text-xs font-mono text-slate-800 bg-white p-4 rounded-xl border border-slate-200 whitespace-pre-wrap leading-relaxed shadow-2xs">
+                      {evaluacionInicialTMO.razonamiento_clinico || evaluacionInicialTMO.datos_segmento?.razonamiento_clinico}
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Diagnóstico TMO y Plan */}
                 <div className="col-span-1 md:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
-                    3. Diagnóstico y Plan
+                    4. Diagnóstico TMO y Plan de Tratamiento
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div>
@@ -1452,11 +1498,11 @@ export function ClinicalRecordView({
                   </div>
                 </div>
 
-                {/* 4. Codificación Clínica y Estándares Internacionales */}
+                {/* 5. Codificación Clínica y Estándares Internacionales */}
                 {(evaluacionInicialTMO.cie10_codigo || evaluacionInicialTMO.diagnostico_cif || evaluacionInicialTMO.diagnostico_apta) && (
                   <div className="col-span-1 md:col-span-2 mt-2 p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
                     <h4 className="text-xs font-bold uppercase text-slate-500 tracking-wider">
-                      4. Codificación Clínica y Estándares Internacionales
+                      5. Codificación Clínica y Estándares Internacionales
                     </h4>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1926,20 +1972,45 @@ export function ClinicalRecordView({
                 hipotesis_diagnostica_tmo: form.diagnostico_tmo_biomecanico || null,
                 objetivos_terapeuticos: form.objetivos_terapeuticos || null,
                 pronostico_sesiones: form.pronostico_sesiones || null,
+                razonamiento_clinico: form.razonamiento_clinico || null,
+
+                // Datos estructurados en JSONB garantizado
+                datos_segmento: {
+                  pruebas_estructuradas: form.pruebas_estructuradas || {},
+                  segmento_activo: form.segmentoActivo || null,
+                  razonamiento_clinico: form.razonamiento_clinico || null,
+                  clusters_detectados: form.clusters_detectados || null,
+                },
                 
                 // Soporte Legacy (necesario por dependencias de type de la db)
-                segmento_evaluado: 'Columna / General',
+                segmento_evaluado: form.segmentoActivo || 'Columna / General',
                 diagnostico_tmo: form.diagnostico_tmo_biomecanico || null,
                 plan_tratamiento: (form.objetivos_terapeuticos || '') + '\n\n' + (form.pronostico_sesiones || ''),
               };
               
+              let saveError = null;
               if (evaluacionInicialTMO?.id && modoEvaluacion === 'editar') {
                 const { error } = await supabaseClient.from('evaluaciones_iniciales_tmo').update(payload).eq('id', evaluacionInicialTMO.id);
-                if (error) throw error;
+                saveError = error;
               } else {
                 const { error } = await supabaseClient.from('evaluaciones_iniciales_tmo').insert([payload]);
-                if (error) throw error;
+                saveError = error;
               }
+
+              // Resiliencia si la columna razonamiento_clinico aún no está aplicada en la instancia remota
+              if (saveError && (saveError.message?.includes('razonamiento_clinico') || saveError.code === '42703')) {
+                console.warn('Columna razonamiento_clinico no encontrada, persistiendo en datos_segmento JSONB...');
+                delete payload.razonamiento_clinico;
+                if (evaluacionInicialTMO?.id && modoEvaluacion === 'editar') {
+                  const { error } = await supabaseClient.from('evaluaciones_iniciales_tmo').update(payload).eq('id', evaluacionInicialTMO.id);
+                  saveError = error;
+                } else {
+                  const { error } = await supabaseClient.from('evaluaciones_iniciales_tmo').insert([payload]);
+                  saveError = error;
+                }
+              }
+
+              if (saveError) throw saveError;
               
               toast.success('Evaluación Inicial guardada correctamente');
               setAbrirEvaluacionModal(false);
