@@ -89,6 +89,7 @@ export interface EgresoCaja {
   observacion?: string | null;
   comprobante_ref?: string | null;
   responsable?: string;
+  sede?: string;
   created_at?: string;
 }
 
@@ -106,6 +107,7 @@ export interface VistaResumenPaciente {
   ultima_atencion: string | null;
   dias_sin_atencion: number | null;
   estado_plan: EstadoPlan;
+  sede?: string;
   fecha_nacimiento?: string | null;
   prevision_salud?: PrevisionSalud | string | null;
   motivo_consulta?: string | null;
@@ -123,6 +125,7 @@ export interface Paciente {
   rut: string;
   telefono: string;
   email?: string | null;
+  sede?: string;
   fecha_nacimiento?: string | null;
   prevision_salud?: PrevisionSalud | string | null;
   categoria_tarifa?: "particular_vigente" | "convenio" | "tarifa_antigua" | "personalizada" | string | null;
@@ -143,20 +146,21 @@ export interface CompraPlan {
   plan_id?: string | null;
   nombre_plan: string;
   total_sesiones: number;
-    sesiones_usadas?: number;
+  sesiones_usadas?: number;
   precio_base?: number;
   descuento_clp?: number;
   codigo_cupon?: string | null;
   valor_total: number;
-    monto_clp?: number;
+  monto_clp?: number;
   numero_boleta?: string | null;
   metodo_pago?: MedioPago;
-    estado_pago?: EstadoPago | 'parcial' | 'pendiente' | string;
+  estado_pago?: EstadoPago | 'parcial' | 'pendiente' | string;
   monto_pagado?: number;
   saldo_pendiente?: number;
   fecha_compra: string;
   estado: "activo" | "finalizado" | "cancelado";
   notas?: string | null;
+  sede?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -183,6 +187,8 @@ export interface CitaAtencion {
   fecha: string;
   hora: string;
   profesional: string;
+  profesional_email?: string;
+  sede?: string;
   estado: EstadoAtencion;
   estado_pago?: "pagado" | "cubierto_por_plan" | "pendiente_pago" | "cortesia" | string | null;
   monto_cobrado?: number | null;
@@ -297,5 +303,6 @@ export interface PagoPaciente {
   estado: "completado" | "anulado" | string;
   fecha: string;
   notas?: string | null;
+  sede?: string;
   created_at?: string;
 }

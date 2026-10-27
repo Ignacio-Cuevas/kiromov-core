@@ -14,6 +14,9 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { nombre, rut, telefono, email, prevision, motivo, fecha, hora } = body;
+    const sede = body.sede || 'chillan';
+    const profesionalNombre = sede === 'concepcion' ? 'Klgo. Michael Pinto M.' : 'Klgo. Ignacio Cuevas Silva';
+    const profesionalEmail = sede === 'concepcion' ? 'michael@kiromov.cl' : 'ignacio@kiromov.cl';
 
     if (!nombre || !telefono || !fecha || !hora) {
       return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 });
@@ -89,6 +92,7 @@ export async function POST(req: Request) {
           prevision: prevision || 'Particular',
           motivo_consulta: motivo || 'Evaluación Inicial TMO (60 min)',
           estado: 'activo',
+          sede: sede,
         }])
         .select()
         .single();
@@ -111,8 +115,10 @@ export async function POST(req: Request) {
         hora: horaNormalizada,
         estado: 'confirmada',
         motivo_consulta: motivo || 'Evaluación Inicial TMO (60 min)',
-        profesional: 'Klgo. Ignacio Cuevas Silva',
-        notas: 'Reserva Online Portal Nativo (/agendar)',
+        profesional: profesionalNombre,
+        profesional_email: profesionalEmail,
+        sede: sede,
+        notas: `Reserva Online Portal Nativo (/agendar) - Sede ${sede === 'concepcion' ? 'Concepción' : 'Chillán'}`,
       }])
       .select()
       .single();

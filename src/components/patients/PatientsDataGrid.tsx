@@ -30,6 +30,7 @@ export interface PacienteResumen {
   prevision: string;
   prevision_salud?: string | null;
   estado: string;
+  sede?: string;
   plan_id: string | null;
   nombre_plan: string | null;
   total_sesiones: number;
@@ -179,6 +180,13 @@ export function PatientsDataGrid({
                         </button>
                         <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-mono tabular-nums leading-none mt-0.5">
                           <span>{p.rut ? formatRut(p.rut) : 'Sin RUT'}</span>
+                          <span className={`text-[9px] px-1 py-0.2 rounded font-sans font-semibold ${
+                            (p.sede || 'chillan') === 'concepcion'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-blue-50 text-blue-700 border border-blue-200'
+                          }`}>
+                            {(p.sede || 'chillan') === 'concepcion' ? 'Concepción' : 'Chillán'}
+                          </span>
                           {esRiesgo && (
                             <span 
                               className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" 

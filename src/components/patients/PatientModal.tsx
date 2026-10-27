@@ -16,6 +16,7 @@ import { Patient, HealthInsurance } from '@/types/clinical';
 import { createClient } from '@/utils/supabase/client';
 import { formatRut, validateRut } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useSede } from '@/context/SedeContext';
 import {
   UserPlus,
   User,
@@ -45,6 +46,7 @@ export function PatientModal({
   onPatientSaved,
 }: PatientModalProps) {
   const supabase = createClient();
+  const { sedeActiva } = useSede();
 
   const [nombreCompleto, setNombreCompleto] = useState('');
   const [rut, setRut] = useState('');
@@ -175,6 +177,7 @@ export function PatientModal({
         diagnostico_principal: diagnosticoPrincipal?.trim() || null,
         antecedentes_morbidos: antecedentesMorbidos?.trim() || null,
         alertas_seguridad: alertasSeguridad?.trim() || null,
+        sede: (patientToEdit as any)?.sede || sedeActiva,
         estado: 'activo'
       };
 

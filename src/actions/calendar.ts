@@ -13,6 +13,7 @@ export async function crearEventoGoogleCalendar(params: {
   fecha: string;
   hora: string;
   motivo?: string | null;
+  calendarId?: string;
 }) {
   return await crearEventoGoogleCalendarUtil(params);
 }

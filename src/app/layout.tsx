@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { SedeProvider } from "@/context/SedeContext";
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
@@ -33,22 +34,24 @@ export default function RootLayout({
   return (
     <html lang="es" className={`h-full ${inter.variable}`}>
       <body className="bg-slate-50/60 text-slate-900 antialiased flex flex-col min-h-full font-sans">
-        <div className="flex min-h-screen bg-slate-50/60 text-slate-900 antialiased">
-          {/* Sidebar fijo en escritorio */}
-          <Sidebar />
+        <SedeProvider>
+          <div className="flex min-h-screen bg-slate-50/60 text-slate-900 antialiased">
+            {/* Sidebar fijo en escritorio */}
+            <Sidebar />
 
-          {/* Área de contenido */}
-          <div className="flex-1 flex flex-col min-w-0">
-            <TopBar />
-            <main className="flex-1 p-3 sm:p-4 md:p-6 pb-20 md:pb-6 overflow-y-auto overflow-x-hidden">
-              {children}
-            </main>
+            {/* Área de contenido */}
+            <div className="flex-1 flex flex-col min-w-0">
+              <TopBar />
+              <main className="flex-1 p-3 sm:p-4 md:p-6 pb-20 md:pb-6 overflow-y-auto overflow-x-hidden">
+                {children}
+              </main>
+            </div>
+
+            {/* Barra inferior en móviles */}
+            <BottomNav />
           </div>
-
-          {/* Barra inferior en móviles */}
-          <BottomNav />
-        </div>
-        <Toaster position="top-right" richColors closeButton />
+          <Toaster position="top-right" richColors closeButton />
+        </SedeProvider>
       </body>
     </html>
   );

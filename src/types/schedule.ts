@@ -19,6 +19,8 @@ export const scheduleAppointmentSchema = z.object({
   motivo_consulta: z.string().trim().min(2, 'El motivo de consulta es obligatorio'),
   box: z.string(),
   profesional: z.string(),
+  sede: z.enum(['chillan', 'concepcion']).optional(),
+  profesional_email: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.isNewPatient) {
     if (!data.nombre_completo || data.nombre_completo.trim().length < 3) {

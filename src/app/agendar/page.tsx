@@ -18,10 +18,12 @@ import {
   ChevronRight,
   AlertCircle,
   Loader2,
-  CalendarCheck
+  CalendarCheck,
+  MessageCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatRut } from '@/lib/utils';
+import { SedeId, SEDES_CONFIG } from '@/config/sedes';
 
 interface ServiceOption {
   id: string;
@@ -67,7 +69,10 @@ const PREVISIONES = [
 ];
 
 export default function AgendarOnlinePage() {
-  // Pasos: 1 = Servicio, 2 = Fecha y Hora, 3 = Datos Paciente, 4 = Éxito
+  // Sede: 'chillan' | 'concepcion'
+  const [sedeSeleccionada, setSedeSeleccionada] = useState<SedeId>('chillan');
+
+  // Pasos: 1 = Sucursal & Servicio, 2 = Fecha y Hora, 3 = Datos Paciente, 4 = Éxito
   const [paso, setPaso] = useState<number>(1);
   const [servicioSeleccionado, setServicioSeleccionado] = useState<ServiceOption>(SERVICES[0]);
 
@@ -114,15 +119,19 @@ export default function AgendarOnlinePage() {
     servicio: string;
   } | null>(null);
 
-  // Cargar slots al cambiar la fecha
+  // Cargar slots al cambiar la fecha (únicamente para sede Chillán)
   useEffect(() => {
-    if (!fecha) return;
+    if (!fecha || sedeSeleccionada !== 'chillan') {
+      setSlots([]);
+      setLoadingSlots(false);
+      return;
+    }
 
     let isMounted = true;
     setLoadingSlots(true);
     setHoraSeleccionada('');
 
-    fetch(`/api/public/slots?fecha=${fecha}`)
+    fetch(`/api/public/slots?fecha=${fecha}&sede=chillan`)
       .then((res) => res.json())
       .then((data) => {
         if (!isMounted) return;
@@ -145,7 +154,7 @@ export default function AgendarOnlinePage() {
     return () => {
       isMounted = false;
     };
-  }, [fecha]);
+  }, [fecha, sedeSeleccionada]);
 
   // Formatear RUT reactivamente
   const handleRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -190,6 +199,7 @@ export default function AgendarOnlinePage() {
           fecha,
           hora: horaSeleccionada,
           tipo_motivo: servicioSeleccionado.id,
+          sede: sedeSeleccionada,
         }),
       });
 
@@ -220,6 +230,7 @@ export default function AgendarOnlinePage() {
   const generarEnlaceWhatsAppPaciente = () => {
     if (!reservaExitosa) return '#';
     const fechaLegible = formatFechaLegible(reservaExitosa.fecha);
+    const sedeActual = SEDES_CONFIG[sedeSeleccionada] || SEDES_CONFIG.chillan;
 
     const mensaje = 
       `*Comprobante de Reserva · KIROMOV Centro Clínico*\n\n` +
@@ -227,9 +238,10 @@ export default function AgendarOnlinePage() {
       `📋 *Servicio:* ${reservaExitosa.servicio}\n` +
       `📅 *Fecha:* ${fechaLegible}\n` +
       `⏰ *Horario:* ${reservaExitosa.hora} hrs\n` +
-      `👨‍⚕️ *Profesional:* Klgo. Ignacio Cuevas Silva\n\n` +
+      `📍 *Sede:* ${sedeActual.nombre} (${sedeActual.direccion})\n` +
+      `👨‍⚕️ *Profesional:* ${sedeActual.profesionalNombre}\n\n` +
       `*Indicaciones importantes para tu atención presencial:*\n` +
-      `📍 *Ubicación:* Edificio Aranjuez / Piso 7, Of. 75 (Bulnes 470, Chillán)\n` +
+      `📍 *Ubicación:* ${sedeActual.direccion}\n` +
       `⏰ *Puntualidad:* Llegar 5-10 min antes\n` +
       `👟 *Vestimenta:* Ropa cómoda o deportiva\n` +
       `📑 *Exámenes:* Traer radiografías o resonancias si tienes\n` +
@@ -244,6 +256,7 @@ export default function AgendarOnlinePage() {
     if (!reservaExitosa) return '#';
     const cleanFecha = reservaExitosa.fecha.replace(/-/g, '');
     const cleanHora = reservaExitosa.hora.replace(/:/g, '').slice(0, 4);
+    const sedeActual = SEDES_CONFIG[sedeSeleccionada] || SEDES_CONFIG.chillan;
     
     // 60 minutos después
     const [h, m] = reservaExitosa.hora.split(':').map(Number);
@@ -255,16 +268,16 @@ export default function AgendarOnlinePage() {
     const title = encodeURIComponent(`Kiromov: ${reservaExitosa.servicio}`);
     const details = encodeURIComponent(
       `Cita confirmada en Kiromov Centro Clínico.\n` +
-      `Profesional: Klgo. Ignacio Cuevas Silva\n` +
+      `Profesional: ${sedeActual.profesionalNombre}\n` +
       `Paciente: ${reservaExitosa.nombre}\n` +
       `Servicio: ${reservaExitosa.servicio}\n\n` +
-      `📍 Ubicación: Edificio Aranjuez / Piso 7, Of. 75 (Bulnes 470, Chillán)\n` +
+      `📍 Ubicación: ${sedeActual.direccion}\n` +
       `⏰ Puntualidad: Llegar 5-10 min antes\n` +
       `👟 Vestimenta: Ropa cómoda o deportiva\n` +
       `📑 Exámenes: Traer radiografías o resonancias si tienes\n` +
       `⏳ Cancelaciones: Con al menos 24 hrs de anticipación`
     );
-    const location = encodeURIComponent('Bulnes 470, Piso 7, Of. 75 (Edificio Aranjuez), Chillán');
+    const location = encodeURIComponent(sedeActual.direccion);
     const dates = `${cleanFecha}T${cleanHora}00/${cleanFecha}T${cleanEndHora}00`;
 
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}&location=${location}`;
@@ -281,6 +294,7 @@ export default function AgendarOnlinePage() {
     const endH = String(Math.floor(endMinutes / 60)).padStart(2, '0');
     const endM = String(endMinutes % 60).padStart(2, '0');
     const cleanEndHora = `${endH}${endM}`;
+    const sedeActual = SEDES_CONFIG[sedeSeleccionada] || SEDES_CONFIG.chillan;
 
     const icsContent = [
       'BEGIN:VCALENDAR',
@@ -291,8 +305,8 @@ export default function AgendarOnlinePage() {
       `DTSTART:${cleanFecha}T${cleanHora}00`,
       `DTEND:${cleanFecha}T${cleanEndHora}00`,
       `SUMMARY:Kiromov: ${reservaExitosa.servicio}`,
-      `DESCRIPTION:Atención Kinésica y TMO con Klgo. Ignacio Cuevas Silva\\nPaciente: ${reservaExitosa.nombre}\\nServicio: ${reservaExitosa.servicio}\\n\\n📍 Ubicación: Edificio Aranjuez / Piso 7, Of. 75 (Bulnes 470, Chillán)\\n⏰ Puntualidad: Llegar 5-10 min antes\\n👟 Vestimenta: Ropa cómoda o deportiva\\n📑 Exámenes: Traer radiografías o resonancias si tienes\\n⏳ Cancelaciones: Con al menos 24 hrs de anticipación`,
-      'LOCATION:Bulnes 470, Piso 7, Of. 75, Edificio Aranjuez, Chillán',
+      `DESCRIPTION:Atención Kinésica y TMO con ${sedeActual.profesionalNombre}\\nPaciente: ${reservaExitosa.nombre}\\nServicio: ${reservaExitosa.servicio}\\n\\n📍 Ubicación: ${sedeActual.direccion}\\n⏰ Puntualidad: Llegar 5-10 min antes\\n👟 Vestimenta: Ropa cómoda o deportiva\\n📑 Exámenes: Traer radiografías o resonancias si tienes\\n⏳ Cancelaciones: Con al menos 24 hrs de anticipación`,
+      `LOCATION:${sedeActual.direccion}`,
       'STATUS:CONFIRMED',
       'END:VEVENT',
       'END:VCALENDAR',
@@ -347,7 +361,11 @@ export default function AgendarOnlinePage() {
           </p>
           <div className="flex items-center justify-center gap-1 text-xs font-medium text-slate-500 mt-2">
             <MapPin className="w-3.5 h-3.5 text-[#c2410c] shrink-0" />
-            <span>Bulnes 470, Of. 75, Chillán</span>
+            <span>
+              {sedeSeleccionada === 'concepcion'
+                ? 'Concepción (Apertura en coordinación directa)'
+                : 'Bulnes 470, Of. 75, Chillán'}
+            </span>
           </div>
         </header>
 
@@ -413,84 +431,226 @@ export default function AgendarOnlinePage() {
         <div className="bg-white border border-slate-200/90 rounded-3xl shadow-xl p-6 md:p-8 max-w-2xl mx-auto">
           
           {/* ======================================================== */}
-          {/* PASO 1: SELECCIÓN DE SERVICIO                            */}
+          {/* PASO 1: SELECCIÓN DE SUCURSAL Y SERVICIO                 */}
           {/* ======================================================== */}
           {paso === 1 && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-1">
-                  Paso 1: Selecciona el Tipo de Atención
+                  Paso 1: Selecciona tu Sucursal
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500">
-                  Ambas prestaciones son realizadas por el Klgo. Ignacio Cuevas Silva (Registro SIS N° 396889).
+                  Elige la sede en la que deseas atenderte con nuestro equipo clínico.
                 </p>
               </div>
 
-              <div className="space-y-4">
-                {SERVICES.map((servicio) => {
-                  const seleccionado = servicioSeleccionado.id === servicio.id;
-                  return (
-                    <div
-                      key={servicio.id}
-                      onClick={() => setServicioSeleccionado(servicio)}
-                      className={`rounded-2xl p-5 cursor-pointer transition-all relative ${
-                        seleccionado
-                          ? 'bg-slate-50/80 border-2 border-slate-900 shadow-md'
-                          : 'bg-white border border-slate-200 hover:border-slate-300 shadow-xs'
-                      }`}
+              {/* Tarjetas de Selección de Sucursal */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* 📍 Sede Chillán */}
+                <div
+                  onClick={() => setSedeSeleccionada('chillan')}
+                  className={`rounded-2xl p-4 sm:p-5 cursor-pointer transition-all border relative flex flex-col justify-between ${
+                    sedeSeleccionada === 'chillan'
+                      ? 'bg-blue-50/70 border-2 border-slate-900 shadow-md ring-1 ring-slate-900/10'
+                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60 shadow-xs'
+                  }`}
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 flex items-center gap-1">
+                        <span>📍</span> Sede Chillán
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        Online Activa
+                      </span>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 pt-1">
+                      Box Chillán
+                    </h3>
+                    <p className="text-xs text-slate-600 font-medium">
+                      Bulnes 470, Of. 75 · Klgo. Ignacio Cuevas
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Director Clínico · Registro SIS N° 396889
+                    </p>
+                  </div>
+                  <div className="mt-3.5 pt-3 border-t border-slate-200/80 flex items-center justify-between text-xs">
+                    <span className={`font-semibold ${sedeSeleccionada === 'chillan' ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
+                      {sedeSeleccionada === 'chillan' ? '✓ Seleccionada' : 'Elegir Chillán'}
+                    </span>
+                    <span className="text-blue-600 font-semibold text-xs flex items-center gap-0.5">
+                      Agendar Online <ChevronRight className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
+
+                {/* 📍 Sede Concepción */}
+                <div
+                  onClick={() => setSedeSeleccionada('concepcion')}
+                  className={`rounded-2xl p-4 sm:p-5 cursor-pointer transition-all border relative flex flex-col justify-between ${
+                    sedeSeleccionada === 'concepcion'
+                      ? 'bg-emerald-50/70 border-2 border-emerald-600 shadow-md ring-1 ring-emerald-600/10'
+                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60 shadow-xs'
+                  }`}
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 flex items-center gap-1">
+                        <span>📍</span> Sede Concepción
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300">
+                        WhatsApp Directo
+                      </span>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 pt-1">
+                      Sede Concepción
+                    </h3>
+                    <p className="text-xs text-slate-600 font-medium">
+                      Klgo. Michael Pinto M.
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Director Clínico · Registro SIS N° 404500
+                    </p>
+                  </div>
+                  <div className="mt-3.5 pt-3 border-t border-slate-200/80 flex items-center justify-between text-xs">
+                    <span className={`font-semibold ${sedeSeleccionada === 'concepcion' ? 'text-emerald-700 font-bold' : 'text-slate-400'}`}>
+                      {sedeSeleccionada === 'concepcion' ? '✓ Seleccionada' : 'Elegir Concepción'}
+                    </span>
+                    <span className="text-emerald-700 font-semibold text-xs flex items-center gap-0.5">
+                      Coordinar WhatsApp <ChevronRight className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Caso Sede Concepción: Tarjeta de Coordinación Directa vía WhatsApp */}
+              {sedeSeleccionada === 'concepcion' && (
+                <div className="p-6 rounded-2xl bg-emerald-50/60 border border-emerald-200/90 shadow-sm space-y-4 animate-in fade-in-50 duration-200">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-base shrink-0 shadow-sm">
+                      MP
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
+                        {SEDES_CONFIG.concepcion.mensajeAgendaPausada?.titulo}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+                        {SEDES_CONFIG.concepcion.mensajeAgendaPausada?.bajada}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-white border border-emerald-100 text-xs text-slate-700 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-900">👨‍⚕️ Profesional:</span>
+                      <span>Klgo. Michael Pinto M. · Director Clínico (Registro SIS N° 404500)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-900">📍 Ubicación:</span>
+                      <span>Concepción (Apertura en coordinación)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-900">📱 WhatsApp:</span>
+                      <span className="font-mono font-bold text-emerald-700">+56 9 9091 5094</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <a
+                      href="https://api.whatsapp.com/send?phone=56990915094&text=Hola%20Michael%2C%20quisiera%20consultar%20por%20horas%20y%20disponibilidad%20de%20atenci%C3%B3n%20kinesiol%C3%B3gica%20en%20Concepci%C3%B3n."
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full min-h-[48px] h-14 bg-[#25D366] hover:bg-[#20ba59] active:scale-[0.99] text-white font-extrabold text-sm sm:text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-2.5 cursor-pointer px-6"
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-base font-bold text-slate-900">
-                              {servicio.title}
-                            </h3>
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                              {servicio.duration}
+                      <MessageCircle className="w-5 h-5 fill-current" />
+                      <span>Coordinar Hora por WhatsApp con Michael (+56 9 9091 5094)</span>
+                    </a>
+                    <p className="text-center text-[11px] text-slate-500 mt-2 font-medium">
+                      Te responderemos a la brevedad para coordinar día y horario según disponibilidad.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Caso Sede Chillán: Selección de Tipo de Atención */}
+              {sedeSeleccionada === 'chillan' && (
+                <div className="space-y-4 pt-1 animate-in fade-in-50 duration-200">
+                  <div className="border-t border-slate-100 pt-4">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900 mb-1">
+                      Selecciona el Tipo de Atención en Chillán
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Ambas prestaciones son realizadas por el Klgo. Ignacio Cuevas Silva (Registro SIS N° 396889).
+                    </p>
+                  </div>
+
+                  <div className="space-y-3.5">
+                    {SERVICES.map((servicio) => {
+                      const seleccionado = servicioSeleccionado.id === servicio.id;
+                      return (
+                        <div
+                          key={servicio.id}
+                          onClick={() => setServicioSeleccionado(servicio)}
+                          className={`rounded-2xl p-4 sm:p-5 cursor-pointer transition-all relative ${
+                            seleccionado
+                              ? 'bg-slate-50/80 border-2 border-slate-900 shadow-md'
+                              : 'bg-white border border-slate-200 hover:border-slate-300 shadow-xs'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-base font-bold text-slate-900">
+                                  {servicio.title}
+                                </h3>
+                                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                  {servicio.duration}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 font-medium">
+                                {servicio.subtitle}
+                              </p>
+                              <p className="text-xs text-slate-600 pt-1 leading-relaxed">
+                                {servicio.description}
+                              </p>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <span className="text-xl font-bold text-slate-900 font-mono">
+                                {servicio.price}
+                              </span>
+                              <span className="block text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                                CLP
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="mt-3.5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs">
+                            <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1.5">
+                              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                              Reembolsable Isapre / Seguros Complementarios
+                            </span>
+                            <span className={`text-xs font-semibold ${seleccionado ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
+                              {seleccionado ? '✓ Seleccionado' : 'Elegir'}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-500 font-medium">
-                            {servicio.subtitle}
-                          </p>
-                          <p className="text-xs text-slate-600 pt-1 leading-relaxed">
-                            {servicio.description}
-                          </p>
                         </div>
+                      );
+                    })}
+                  </div>
 
-                        <div className="text-right shrink-0">
-                          <span className="text-xl font-bold text-slate-900 font-mono">
-                            {servicio.price}
-                          </span>
-                          <span className="block text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
-                            CLP
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mt-3.5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                        <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1.5">
-                          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                          Reembolsable Isapre / Seguros Complementarios
-                        </span>
-                        <span className={`text-xs font-semibold ${seleccionado ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
-                          {seleccionado ? '✓ Seleccionado' : 'Elegir'}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="pt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setPaso(2)}
-                  className="w-full sm:w-auto bg-[#c2410c] hover:bg-[#9a3412] text-white font-bold py-3.5 px-6 rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 text-sm"
-                >
-                  Continuar a Selección de Fecha
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setPaso(2)}
+                      className="w-full sm:w-auto bg-[#c2410c] hover:bg-[#9a3412] text-white font-bold py-3.5 px-6 rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 text-sm"
+                    >
+                      Continuar a Selección de Fecha y Horario
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -840,7 +1000,7 @@ export default function AgendarOnlinePage() {
                     Ubicación del Centro
                   </span>
                   <p className="text-sm text-slate-700">
-                    Edificio Aranjuez / Piso 7, Of. 75 (Bulnes 470, Chillán)
+                    {SEDES_CONFIG[sedeSeleccionada]?.direccion || 'Bulnes 470, Of. 75, Chillán'}
                   </p>
                 </div>
               </div>
@@ -854,7 +1014,7 @@ export default function AgendarOnlinePage() {
                   <ul className="text-xs text-slate-600 space-y-2 list-none pl-1">
                     <li className="flex items-start gap-2">
                       <span className="text-slate-400">•</span>
-                      <span><strong className="text-slate-900">Ubicación:</strong> Edificio Aranjuez / Piso 7, Of. 75 (Bulnes 470, Chillán).</span>
+                      <span><strong className="text-slate-900">Ubicación:</strong> {SEDES_CONFIG[sedeSeleccionada]?.direccion || 'Bulnes 470, Of. 75, Chillán'}.</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-slate-400">•</span>

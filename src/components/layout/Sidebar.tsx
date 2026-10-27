@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Calendar, Users, CreditCard, ClipboardList, LogOut } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useSede } from '@/context/SedeContext';
 
 interface NavItem {
   name: string;
@@ -42,6 +43,7 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { sedeActiva, sedeConfig } = useSede();
 
   // No renderizar en la vista de login ni en portal de agendamiento
   if (pathname === '/login' || pathname.startsWith('/agendar')) return null;
@@ -112,15 +114,21 @@ export function Sidebar() {
       <div className="p-3.5 border-t border-slate-800/90 bg-slate-950/40 mt-auto">
         <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800/80">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
-              IC
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border ${
+              sedeActiva === 'concepcion'
+                ? 'bg-emerald-600/20 border-emerald-500/30 text-emerald-400'
+                : 'bg-blue-600/20 border-blue-500/30 text-blue-400'
+            }`}>
+              {sedeActiva === 'concepcion' ? 'MP' : 'IC'}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-white truncate leading-tight">
-                Klgo. Ignacio Cuevas Silva
+                {sedeActiva === 'concepcion' ? 'Klgo. Michael Pinto M.' : 'Klgo. Ignacio Cuevas Silva'}
               </p>
-              <p className="text-[10px] font-medium text-blue-400/90 truncate leading-tight mt-0.5">
-                Director Clínico • SIS N° 396889
+              <p className={`text-[10px] font-medium truncate leading-tight mt-0.5 ${
+                sedeActiva === 'concepcion' ? 'text-emerald-400/90' : 'text-blue-400/90'
+              }`}>
+                Director Clínico • SIS N° {sedeActiva === 'concepcion' ? '404500' : '396889'}
               </p>
             </div>
           </div>

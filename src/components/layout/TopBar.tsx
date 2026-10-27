@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { Search, MapPin, User, ArrowRight, X, Loader2 } from 'lucide-react';
+import { Search, MapPin, User, ArrowRight, X, Loader2, ArrowLeftRight } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import ClinicalRecordView from '@/components/clinical/ClinicalRecordView';
+import { useSede } from '@/context/SedeContext';
+import { toast } from 'sonner';
 
 interface PacienteResultado {
   id: string;
@@ -20,6 +22,7 @@ interface PacienteResultado {
 export function TopBar() {
   const pathname = usePathname();
   const supabase = createClient();
+  const { sedeActiva, toggleSede, setSede } = useSede();
 
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -241,13 +244,35 @@ export function TopBar() {
           )}
         </div>
 
-        {/* Identificador de Sucursal */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100/90 text-slate-700 text-xs font-semibold rounded-full border border-slate-200/80 shadow-2xs">
-            <span className="text-sm leading-none">📍</span>
-            <span className="hidden sm:inline">Box Chillán — Bulnes 470, Of. 75</span>
-            <span className="sm:hidden">Box Chillán</span>
-          </div>
+        {/* Selector Interactivo de Sede (1 Clic) */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              toggleSede();
+              const target = sedeActiva === 'chillan' ? 'Sede Concepción' : 'Box Chillán';
+              toast.info(`Cambiado a ${target}`, { duration: 2000 });
+            }}
+            className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border shadow-xs cursor-pointer select-none active:scale-95 ${
+              sedeActiva === 'chillan'
+                ? 'bg-blue-50/90 text-blue-900 border-blue-200/90 hover:bg-blue-100 hover:border-blue-300'
+                : 'bg-emerald-50/90 text-emerald-900 border-emerald-200/90 hover:bg-emerald-100 hover:border-emerald-300'
+            }`}
+            title="Alternar entre Sede Chillán y Sede Concepción"
+          >
+            <span className="flex items-center gap-1.5">
+              <span className="text-sm leading-none">📍</span>
+              <span className="font-bold tracking-tight">
+                {sedeActiva === 'chillan' ? 'Sede Chillán' : 'Sede Concepción'}
+              </span>
+            </span>
+            <div className="flex items-center gap-1 pl-1.5 border-l border-slate-300/80 text-slate-500 group-hover:text-slate-900 transition-colors">
+              <ArrowLeftRight className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-[11px] font-medium text-slate-500 group-hover:text-slate-800">
+                {sedeActiva === 'chillan' ? 'Concepción' : 'Chillán'}
+              </span>
+            </div>
+          </button>
         </div>
 
       </header>

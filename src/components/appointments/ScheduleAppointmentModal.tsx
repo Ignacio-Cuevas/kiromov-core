@@ -21,6 +21,7 @@ import {
   ScheduleAppointmentFormValues,
 } from '@/types/schedule';
 import { createScheduleAppointmentAction } from '@/actions/appointments';
+import { useSede } from '@/context/SedeContext';
 import {
   Search,
   UserPlus,
@@ -103,6 +104,7 @@ export function ScheduleAppointmentModal({
   const [submitting, setSubmitting] = useState(false);
   const [modoHoraManual, setModoHoraManual] = useState(false);
   const [deudaPendiente, setDeudaPendiente] = useState<number>(0);
+  const { sedeActiva, sedeConfig } = useSede();
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -131,8 +133,10 @@ export function ScheduleAppointmentModal({
       hora: defaultHora,
       duracionMin: 45,
       motivo_consulta: initialMotivo || 'Sesión de Tratamiento Kinésico / TMO (45 min)',
-      box: 'Bulnes 470, Of. 75',
-      profesional: 'Klgo. Ignacio Cuevas Silva',
+      box: sedeActiva === 'concepcion' ? 'Sede Concepción' : 'Bulnes 470, Of. 75',
+      profesional: sedeConfig.profesionalNombre,
+      sede: sedeActiva,
+      profesional_email: sedeConfig.email,
     },
   });
 
@@ -433,7 +437,14 @@ export function ScheduleAppointmentModal({
     isSubmittingRef.current = true;
     setSubmitting(true);
     try {
-      const res = await createScheduleAppointmentAction(values);
+      const payload: ScheduleAppointmentFormValues = {
+        ...values,
+        sede: sedeActiva,
+        profesional_email: sedeConfig.email,
+        profesional: sedeConfig.profesionalNombre,
+        box: sedeActiva === 'concepcion' ? 'Sede Concepción' : 'Bulnes 470, Of. 75',
+      };
+      const res = await createScheduleAppointmentAction(payload);
 
       if (!res.success) {
         toast.error(res.error || 'No se pudo agendar la cita.');
@@ -854,15 +865,15 @@ export function ScheduleAppointmentModal({
               </div>
             )}
 
-            {/* Box y Profesional */}
+            {/* Box y Profesional Dinámico por Sede */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-blue-600" />
                   <span>Box de Atención</span>
                 </label>
-                <div className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center text-xs font-semibold text-slate-700">
-                  Bulnes 470, Of. 75
+                <div className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center text-xs font-semibold text-slate-700 truncate">
+                  {sedeActiva === 'concepcion' ? 'Sede Concepción' : 'Bulnes 470, Of. 75'}
                 </div>
               </div>
 
@@ -871,8 +882,8 @@ export function ScheduleAppointmentModal({
                   <Stethoscope className="w-3 h-3 text-emerald-600" />
                   <span>Kinesiólogo Responsable</span>
                 </label>
-                <div className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center text-xs font-semibold text-slate-700">
-                  Klgo. Ignacio Cuevas Silva
+                <div className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center text-xs font-semibold text-slate-700 truncate">
+                  {sedeConfig.profesionalNombre}
                 </div>
               </div>
             </div>

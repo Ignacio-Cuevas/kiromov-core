@@ -7,7 +7,15 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const fecha = searchParams.get('fecha'); // 'YYYY-MM-DD'
+    const sede = searchParams.get('sede') || 'chillan';
     if (!fecha) return NextResponse.json({ error: 'Fecha requerida' }, { status: 400 });
+
+    if (sede === 'concepcion') {
+      return NextResponse.json({
+        slots: [],
+        mensaje: 'Horas en Concepción se agendan de forma personalizada vía WhatsApp con el Klgo. Michael Pinto.'
+      });
+    }
 
     // 1. REGLA: Máximo 8 días hacia adelante (evaluado en horario de Chile)
     const ahoraChile = new Intl.DateTimeFormat('es-CL', {
@@ -55,11 +63,19 @@ export async function GET(req: Request) {
     }
 
     // 3. CONSULTAR CITAS OCUPADAS EN SUPABASE
-    const { data: citasOcupadas, error: errCitas } = await supabase
+    let queryCitas = supabase
       .from('citas_atenciones')
       .select('hora')
       .eq('fecha', fecha)
       .not('estado', 'in', '("cancelada","no_asistio")');
+
+    if (sede === 'chillan') {
+      queryCitas = queryCitas.or('sede.eq.chillan,sede.is.null');
+    } else {
+      queryCitas = queryCitas.eq('sede', sede);
+    }
+
+    const { data: citasOcupadas, error: errCitas } = await queryCitas;
 
     if (errCitas) {
       console.error('Error consultando citas ocupadas:', errCitas);
@@ -70,11 +86,19 @@ export async function GET(req: Request) {
     // Verificar bloqueos clínicos si existen
     const horasBloqueadas: string[] = [];
     try {
-      const { data: bloqueos } = await supabase
+      let queryBloqueos = supabase
         .from('bloqueos_agenda')
         .select('*')
         .lte('fecha_inicio', fecha)
         .gte('fecha_fin', fecha);
+
+      if (sede === 'chillan') {
+        queryBloqueos = queryBloqueos.or('sede.eq.chillan,sede.is.null');
+      } else {
+        queryBloqueos = queryBloqueos.eq('sede', sede);
+      }
+
+      const { data: bloqueos } = await queryBloqueos;
 
       if (bloqueos && bloqueos.length > 0) {
         for (const b of bloqueos) {

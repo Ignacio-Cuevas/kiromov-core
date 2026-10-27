@@ -42,6 +42,7 @@ import {
 } from '@/lib/availability';
 import { ScheduleAppointmentModal } from '@/components/appointments/ScheduleAppointmentModal';
 import { PaymentCheckoutModal } from '@/components/sales/PaymentCheckoutModal';
+import { useSede } from '@/context/SedeContext';
 
 function getFormattedLocalDate(d: Date): string {
   const year = d.getFullYear();
@@ -68,6 +69,7 @@ type VistaAgenda = 'dia' | 'semana';
 function AgendaContent() {
   const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
+  const { sedeActiva, sedeConfig } = useSede();
   
   const [fechaBase, setFechaBase] = useState<Date>(new Date());
   const [vista, setVista] = useState<VistaAgenda>('semana');
@@ -205,8 +207,8 @@ function AgendaContent() {
       const { data: citasData, error: citasError } = await supabase
         .from('citas_atenciones')
         .select(`
-          id, fecha, hora, profesional, estado, motivo_consulta, notas, paciente_id, google_event_id,
-          pacientes:paciente_id ( id, nombre_completo, rut, telefono, email, prevision, motivo_consulta, alertas_seguridad, antecedentes_morbidos )
+          id, fecha, hora, profesional, profesional_email, sede, estado, motivo_consulta, notas, paciente_id, google_event_id,
+          pacientes:paciente_id ( id, nombre_completo, rut, telefono, email, prevision, motivo_consulta, alertas_seguridad, antecedentes_morbidos, sede )
         `)
         .gte('fecha', fechaInicioStr)
         .lte('fecha', fechaFinStr)
@@ -290,11 +292,15 @@ function AgendaContent() {
             }
           });
         }
-        setBloqueos(listaBloqueos);
+        const bloqueosFiltrados = listaBloqueos.filter((b: any) => (b.sede || 'chillan') === sedeActiva);
+        setBloqueos(bloqueosFiltrados);
       } catch (blkErr) {
         console.warn('Aviso cargando bloqueos:', blkErr);
         const localBlk = localStorage.getItem('kiromov_bloqueos_agenda');
-        if (localBlk) setBloqueos(JSON.parse(localBlk));
+        if (localBlk) {
+          const parsed = JSON.parse(localBlk);
+          setBloqueos(parsed.filter((b: any) => (b.sede || 'chillan') === sedeActiva));
+        }
       }
 
       // Cargar configuración de horarios de box y disponibilidad
@@ -354,14 +360,20 @@ function AgendaContent() {
         console.warn('Aviso cargando disponibilidad en agenda:', boxErr);
       }
 
-      setCitas((citasData as CitaExtendida[]) || []);
+      // Filtrar citas según la sede activa
+      const citasFiltradas = ((citasData as CitaExtendida[]) || []).filter(c => {
+        const cSede = (c as any).sede || 'chillan';
+        return cSede === sedeActiva;
+      });
+
+      setCitas(citasFiltradas);
     } catch (err) {
       console.error('Error cargando agenda:', err);
       toast.error('Error al cargar la agenda');
     } finally {
       setLoading(false);
     }
-  }, [fechaBase, vista, supabase]);
+  }, [fechaBase, vista, supabase, sedeActiva]);
 
   useEffect(() => { loadAgenda(); }, [loadAgenda]);
 

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Printer } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getChileanDate } from '@/lib/utils';
+import { useSede } from '@/context/SedeContext';
 
 export interface ReimbursementCertificateProps {
   isOpen?: boolean;
@@ -43,6 +44,7 @@ export function ReimbursementCertificate({
   numeroBoleta,
   planActivo,
 }: ReimbursementCertificateProps) {
+  const { sedeActiva, sedeConfig } = useSede();
   const [planInfo, setPlanInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -456,14 +458,14 @@ export function ReimbursementCertificate({
                   <div>
                     <h1 className="text-xl font-bold tracking-tight text-slate-900 font-sans leading-none mb-1">KIROMOV CENTRO CLÍNICO</h1>
                     <p className="text-xs text-slate-700 font-sans font-medium mt-1">Terapia Manual Ortopédica & Rehabilitación Funcional</p>
-                    <p className="text-[11px] text-slate-500 font-sans">Bulnes 470, Of. 75 (Edificio Aranjuez) • Chillán, Región de Ñuble</p>
+                    <p className="text-[11px] text-slate-500 font-sans">{sedeConfig.direccion}</p>
                   </div>
                 </div>
 
                 <div className="text-right text-[11px] font-sans text-slate-600">
                   <p className="font-semibold text-slate-800">Fecha: {new Date().toLocaleDateString('es-CL')}</p>
                   <p className="text-xs text-slate-600">
-                    ignacio@kiromov.cl · +56 9 3949 9906
+                    {sedeConfig.email} · {sedeConfig.telefono}
                   </p>
                 </div>
               </div>
@@ -478,7 +480,7 @@ export function ReimbursementCertificate({
               {/* Cuerpo del Certificado */}
               <div className="space-y-4 text-sm leading-relaxed text-slate-800 text-justify">
                 <p>
-                  El kinesiólogo que suscribe, <strong>Klgo. Ignacio Cuevas Silva</strong>, certificado bajo el Registro de Prestadores Individuales de Salud <strong>SIS N° 396889</strong>, certifica que el/la paciente:
+                  El kinesiólogo que suscribe, <strong>{sedeConfig.profesionalNombre}</strong>, certificado bajo el Registro de Prestadores Individuales de Salud <strong>SIS N° {sedeConfig.registroSis}</strong>, certifica que el/la paciente:
                 </p>
 
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 font-sans text-xs space-y-2 my-3">
@@ -755,7 +757,7 @@ export function ReimbursementCertificate({
                 <div className="text-center font-sans">
                   {/* Imagen del Timbre Clínico */}
                   <div className="h-20 flex items-center justify-center mb-1 relative">
-                    {timbreSrc && (
+                    {sedeActiva === 'chillan' && timbreSrc && (
                       <img 
                         src={timbreSrc} 
                         alt="Timbre Profesional SIS N° 396889" 
@@ -769,10 +771,14 @@ export function ReimbursementCertificate({
 
                   <div className="w-56 border-b-2 border-slate-900 mb-1 mx-auto relative z-10" />
                   
-                  <p className="font-bold text-xs text-slate-900 uppercase relative z-10">Klgo. Ignacio Cuevas Silva</p>
-                  <p className="text-[11px] font-semibold text-blue-700 relative z-10">Magíster en Terapia Manual Ortopédica</p>
-                  <p className="text-[10px] text-slate-600 relative z-10">Universidad Andrés Bello</p>
-                  <p className="text-[11px] font-mono font-bold text-slate-800 mt-0.5 relative z-10">Registro SIS N° 396889</p>
+                  <p className="font-bold text-xs text-slate-900 uppercase relative z-10">{sedeConfig.profesionalNombre}</p>
+                  <p className="text-[11px] font-semibold text-blue-700 relative z-10">
+                    {sedeActiva === 'concepcion' ? 'Director Clínico · Kinesiólogo' : 'Magíster en Terapia Manual Ortopédica'}
+                  </p>
+                  <p className="text-[10px] text-slate-600 relative z-10">
+                    {sedeActiva === 'concepcion' ? 'Kiromov Centro Clínico' : 'Universidad Andrés Bello'}
+                  </p>
+                  <p className="text-[11px] font-mono font-bold text-slate-800 mt-0.5 relative z-10">Registro SIS N° {sedeConfig.registroSis}</p>
                 </div>
 
               </div>

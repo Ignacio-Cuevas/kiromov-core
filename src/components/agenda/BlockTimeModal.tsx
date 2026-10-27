@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
+import { useSede } from '@/context/SedeContext';
 
 export interface BloqueoAgenda {
   id: string;
@@ -38,6 +39,7 @@ export interface BloqueoAgenda {
   dia_completo?: boolean;
   google_event_id?: string | null;
   motivo?: string | null;
+  sede?: string;
   created_at?: string;
 }
 
@@ -57,6 +59,7 @@ export function BlockTimeModal({
   bloqueosExistentes = [],
 }: BlockTimeModalProps) {
   const supabase = createClient();
+  const { sedeActiva } = useSede();
 
   const [tipo, setTipo] = useState<'vacaciones' | 'reunion' | 'almuerzo' | 'permiso' | 'otro'>('almuerzo');
   const [titulo, setTitulo] = useState('Almuerzo / Colación');
@@ -130,6 +133,7 @@ export function BlockTimeModal({
         hora_fin: diaCompleto ? null : horaFin,
         dia_completo: diaCompleto,
         google_event_id: googleEventId,
+        sede: sedeActiva,
         created_at: new Date().toISOString(),
       };
 
@@ -414,41 +418,45 @@ export function BlockTimeModal({
           </div>
 
           {/* Bloqueos Activos / Gestión */}
-          {bloqueosExistentes.length > 0 && (
-            <div className="pt-2 border-t border-slate-200 space-y-2">
-              <span className="text-xs font-bold text-slate-600 uppercase tracking-wider block">
-                Bloqueos Activos ({bloqueosExistentes.length})
-              </span>
-              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                {bloqueosExistentes.map((b) => (
-                  <div
-                    key={b.id}
-                    className="flex items-center justify-between p-2.5 rounded-xl border border-amber-200 bg-amber-50/50 text-xs"
-                  >
-                    <div className="min-w-0 pr-2">
-                      <p className="font-bold text-slate-900 truncate">
-                        🔒 {b.titulo}
-                      </p>
-                      <p className="text-[11px] text-slate-500 font-mono">
-                        {b.dia_completo
-                          ? `${b.fecha_inicio} al ${b.fecha_fin}`
-                          : `${b.fecha_inicio} (${b.hora_inicio || '09:00'} - ${b.hora_fin || '10:00'})`}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDesbloquear(b)}
-                      disabled={deletingId === b.id}
-                      className="px-2 py-1 bg-white hover:bg-rose-50 text-rose-700 border border-slate-200 hover:border-rose-200 rounded-lg font-bold text-[10px] transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-                      title="Desbloquear este horario"
+          {(() => {
+            const bloqueosSede = bloqueosExistentes.filter((b) => (b.sede || 'chillan') === sedeActiva);
+            if (bloqueosSede.length === 0) return null;
+            return (
+              <div className="pt-2 border-t border-slate-200 space-y-2">
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider block">
+                  Bloqueos Activos ({bloqueosSede.length})
+                </span>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {bloqueosSede.map((b) => (
+                    <div
+                      key={b.id}
+                      className="flex items-center justify-between p-2.5 rounded-xl border border-amber-200 bg-amber-50/50 text-xs"
                     >
-                      {deletingId === b.id ? 'Liberando...' : 'Desbloquear'}
-                    </button>
-                  </div>
-                ))}
+                      <div className="min-w-0 pr-2">
+                        <p className="font-bold text-slate-900 truncate">
+                          🔒 {b.titulo}
+                        </p>
+                        <p className="text-[11px] text-slate-500 font-mono">
+                          {b.dia_completo
+                            ? `${b.fecha_inicio} al ${b.fecha_fin}`
+                            : `${b.fecha_inicio} (${b.hora_inicio || '09:00'} - ${b.hora_fin || '10:00'})`}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDesbloquear(b)}
+                        disabled={deletingId === b.id}
+                        className="px-2 py-1 bg-white hover:bg-rose-50 text-rose-700 border border-slate-200 hover:border-rose-200 rounded-lg font-bold text-[10px] transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                        title="Desbloquear este horario"
+                      >
+                        {deletingId === b.id ? 'Liberando...' : 'Desbloquear'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
         </DialogBody>
 

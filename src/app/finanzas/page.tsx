@@ -6,6 +6,7 @@ import { CancelPlanModal } from "@/components/sales/CancelPlanModal";
 import { EditExpenseModal } from "@/components/finanzas/EditExpenseModal";
 import { createClient } from "@/utils/supabase/client";
 import { formatCLP, formatRut, getChileanDate } from '@/lib/utils';
+import { useSede } from "@/context/SedeContext";
 import {
   Loader2,
   Plus,
@@ -102,7 +103,11 @@ const ESTADOS_ATENDIDOS = [
 
 function FinanzasContent() {
   const supabase = createClient();
+  const { sedeActiva, sedeConfig } = useSede();
   const [loading, setLoading] = useState(true);
+
+  // Submódulo 0: Selector de Sede vs Consolidado
+  const [filtroSedeFinanzas, setFiltroSedeFinanzas] = useState<'sede_activa' | 'consolidado'>('sede_activa');
 
   // Submódulo 1: Control de período flexible
   const [periodo, setPeriodo] = useState<PeriodoFiltro>('este_mes');
@@ -241,22 +246,34 @@ function FinanzasContent() {
     loadData();
   }, []);
 
-  // Filtrado temporal para Flujo de Caja
+  // Filtrado temporal y por sede para Flujo de Caja
   const pagosFiltrados = useMemo(() => {
     return pagos.filter((p) => {
       if (!p.fecha) return false;
       const fStr = p.fecha.split('T')[0];
-      return fStr >= inicioStr && fStr <= finStr;
+      const matchFecha = fStr >= inicioStr && fStr <= finStr;
+      if (!matchFecha) return false;
+      if (filtroSedeFinanzas === 'sede_activa') {
+        const pSede = p.sede || 'chillan';
+        return pSede === sedeActiva;
+      }
+      return true;
     });
-  }, [pagos, inicioStr, finStr]);
+  }, [pagos, inicioStr, finStr, filtroSedeFinanzas, sedeActiva]);
 
   const egresosFiltrados = useMemo(() => {
     return egresos.filter((e) => {
       const fStr = (e.fecha ? e.fecha.split('T')[0] : '') || (e.created_at ? e.created_at.split('T')[0] : '');
       if (!fStr) return false;
-      return fStr >= inicioStr && fStr <= finStr;
+      const matchFecha = fStr >= inicioStr && fStr <= finStr;
+      if (!matchFecha) return false;
+      if (filtroSedeFinanzas === 'sede_activa') {
+        const eSede = e.sede || 'chillan';
+        return eSede === sedeActiva;
+      }
+      return true;
     });
-  }, [egresos, inicioStr, finStr]);
+  }, [egresos, inicioStr, finStr, filtroSedeFinanzas, sedeActiva]);
 
   // Submódulo 1: Desglose de ingresos en 3 canales (Efectivo Box, POS Débito, Transferencias)
   const { totalEfectivo, totalDebito, totalTransferencia } = useMemo(() => {
@@ -316,6 +333,7 @@ function FinanzasContent() {
       // 1. Obligaciones por planes (solo planes contratados a partir de la fecha de corte operacional)
       const planesPaciente = compras.filter((p) => {
         if (p.paciente_id !== pacId) return false;
+        if (filtroSedeFinanzas === 'sede_activa' && (p.sede || 'chillan') !== sedeActiva) return false;
         const stPago = String(p.estado_pago || '').toLowerCase().trim();
         const stEstado = String(p.estado || '').toLowerCase().trim();
         if (stPago === 'cancelado' || stEstado === 'cancelado') return false;
@@ -331,6 +349,7 @@ function FinanzasContent() {
       // 2. Citas particulares del paciente desde la fecha de corte hasta hoy
       const citasPaciente = citas.filter((c) => {
         if (c.paciente_id !== pacId) return false;
+        if (filtroSedeFinanzas === 'sede_activa' && (c.sede || 'chillan') !== sedeActiva) return false;
         return c.fecha && c.fecha >= FECHA_CORTE_OPERACIONAL && c.fecha <= hoyStr;
       });
 
@@ -369,6 +388,7 @@ function FinanzasContent() {
       // 3. Pagos realizados por el paciente para citas particulares (Desde septiembre a la fecha)
       const pagosCitasPaciente = pagos.filter((pp) => {
         if (pp.paciente_id !== pacId) return false;
+        if (filtroSedeFinanzas === 'sede_activa' && (pp.sede || 'chillan') !== sedeActiva) return false;
         const fPago = (pp.fecha_pago || pp.fecha || pp.created_at)
           ? String(pp.fecha_pago || pp.fecha || pp.created_at).split('T')[0]
           : '';
@@ -489,7 +509,7 @@ function FinanzasContent() {
     });
 
     return Array.from(map.values()).sort((a, b) => b.totalDeuda - a.totalDeuda);
-  }, [compras, citas, pagos, hoyStr]);
+  }, [compras, citas, pagos, hoyStr, filtroSedeFinanzas, sedeActiva]);
 
   const deudoresCount = deudoresConsolidados.length;
 
@@ -683,7 +703,8 @@ Por favor envíanos tu comprobante por este medio al realizar el pago para emiti
       medio_pago: egresoForm.formaPago || 'Débito / Transbank',
       monto_clp: parseInt(String(egresoForm.monto).replace(/\D/g, ''), 10) || 0,
       fecha: egresoForm.fecha || getChileanDate(),
-      responsable: 'Clínica'
+      responsable: sedeActiva === 'concepcion' ? 'Klgo. Michael Pinto M.' : 'Klgo. Ignacio Cuevas Silva',
+      sede: sedeActiva,
     };
     try {
       const { error } = await supabase.from('egresos_caja').insert([payload]);
@@ -745,8 +766,39 @@ Por favor envíanos tu comprobante por este medio al realizar el pago para emiti
             </p>
           </div>
 
-          {/* Control Segmentado de Período Flexible */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+          {/* Controles de Sede y Período Flexible */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 flex-wrap">
+            {/* Selector Sede Activa vs Consolidado Kiromov */}
+            <div className="flex items-center gap-1 bg-paper p-1 rounded-xl border border-hairline shadow-xs">
+              <button
+                type="button"
+                onClick={() => setFiltroSedeFinanzas('sede_activa')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  filtroSedeFinanzas === 'sede_activa'
+                    ? (sedeActiva === 'concepcion' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-blue-600 text-white shadow-xs')
+                    : 'text-slate-gray hover:text-ink-navy hover:bg-pebble'
+                }`}
+                title={`Ver finanzas de ${sedeConfig.nombre}`}
+              >
+                <span>📍</span>
+                <span>{sedeConfig.nombre}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFiltroSedeFinanzas('consolidado')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  filtroSedeFinanzas === 'consolidado'
+                    ? 'bg-ink-navy text-white shadow-xs'
+                    : 'text-slate-gray hover:text-ink-navy hover:bg-pebble'
+                }`}
+                title="Ver suma consolidada de ambas sedes"
+              >
+                <span>🌐</span>
+                <span>Consolidado Kiromov</span>
+              </button>
+            </div>
+
+            {/* Control Segmentado de Período Flexible */}
             <div className="flex flex-wrap items-center gap-1 bg-paper p-1 rounded-xl border border-hairline shadow-xs">
               {[
                 { id: 'hoy', label: 'Hoy' },

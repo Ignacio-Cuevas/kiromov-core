@@ -6,7 +6,7 @@ export function getLastCalendarError() {
   return lastCalendarError;
 }
 
-export const getGoogleCalendarClient = () => {
+export const getGoogleCalendarClient = (calendarIdOverride?: string) => {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   let rawKey = process.env.GOOGLE_PRIVATE_KEY;
 
@@ -32,7 +32,7 @@ export const getGoogleCalendarClient = () => {
     ],
   });
 
-  const calendarId = process.env.GOOGLE_CALENDAR_ID || 'ignacio.kiromov@gmail.com';
+  const calendarId = calendarIdOverride || process.env.GOOGLE_CALENDAR_ID || 'ignacio.kiromov@gmail.com';
 
   return { calendar: google.calendar({ version: 'v3', auth }), calendarId };
 };
@@ -117,10 +117,11 @@ export async function crearEventoGoogleCalendar(params: {
   fecha: string; // YYYY-MM-DD
   hora: string;  // HH:mm:ss o HH:mm
   motivo?: string | null;
+  calendarId?: string;
 }): Promise<string | null> {
   try {
     lastCalendarError = null;
-    const { calendar } = getGoogleCalendarClient();
+    const { calendar, calendarId } = getGoogleCalendarClient(params.calendarId);
     
     // Construir fechas ISO con zona horaria de Chile (-03:00)
     const horaLimpia = (params.hora || '09:00').slice(0, 5);
@@ -147,7 +148,7 @@ export async function crearEventoGoogleCalendar(params: {
       : `Paciente: ${nombreLimpio}\nTeléfono: ${params.pacienteTelefono || 'Sin teléfono'}\nPrevisión: ${params.pacientePrevision || 'Particular'}\nMotivo: ${params.motivo || 'Atención Kinésica TMO'}`;
 
     const res = await calendar.events.insert({
-      calendarId: CALENDAR_ID,
+      calendarId: calendarId || CALENDAR_ID,
       requestBody: {
         summary,
         description,

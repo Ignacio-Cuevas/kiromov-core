@@ -22,6 +22,7 @@ import ClinicalRecordView from "@/components/clinical/ClinicalRecordView";
 import { PatientsDataGrid, PacienteResumen } from "@/components/patients/PatientsDataGrid";
 import { toast } from 'sonner';
 import { purgeDuplicatePatientsAction } from "@/actions/patients";
+import { useSede } from '@/context/SedeContext';
 import { 
   Table, 
   LayoutGrid, 
@@ -57,6 +58,7 @@ type ActiveModal =
 
 export default function PacientesPage() {
   const supabase = createClient();
+  const { sedeActiva, sedeConfig } = useSede();
   const [pacientes, setPacientes] = useState<PacienteResumen[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -65,6 +67,7 @@ export default function PacientesPage() {
   const [filtroSegmento, setFiltroSegmento] = useState<string>('todos');
   const [filtroTab, setFiltroTab] = useState<'todos' | 'vigentes' | 'renovar' | 'riesgo' | 'finalizados' | 'sin_plan'>('todos');
   const [busqueda, setBusqueda] = useState('');
+  const [verTodosRed, setVerTodosRed] = useState<boolean>(false);
 
   // Montaje dinámico de modal único (Lazy / discriminado)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -234,6 +237,7 @@ export default function PacientesPage() {
             estado_plan: estadoPlanFinal,
             estado_pago: estadoPago,
             monto_clp: planElegido?.monto_clp ?? p.monto_clp ?? null,
+            sede: raw.sede || (p as any).sede || 'chillan',
           };
         });
 
@@ -265,22 +269,28 @@ export default function PacientesPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // 2. Métricas y KPIs Superiores con Pestaña de Riesgo de Abandono
+  // 2. Pacientes base según sede activa o red completa
+  const pacientesBase = useMemo(() => {
+    if (verTodosRed) return pacientes;
+    return pacientes.filter(p => ((p as any).sede || 'chillan') === sedeActiva);
+  }, [pacientes, verTodosRed, sedeActiva]);
+
+  // Métricas y KPIs Superiores con Pestaña de Riesgo de Abandono
   const kpis = useMemo(() => {
-    const vigentes = pacientes.filter(p => p.estado_plan === 'vigente').length;
-    const porRenovar = pacientes.filter(p => p.estado_plan === 'por_renovar' || p.sesiones_restantes === 1).length;
-    const enRiesgo = pacientes.filter(p => {
+    const vigentes = pacientesBase.filter(p => p.estado_plan === 'vigente').length;
+    const porRenovar = pacientesBase.filter(p => p.estado_plan === 'por_renovar' || p.sesiones_restantes === 1).length;
+    const enRiesgo = pacientesBase.filter(p => {
       const alerta = evaluarRiesgoDesercion({ ...p, sesiones_consumidas: p.sesiones_usadas } as any);
       return alerta.nivel !== null;
     }).length;
-    const finalizados = pacientes.filter(p => p.estado_plan === 'finalizado').length;
-    const sinPlan = pacientes.filter(p => p.estado_plan === 'sin_plan' || p.total_sesiones === 0).length;
-    return { vigentes, porRenovar, enRiesgo, finalizados, sinPlan, total: pacientes.length };
-  }, [pacientes]);
+    const finalizados = pacientesBase.filter(p => p.estado_plan === 'finalizado').length;
+    const sinPlan = pacientesBase.filter(p => p.estado_plan === 'sin_plan' || p.total_sesiones === 0).length;
+    return { vigentes, porRenovar, enRiesgo, finalizados, sinPlan, total: pacientesBase.length };
+  }, [pacientesBase]);
 
   // 3. Filtrado por Búsqueda, Pestañas y Filtro Anatómico TMO
   const pacientesFiltrados = useMemo(() => {
-    return pacientes.filter(p => {
+    return pacientesBase.filter(p => {
       // Filtro de texto (nombre, rut o teléfono)
       const term = busqueda.toLowerCase().trim();
       const matchText = 
@@ -309,7 +319,7 @@ export default function PacientesPage() {
 
       return true;
     });
-  }, [pacientes, busqueda, filtroTab, filtroSegmento]);
+  }, [pacientesBase, busqueda, filtroTab, filtroSegmento]);
 
   // 4. Columnas del Tablero Kanban según ciclo clínico
   const kanbanColumnas = useMemo(() => {
@@ -490,13 +500,35 @@ export default function PacientesPage() {
                 onChange={(e) => setFiltroSegmento(e.target.value)}
                 className="w-full sm:w-auto h-9 sm:h-8 px-2.5 py-1 bg-slate-50 border border-slate-200 text-slate-700 text-base sm:text-xs font-semibold rounded-lg focus:outline-none focus:border-emerald-500 cursor-pointer"
               >
-                <option value="todos">🦴 Segmento TMO: Todos ({pacientes.length})</option>
+                <option value="todos">🦴 Segmento TMO: Todos ({pacientesBase.length})</option>
                 <option value="lumbar">🦴 Lumbar / Pelvis</option>
                 <option value="cervical">💆 Cervical / Dorsal</option>
                 <option value="hombro">💪 Hombro / EESS</option>
                 <option value="eeii">🦵 Rodilla / Tobillo</option>
                 <option value="atm">🦷 ATM</option>
               </select>
+            </div>
+
+            {/* Switch "Ver todos los pacientes de la red" */}
+            <div className="shrink-0 w-full sm:w-auto">
+              <label 
+                className={`w-full sm:w-auto inline-flex items-center justify-between sm:justify-start gap-2 px-3 py-1.5 h-9 sm:h-8 rounded-lg border text-xs font-semibold cursor-pointer transition-all select-none ${
+                  verTodosRed
+                    ? 'bg-blue-50 text-blue-900 border-blue-300 shadow-2xs font-bold'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+                title="Mostrar pacientes de ambas sedes (Chillán y Concepción)"
+              >
+                <input
+                  type="checkbox"
+                  checked={verTodosRed}
+                  onChange={(e) => setVerTodosRed(e.target.checked)}
+                  className="w-3.5 h-3.5 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                />
+                <span className="whitespace-nowrap">
+                  {verTodosRed ? '🌐 Ver todos los pacientes de la red' : `📍 Sede ${sedeConfig.ciudad}`}
+                </span>
+              </label>
             </div>
           </div>
 

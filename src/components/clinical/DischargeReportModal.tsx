@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Printer, FileText, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getChileanDate, formatRut } from '@/lib/utils';
+import { useSede } from '@/context/SedeContext';
 
 interface DischargeReportModalProps {
   isOpen?: boolean;
@@ -20,6 +21,7 @@ export function DischargeReportModal({
   soaps,
   citas,
 }: DischargeReportModalProps) {
+  const { sedeActiva, sedeConfig } = useSede();
   const [loading, setLoading] = useState(true);
 
   // Datos clínicos derivados / editables
@@ -290,7 +292,7 @@ export function DischargeReportModal({
                       Terapia Manual Ortopédica & Kinesiología Avanzada
                     </p>
                     <p className="text-[10px] text-slate-500">
-                      Bulnes 470, Of. 75 (Edificio Aranjuez) • Chillán, Región de Ñuble
+                      {sedeConfig.direccion}
                     </p>
                   </div>
                 </div>
@@ -299,7 +301,7 @@ export function DischargeReportModal({
                   <p className="font-bold text-slate-800 text-xs">INFORME DE ALTA</p>
                   <p>Fecha emisión: {new Date().toLocaleDateString('es-CL')}</p>
                   <p className="text-xs text-slate-600">
-                    ignacio@kiromov.cl · +56 9 3949 9906
+                    {sedeConfig.email} · {sedeConfig.telefono}
                   </p>
                 </div>
               </div>
@@ -313,7 +315,7 @@ export function DischargeReportModal({
 
               {/* Párrafo de Certificación */}
               <p className="text-justify text-[11px] mb-3">
-                El profesional que suscribe, <strong>Klgo. Ignacio Cuevas Silva</strong>, Magíster en Terapia Manual Ortopédica (UNAB) y registrado en la Superintendencia de Salud bajo el N° <strong>396889</strong>, certifica que el/la paciente ha culminado satisfactoriamente su programa de rehabilitación kinésica especializada:
+                El profesional que suscribe, <strong>{sedeConfig.profesionalNombre}</strong>, {sedeActiva === 'concepcion' ? 'Director Clínico · Kinesiólogo' : 'Magíster en Terapia Manual Ortopédica (UNAB)'} y registrado en la Superintendencia de Salud bajo el N° <strong>{sedeConfig.registroSis}</strong>, certifica que el/la paciente ha culminado satisfactoriamente su programa de rehabilitación kinésica especializada:
               </p>
 
               {/* 2. Datos del Paciente */}
@@ -501,7 +503,7 @@ export function DischargeReportModal({
                 <div className="text-center font-sans">
                   {/* Timbre Clínico */}
                   <div className="h-16 flex items-center justify-center relative mb-1">
-                    {timbreSrc && (
+                    {sedeActiva === 'chillan' && timbreSrc && (
                       <img 
                         src={timbreSrc} 
                         alt="Timbre Profesional SIS N° 396889" 
@@ -514,9 +516,11 @@ export function DischargeReportModal({
                   </div>
 
                   <div className="w-56 border-b-2 border-slate-900 mb-1 mx-auto relative z-10" />
-                  <p className="font-bold text-xs text-slate-900 uppercase relative z-10">Klgo. Ignacio Cuevas Silva</p>
-                  <p className="text-[11px] font-semibold text-blue-700 relative z-10">Magíster en Terapia Manual Ortopédica (UNAB)</p>
-                  <p className="text-[10px] font-mono font-bold text-slate-800 mt-0.5 relative z-10">Registro SIS N° 396889</p>
+                  <p className="font-bold text-xs text-slate-900 uppercase relative z-10">{sedeConfig.profesionalNombre}</p>
+                  <p className="text-[11px] font-semibold text-blue-700 relative z-10">
+                    {sedeActiva === 'concepcion' ? 'Director Clínico · Kinesiólogo' : 'Magíster en Terapia Manual Ortopédica (UNAB)'}
+                  </p>
+                  <p className="text-[10px] font-mono font-bold text-slate-800 mt-0.5 relative z-10">Registro SIS N° {sedeConfig.registroSis}</p>
                 </div>
               </div>
 

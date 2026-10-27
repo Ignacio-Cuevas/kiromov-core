@@ -127,6 +127,7 @@ import { scheduleAppointmentSchema, ScheduleAppointmentFormValues, ScheduleAppoi
 import { formatRut } from '@/lib/utils';
 import { crearEventoGoogleCalendar } from '@/actions/calendar';
 import { getGoogleCalendarClient } from '@/utils/google-calendar';
+import { SEDES_CONFIG, SedeId } from '@/config/sedes';
 
 export async function createScheduleAppointmentAction(
   values: ScheduleAppointmentFormValues
@@ -144,15 +145,28 @@ export async function createScheduleAppointmentAction(
   const data = validation.data;
 
   try {
-    // 2. Verificar colisión horaria
+    const sede: SedeId = (data.sede as SedeId) || 'chillan';
+    const sedeConfig = SEDES_CONFIG[sede] || SEDES_CONFIG.chillan;
+    const profesionalNombre = data.profesional || sedeConfig.profesionalNombre;
+    const profesionalEmail = data.profesional_email || (sede === 'concepcion' ? 'michael@kiromov.cl' : 'ignacio@kiromov.cl');
+    const boxNombre = data.box || (sede === 'concepcion' ? 'Sede Concepción' : 'Bulnes 470, Of. 75');
+
+    // 2. Verificar colisión horaria por sede
     const horaNormalizada = data.hora.length === 5 ? `${data.hora}:00` : data.hora;
-    const { data: conflictoCita, error: errCheck } = await supabase
+    let queryColision = supabase
       .from('citas_atenciones')
       .select('id, hora, pacientes(nombre_completo)')
       .eq('fecha', data.fecha)
       .eq('hora', horaNormalizada)
-      .neq('estado', 'cancelada')
-      .maybeSingle();
+      .neq('estado', 'cancelada');
+
+    if (sede === 'concepcion') {
+      queryColision = queryColision.eq('sede', 'concepcion');
+    } else {
+      queryColision = queryColision.or('sede.eq.chillan,sede.is.null');
+    }
+
+    const { data: conflictoCita, error: errCheck } = await queryColision.maybeSingle();
 
     if (errCheck) {
       console.warn('Advertencia comprobando conflicto de citas:', errCheck.message);
@@ -233,6 +247,7 @@ export async function createScheduleAppointmentAction(
             email: data.email?.trim().toLowerCase() || null,
             motivo_consulta: data.motivo_consulta || 'Evaluación Inicial TMO (60 min)',
             estado: 'activo',
+            sede: sede,
           }])
           .select('id, nombre_completo, telefono, prevision')
           .single();
@@ -273,9 +288,11 @@ export async function createScheduleAppointmentAction(
         paciente_id: targetPacienteId,
         fecha: data.fecha,
         hora: horaNormalizada,
-        profesional: data.profesional || 'Klgo. Ignacio Cuevas Silva',
+        profesional: profesionalNombre,
+        profesional_email: profesionalEmail,
+        sede: sede,
         motivo_consulta: data.motivo_consulta,
-        notas: `Box: ${data.box || 'Bulnes 470, Of. 75'}`,
+        notas: `Box: ${boxNombre}`,
         estado: 'pendiente',
       }])
       .select('id')
@@ -309,6 +326,7 @@ export async function createScheduleAppointmentAction(
         fecha: data.fecha,
         hora: data.hora.slice(0, 5),
         motivo: data.motivo_consulta,
+        calendarId: sedeConfig.calendarId,
       });
 
       if (googleEventId) {
