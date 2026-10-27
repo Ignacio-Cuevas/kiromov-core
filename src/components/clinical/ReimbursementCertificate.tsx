@@ -45,6 +45,7 @@ export function ReimbursementCertificate({
   planActivo,
 }: ReimbursementCertificateProps) {
   const { sedeActiva, sedeConfig } = useSede();
+  const config = sedeConfig;
   const [planInfo, setPlanInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -71,8 +72,6 @@ export function ReimbursementCertificate({
 
   // Helper de URL de imágenes
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const logoSrc = "/branding/logo.png";
-  const timbreSrc = "/branding/timbre.png";
 
   useEffect(() => {
     if (!isOpen || !patient?.id) return;
@@ -328,6 +327,7 @@ export function ReimbursementCertificate({
         <head>
           <title>Certificado de Asistencia y Tratamiento Kinésico - Kiromov</title>
           <meta charset="utf-8" />
+          <base href="${typeof window !== 'undefined' ? window.location.origin : ''}/" />
           <style>
             @page {
               size: letter portrait;
@@ -346,6 +346,14 @@ export function ReimbursementCertificate({
               background: #ffffff;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
+            }
+            img {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              image-rendering: auto;
+            }
+            .mix-blend-multiply {
+              mix-blend-mode: multiply !important;
             }
             table {
               width: 100%;
@@ -442,31 +450,18 @@ export function ReimbursementCertificate({
             /* Hoja de Certificado Oficial */
             <div id="documento-imprimible" className="bg-white p-6 sm:p-10 max-w-4xl w-full mx-auto shadow-sm border border-slate-200 font-serif text-slate-900">
               
-              {/* Encabezado con Logo Oficial */}
-              <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
-                <div className="flex items-center gap-4">
-                  {logoSrc && (
-                    <img 
-                      src={logoSrc} 
-                      alt="Kiromov Centro Clínico" 
-                      className="h-16 w-auto object-contain"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = `${supabaseUrl}/storage/v1/object/public/branding/public%3Alogo.png`;
-                      }}
-                    />
-                  )}
-                  <div>
-                    <h1 className="text-xl font-bold tracking-tight text-slate-900 font-sans leading-none mb-1">KIROMOV CENTRO CLÍNICO</h1>
-                    <p className="text-xs text-slate-700 font-sans font-medium mt-1">Terapia Manual Ortopédica & Rehabilitación Funcional</p>
-                    <p className="text-[11px] text-slate-500 font-sans">{sedeConfig.direccion}</p>
-                  </div>
-                </div>
-
-                <div className="text-right text-[11px] font-sans text-slate-600">
-                  <p className="font-semibold text-slate-800">Fecha: {new Date().toLocaleDateString('es-CL')}</p>
-                  <p className="text-xs text-slate-600">
-                    {sedeConfig.email} · {sedeConfig.telefono}
-                  </p>
+              {/* Membrete con Logo Institucional */}
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-6">
+                <img
+                  src="/branding/logo.png"
+                  alt="Kiromov Centro Clínico"
+                  className="h-10 w-auto object-contain print:block"
+                  style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+                />
+                <div className="text-right text-xs text-slate-500">
+                  <p className="font-semibold text-slate-800">KIROMOV CENTRO CLÍNICO</p>
+                  <p>{config.direccion}</p>
+                  <p>{config.email} · {config.telefono}</p>
                 </div>
               </div>
 
@@ -743,44 +738,26 @@ export function ReimbursementCertificate({
                 </p>
               </div>
 
-              {/* Cierre: Membrete Legal y Firma con Timbre Oficial */}
-              <div className="mt-12 pt-6 border-t border-slate-200 flex justify-between items-end break-inside-avoid">
-                
-                {/* Membrete legal */}
-                <div className="text-[10px] text-slate-500 font-sans max-w-xs space-y-1">
-                  <p className="font-bold text-slate-700 text-xs">KIROMOV CENTRO CLÍNICO</p>
-                  <p>Documento médico-legal emitido conforme a la Ley N° 20.584 y D.S. N° 41/2012 del MINSAL.</p>
-                  <p>Válido para trámites de reembolso en Isapres, Fonasa y Seguros de Salud Complementarios.</p>
-                </div>
-
-                {/* Timbre y Firma Profesional */}
-                <div className="text-center font-sans">
-                  {/* Imagen del Timbre Clínico */}
-                  <div className="h-20 flex items-center justify-center mb-1 relative">
-                    {sedeActiva === 'chillan' && timbreSrc && (
-                      <img 
-                        src={timbreSrc} 
-                        alt="Timbre Profesional SIS N° 396889" 
-                        className="absolute h-28 w-auto object-contain mix-blend-multiply opacity-90 -top-4 pointer-events-none mx-auto"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = `${supabaseUrl}/storage/v1/object/public/branding/public%3Atimbre.png`;
-                        }}
-                      />
-                    )}
+              {/* Pie de Firma y Estampado del Sello */}
+              <div className="flex flex-col items-center justify-center mt-10 text-center break-inside-avoid">
+                {config.selloUrl && (
+                  <div className="relative w-28 h-28 -mb-4 z-10 pointer-events-none">
+                    <img
+                      src={config.selloUrl}
+                      alt={`Sello ${config.profesionalNombre}`}
+                      className="w-full h-full object-contain mix-blend-multiply opacity-95 print:block"
+                      style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+                    />
                   </div>
-
-                  <div className="w-56 border-b-2 border-slate-900 mb-1 mx-auto relative z-10" />
-                  
-                  <p className="font-bold text-xs text-slate-900 uppercase relative z-10">{sedeConfig.profesionalNombre}</p>
-                  <p className="text-[11px] font-semibold text-blue-700 relative z-10">
-                    {sedeActiva === 'concepcion' ? 'Director Clínico · Kinesiólogo' : 'Magíster en Terapia Manual Ortopédica'}
+                )}
+                <div className="w-64 border-t border-slate-700 pt-1.5">
+                  <p className="font-bold text-slate-900 text-sm">{config.profesionalNombre}</p>
+                  <p className="text-xs text-slate-700 font-medium">{config.profesionalTitulo}</p>
+                  <p className="text-xs text-slate-600">Registro SIS N° {config.registroSis}</p>
+                  <p className="text-[11px] text-slate-500 font-semibold tracking-wide uppercase mt-0.5">
+                    Kiromov Centro Clínico · {config.ciudad}
                   </p>
-                  <p className="text-[10px] text-slate-600 relative z-10">
-                    {sedeActiva === 'concepcion' ? 'Kiromov Centro Clínico' : 'Universidad Andrés Bello'}
-                  </p>
-                  <p className="text-[11px] font-mono font-bold text-slate-800 mt-0.5 relative z-10">Registro SIS N° {sedeConfig.registroSis}</p>
                 </div>
-
               </div>
 
             </div>

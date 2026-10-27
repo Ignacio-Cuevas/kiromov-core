@@ -22,6 +22,7 @@ export function DischargeReportModal({
   citas,
 }: DischargeReportModalProps) {
   const { sedeActiva, sedeConfig } = useSede();
+  const config = sedeConfig;
   const [loading, setLoading] = useState(true);
 
   // Datos clínicos derivados / editables
@@ -44,8 +45,6 @@ export function DischargeReportModal({
   const [logroMovilidad, setLogroMovilidad] = useState('✓ Movilidad 100% Recuperada');
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const logoSrc = "/branding/logo.png";
-  const timbreSrc = "/branding/timbre.png";
 
   useEffect(() => {
     if (!isOpen || !patient?.id) return;
@@ -170,6 +169,7 @@ export function DischargeReportModal({
         <head>
           <title>Informe de Alta Kinésica - Kiromov Centro Clínico</title>
           <meta charset="utf-8" />
+          <base href="${typeof window !== 'undefined' ? window.location.origin : ''}/" />
           <style>
             @page {
               size: letter portrait;
@@ -177,6 +177,8 @@ export function DischargeReportModal({
             }
             * {
               box-sizing: border-box;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
             body {
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -184,10 +186,18 @@ export function DischargeReportModal({
               padding: 0;
               color: #0f172a;
               background: #ffffff;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
               font-size: 11px;
               line-height: 1.35;
+            }
+            img {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              image-rendering: auto;
+            }
+            .mix-blend-multiply {
+              mix-blend-mode: multiply !important;
             }
             table {
               width: 100%;
@@ -215,7 +225,7 @@ export function DischargeReportModal({
               setTimeout(() => {
                 window.print();
                 window.close();
-              }, 600);
+              }, 800);
             };
           </script>
         </body>
@@ -271,38 +281,18 @@ export function DischargeReportModal({
               id="informe-alta-imprimible"
               className="bg-white p-8 sm:p-10 max-w-3xl mx-auto shadow-sm border border-slate-200 font-sans text-slate-900 text-xs leading-relaxed"
             >
-              {/* 1. Membrete Oficial */}
-              <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-4">
-                <div className="flex items-center gap-4">
-                  {logoSrc && (
-                    <img 
-                      src={logoSrc} 
-                      alt="Kiromov Centro Clínico" 
-                      className="h-14 w-auto object-contain"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = `${supabaseUrl}/storage/v1/object/public/branding/public%3Alogo.png`;
-                      }}
-                    />
-                  )}
-                  <div>
-                    <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-none mb-1">
-                      KIROMOV CENTRO CLÍNICO
-                    </h1>
-                    <p className="text-[11px] text-slate-700 font-medium">
-                      Terapia Manual Ortopédica & Kinesiología Avanzada
-                    </p>
-                    <p className="text-[10px] text-slate-500">
-                      {sedeConfig.direccion}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right text-[10px] text-slate-600">
-                  <p className="font-bold text-slate-800 text-xs">INFORME DE ALTA</p>
-                  <p>Fecha emisión: {new Date().toLocaleDateString('es-CL')}</p>
-                  <p className="text-xs text-slate-600">
-                    {sedeConfig.email} · {sedeConfig.telefono}
-                  </p>
+              {/* Membrete con Logo Institucional */}
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-6">
+                <img
+                  src="/branding/logo.png"
+                  alt="Kiromov Centro Clínico"
+                  className="h-10 w-auto object-contain print:block"
+                  style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+                />
+                <div className="text-right text-xs text-slate-500">
+                  <p className="font-semibold text-slate-800">KIROMOV CENTRO CLÍNICO</p>
+                  <p>{config.direccion}</p>
+                  <p>{config.email} · {config.telefono}</p>
                 </div>
               </div>
 
@@ -315,7 +305,7 @@ export function DischargeReportModal({
 
               {/* Párrafo de Certificación */}
               <p className="text-justify text-[11px] mb-3">
-                El profesional que suscribe, <strong>{sedeConfig.profesionalNombre}</strong>, {sedeActiva === 'concepcion' ? 'Director Clínico · Kinesiólogo' : 'Magíster en Terapia Manual Ortopédica (UNAB)'} y registrado en la Superintendencia de Salud bajo el N° <strong>{sedeConfig.registroSis}</strong>, certifica que el/la paciente ha culminado satisfactoriamente su programa de rehabilitación kinésica especializada:
+                El profesional que suscribe, <strong>{config.profesionalNombre}</strong>, {config.profesionalTitulo} y registrado en la Superintendencia de Salud bajo el N° <strong>{config.registroSis}</strong>, certifica que el/la paciente ha culminado satisfactoriamente su programa de rehabilitación kinésica especializada:
               </p>
 
               {/* 2. Datos del Paciente */}
@@ -492,35 +482,25 @@ export function DischargeReportModal({
                 </div>
               </div>
 
-              {/* 4. Timbre y Firma Oficial */}
-              <div className="mt-8 pt-4 border-t border-slate-200 flex justify-between items-end break-inside-avoid">
-                <div className="text-[10px] text-slate-500 font-sans max-w-xs space-y-0.5">
-                  <p className="font-bold text-slate-700">KIROMOV CENTRO CLÍNICO</p>
-                  <p>Documento médico-legal extendido para el paciente y médico tratante.</p>
-                  <p>Certifica cumplimiento de objetivos del tratamiento kinésico.</p>
-                </div>
-
-                <div className="text-center font-sans">
-                  {/* Timbre Clínico */}
-                  <div className="h-16 flex items-center justify-center relative mb-1">
-                    {sedeActiva === 'chillan' && timbreSrc && (
-                      <img 
-                        src={timbreSrc} 
-                        alt="Timbre Profesional SIS N° 396889" 
-                        className="absolute h-24 w-auto object-contain mix-blend-multiply opacity-90 -top-4 pointer-events-none mx-auto"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = `${supabaseUrl}/storage/v1/object/public/branding/public%3Atimbre.png`;
-                        }}
-                      />
-                    )}
+              {/* Pie de Firma y Estampado del Sello */}
+              <div className="flex flex-col items-center justify-center mt-10 text-center break-inside-avoid">
+                {config.selloUrl && (
+                  <div className="relative w-28 h-28 -mb-4 z-10 pointer-events-none">
+                    <img
+                      src={config.selloUrl}
+                      alt={`Sello ${config.profesionalNombre}`}
+                      className="w-full h-full object-contain mix-blend-multiply opacity-95 print:block"
+                      style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+                    />
                   </div>
-
-                  <div className="w-56 border-b-2 border-slate-900 mb-1 mx-auto relative z-10" />
-                  <p className="font-bold text-xs text-slate-900 uppercase relative z-10">{sedeConfig.profesionalNombre}</p>
-                  <p className="text-[11px] font-semibold text-blue-700 relative z-10">
-                    {sedeActiva === 'concepcion' ? 'Director Clínico · Kinesiólogo' : 'Magíster en Terapia Manual Ortopédica (UNAB)'}
+                )}
+                <div className="w-64 border-t border-slate-700 pt-1.5">
+                  <p className="font-bold text-slate-900 text-sm">{config.profesionalNombre}</p>
+                  <p className="text-xs text-slate-700 font-medium">{config.profesionalTitulo}</p>
+                  <p className="text-xs text-slate-600">Registro SIS N° {config.registroSis}</p>
+                  <p className="text-[11px] text-slate-500 font-semibold tracking-wide uppercase mt-0.5">
+                    Kiromov Centro Clínico · {config.ciudad}
                   </p>
-                  <p className="text-[10px] font-mono font-bold text-slate-800 mt-0.5 relative z-10">Registro SIS N° {sedeConfig.registroSis}</p>
                 </div>
               </div>
 
