@@ -216,9 +216,10 @@ export function CancelPlanModal({
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
               <Input
                 type="number"
-                step="1000"
+                step="1"
                 min="0"
                 value={montoAjustado}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => setMontoAjustado(Number(e.target.value))}
                 className="pl-8 text-base font-bold text-emerald-700 font-mono"
               />

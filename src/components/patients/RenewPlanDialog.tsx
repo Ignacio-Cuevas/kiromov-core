@@ -16,7 +16,7 @@ import {
   registrarCompraPlan,
   validarCupon,
 } from "@/lib/supabase";
-import { formatCLP , getChileanDate } from '@/lib/utils';
+import { formatCLP, getChileanDate } from '@/lib/utils';
 import { toast } from "sonner";
 import {
   PackagePlus,
@@ -27,7 +27,7 @@ import {
   Check,
 } from "lucide-react";
 import { getCatalogoPlanesParaPaciente } from '@/lib/pricing';
-
+import { useSede } from "@/context/SedeContext";
 
 interface RenewPlanDialogProps {
   pacienteId: string;
@@ -49,13 +49,14 @@ export function RenewPlanDialog({
   onPlanPurchased,
 }: RenewPlanDialogProps) {
   const supabase = createClient();
+  const { sedeActiva } = useSede();
   const [catalogPlanes, setCatalogPlanes] = useState<any[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [customNombre, setCustomNombre] = useState<string>("");
   const [sesiones, setSesiones] = useState<number>(4);
   const [precioBase, setPrecioBase] = useState<number>(100000);
   const [descuentoCLP, setDescuentoCLP] = useState<number>(0);
-  const [montoPagadoHoy, setMontoPagadoHoy] = useState<number>(0);
+  const [montoPagadoHoy, setMontoPagadoHoy] = useState<number | ''>(0);
   const [medioPago, setMedioPago] = useState<string>('transferencia');
   const [numeroBoleta, setNumeroBoleta] = useState<string>('');
   const [usarAbonoReciente, setUsarAbonoReciente] = useState<boolean>(true);
@@ -82,6 +83,8 @@ export function RenewPlanDialog({
       setSesiones(first.sesiones);
       setPrecioBase(first.precio);
       setDescuentoCLP(0);
+      setMontoPagadoHoy(0);
+      setNumeroBoleta('');
       setCouponCode("");
       setAppliedCoupon(null);
       setCouponSuccessMessage("");
@@ -147,9 +150,11 @@ export function RenewPlanDialog({
     }
   };
 
+  const abonoHoyNumerico = typeof montoPagadoHoy === 'number' ? montoPagadoHoy : (parseInt(String(montoPagadoHoy), 10) || 0);
   const abonoCalculado = (usarAbonoReciente && pagoReciente) ? pagoReciente.monto : 0;
-  const valorTotal = Math.max(0, precioBase - descuentoCLP);
-  const saldoPendiente = Math.max(0, valorTotal - abonoCalculado - montoPagadoHoy);
+  const totalFinal = Math.max(0, precioBase - descuentoCLP);
+  const abonoTotal = abonoHoyNumerico + abonoCalculado;
+  const saldoPendiente = Math.max(0, totalFinal - abonoTotal);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,7 +169,7 @@ export function RenewPlanDialog({
       return;
     }
 
-    if (valorTotal < 0) {
+    if (totalFinal < 0) {
       toast.error("El valor total no puede ser negativo.");
       return;
     }
@@ -172,33 +177,127 @@ export function RenewPlanDialog({
     setIsSaving(true);
 
     try {
-      const citaHoyId = usarAbonoReciente && pagoReciente ? pagoReciente.cita_id : null;
       if (!supabase) throw new Error("No database client");
-      const { data, error } = await supabase.rpc("contratar_plan_transaccional", {
-        p_paciente_id: pacienteId,
-        p_nombre_plan: customNombre.trim(),
-        p_sesiones_totales: Number(sesiones),
-        p_valor_total: Number(precioBase - descuentoCLP),
-        p_abono_hoy: Number(montoPagadoHoy + abonoCalculado),
-        p_metodo_pago: medioPago,
-        p_numero_boleta: numeroBoleta ? String(numeroBoleta).trim() : null,
-        p_cita_hoy_id: citaHoyId || null
-      });
 
-      if (error) {
-        console.error("[AsignarPlan RPC Error]:", error);
-        toast.error("Error al contratar plan: " + error.message);
+      const estadoPago = abonoTotal >= totalFinal ? 'pagado' : 'abono_parcial';
+      const boletaClean = numeroBoleta.trim() || null;
+
+      // 1. Inserción Primaria en compras_planes
+      const compraPayload: any = {
+        paciente_id: pacienteId,
+        catalogo_plan_id: selectedPlanId !== "custom" ? selectedPlanId : null,
+        nombre_plan: customNombre.trim(),
+        total_sesiones: Number(sesiones),
+        sesiones_usadas: (usarAbonoReciente && pagoReciente) ? 1 : 0,
+        valor_total: totalFinal,
+        monto_clp: totalFinal,
+        monto_pagado: abonoTotal,
+        saldo_pendiente: saldoPendiente,
+        estado_pago: estadoPago,
+        numero_boleta: boletaClean,
+        n_boleta: boletaClean,
+        metodo_pago: medioPago,
+        fecha_compra: getChileanDate(),
+        estado: 'activo',
+        sede: sedeActiva,
+        notas: appliedCoupon ? `Cupón aplicado: ${appliedCoupon.codigo}` : null,
+      };
+
+      let { data: newPlan, error: planError } = await supabase
+        .from('compras_planes')
+        .insert([compraPayload])
+        .select()
+        .single();
+
+      // Retry sin n_boleta si la columna no existe en la BD
+      if (planError && planError.message?.includes('n_boleta')) {
+        delete compraPayload.n_boleta;
+        const retryRes = await supabase
+          .from('compras_planes')
+          .insert([compraPayload])
+          .select()
+          .single();
+        newPlan = retryRes.data;
+        planError = retryRes.error;
+      }
+
+      if (planError || !newPlan) {
+        console.error("[AsignarPlan compras_planes error]:", planError);
+        toast.error("Error al contratar plan: " + (planError?.message || "Error desconocido"));
         return;
       }
 
-      toast.success("Plan contratado y registrado exitosamente");
+      // 2. Si abona hoy > 0, registrar atómicamente en pagos_pacientes
+      if (abonoHoyNumerico > 0) {
+        const nowIso = new Date().toISOString();
+        const pagoPayload: any = {
+          paciente_id: pacienteId,
+          plan_id: newPlan.id,
+          monto: abonoHoyNumerico,
+          metodo_pago: medioPago,
+          numero_boleta: boletaClean,
+          fecha: nowIso,
+          fecha_pago: nowIso,
+          sede: sedeActiva,
+          notas: `Abono venta ${customNombre.trim()}${boletaClean ? ` | Boleta: ${boletaClean}` : ''}`,
+        };
+
+        let { error: pagoError } = await supabase
+          .from('pagos_pacientes')
+          .insert([pagoPayload]);
+
+        // Retry sin fecha_pago si la columna en BD se llama solo fecha
+        if (pagoError && pagoError.message?.includes('fecha_pago')) {
+          delete pagoPayload.fecha_pago;
+          const retryPago = await supabase
+            .from('pagos_pacientes')
+            .insert([pagoPayload]);
+          pagoError = retryPago.error;
+        }
+
+        if (pagoError) {
+          console.warn("[pagos_pacientes warning]:", pagoError.message);
+        }
+      }
+
+      // 3. Vincular cita previa si se aplicó abono de evaluación
+      if (usarAbonoReciente && pagoReciente?.cita_id) {
+        try {
+          await supabase
+            .from('citas_atenciones')
+            .update({ compra_plan_id: newPlan.id })
+            .eq('id', pagoReciente.cita_id);
+
+          await supabase
+            .from('pagos_pacientes')
+            .update({ plan_id: newPlan.id })
+            .eq('cita_id', pagoReciente.cita_id);
+        } catch (linkErr) {
+          console.warn("Detalle al vincular cita previa:", linkErr);
+        }
+      }
+
+      // 4. Incrementar uso de cupón si aplica
+      if (appliedCoupon?.codigo) {
+        try {
+          await supabase.rpc('increment_coupon_usage', {
+            coupon_code: appliedCoupon.codigo,
+          });
+        } catch {}
+      }
+
+      toast.success("¡Plan contratado y registrado exitosamente!", {
+        description: `Total: ${formatCLP(totalFinal)} | Abono: ${formatCLP(abonoHoyNumerico)}${saldoPendiente > 0 ? ` | Saldo Pendiente: ${formatCLP(saldoPendiente)}` : ''}`
+      });
+
       if (onPlanPurchased) {
-        onPlanPurchased();
+        onPlanPurchased(newPlan);
       }
 
       onOpenChange(false);
-    } catch {
-      toast.error("Error de conexión al registrar la compra.");
+    } catch (err: any) {
+      console.error("[RenewPlanDialog error]:", err);
+      toast.error("Error de conexión al registrar la compra: " + (err?.message || ""));
     } finally {
       setIsSaving(false);
     }
@@ -234,13 +333,13 @@ export function RenewPlanDialog({
               className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-medium"
             >
               {catalogPlanes.map((plan) => {
-                const nombre = plan.nombre_plan || plan.nombre_plan || plan.nombre || "Plan";
-                const sesiones = plan.total_sesiones || plan.total_sesiones || plan.sesiones || 0;
-                const precio = Number(plan.valor_total || plan.valor_total || plan.valor_total || plan.precio || plan.precio_clp || 0);
+                const nombre = plan.nombre_plan || plan.nombre || "Plan";
+                const sesionesPlan = plan.total_sesiones || plan.sesiones || 0;
+                const precio = Number(plan.valor_total || plan.precio || plan.precio_clp || 0);
 
                 return (
                   <option key={plan.id || nombre} value={plan.id}>
-                    {nombre} ({sesiones} ses.) — ${precio.toLocaleString("es-CL")}
+                    {nombre} ({sesionesPlan} ses.) — ${precio.toLocaleString("es-CL")}
                   </option>
                 );
               })}
@@ -288,8 +387,9 @@ export function RenewPlanDialog({
               <Input
                 type="number"
                 min={0}
-                step={1000}
+                step="1"
                 value={precioBase}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => setPrecioBase(parseInt(e.target.value, 10) || 0)}
                 disabled={isSaving || selectedPlanId !== "custom"}
                 className="h-10 text-sm font-semibold bg-white rounded-xl"
@@ -346,11 +446,13 @@ export function RenewPlanDialog({
             <Input
               type="number"
               min={0}
-              step={1000}
+              step="1"
               placeholder="0"
               value={descuentoCLP || ""}
+              onFocus={(e) => e.target.select()}
               onChange={(e) => {
-                setDescuentoCLP(parseInt(e.target.value, 10) || 0);
+                const raw = e.target.value.replace(/^0+(?=\d)/, '');
+                setDescuentoCLP(raw === '' ? 0 : Math.max(0, parseInt(raw, 10) || 0));
                 if (appliedCoupon) {
                   setAppliedCoupon(null);
                   setCouponSuccessMessage("");
@@ -387,9 +489,13 @@ export function RenewPlanDialog({
               <Input
                 type="number"
                 min={0}
-                step={1000}
+                step="1"
                 value={montoPagadoHoy}
-                onChange={(e) => setMontoPagadoHoy(parseInt(e.target.value, 10) || 0)}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/^0+(?=\d)/, '');
+                  setMontoPagadoHoy(raw === '' ? '' : Math.max(0, parseInt(raw, 10) || 0));
+                }}
                 disabled={isSaving}
                 className="h-10 text-sm font-semibold bg-white rounded-xl"
               />
@@ -412,6 +518,21 @@ export function RenewPlanDialog({
             </div>
           </div>
 
+          {/* N° Boleta Exenta */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              N° Boleta Exenta (Opcional si abona hoy)
+            </label>
+            <input
+              type="text"
+              placeholder="Ej: 18055"
+              value={numeroBoleta}
+              onChange={(e) => setNumeroBoleta(e.target.value)}
+              disabled={isSaving}
+              className="w-full h-10 px-3 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+            />
+          </div>
+
           {/* Resumen de Cobro Histórico */}
           <div className="rounded-xl bg-slate-900 text-white p-4 space-y-2">
             <div className="flex items-center justify-between text-xs text-slate-400">
@@ -429,9 +550,24 @@ export function RenewPlanDialog({
             <div className="flex items-center justify-between border-t border-slate-800 pt-2">
               <span className="text-sm font-medium text-slate-300">Total a Cobrar:</span>
               <span className="text-xl font-extrabold text-blue-400">
-                {formatCLP(valorTotal)}
+                {formatCLP(totalFinal)}
               </span>
             </div>
+
+            {abonoTotal > 0 && (
+              <div className="flex items-center justify-between text-xs text-emerald-400 pt-1">
+                <span>Abono Total {usarAbonoReciente && pagoReciente ? '(Hoy + Previo)' : 'Hoy'}:</span>
+                <span className="font-bold">{formatCLP(abonoTotal)}</span>
+              </div>
+            )}
+
+            {saldoPendiente > 0 && (
+              <div className="flex items-center justify-between text-xs text-amber-400 pt-1">
+                <span>Saldo Pendiente:</span>
+                <span className="font-bold">{formatCLP(saldoPendiente)}</span>
+              </div>
+            )}
+
             <p className="text-[11px] text-slate-400 italic pt-1">
               * El valor histórico y número de sesiones quedarán fijados en la ficha del paciente.
             </p>
@@ -444,14 +580,14 @@ export function RenewPlanDialog({
             type="button"
             onClick={() => onOpenChange(false)}
             disabled={isSaving}
-            className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 font-medium text-sm transition-colors shadow-sm disabled:opacity-50"
+            className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 font-medium text-sm transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={isSaving}
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {isSaving ? (
               <>
