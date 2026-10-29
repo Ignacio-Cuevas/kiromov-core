@@ -5,6 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function esUUIDValido(valor: any): boolean {
+  if (typeof valor !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor);
+}
+
 export function formatRut(rut: string): string {
   if (!rut) return "";
   const clean = rut.replace(/[^0-9kK]/g, "");

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { CreditCard, Clock, Loader2 } from 'lucide-react';
-import { getChileanDate } from '@/lib/utils';
+import { getChileanDate, esUUIDValido } from '@/lib/utils';
 
 interface PostSessionModalProps {
   isOpen: boolean;
@@ -104,7 +104,7 @@ export function PostSessionModal({ isOpen, paciente, motivo, onClose, onSuccess 
       
       const payload = {
         paciente_id: paciente.id,
-        catalogo_plan_id: planElegido.id || null,
+        catalogo_plan_id: esUUIDValido(planElegido.id) ? planElegido.id : null,
         nombre_plan: planElegido.nombre || 'Plan Kinésico',
         total_sesiones: Number(planElegido.sesiones) || 1,
         sesiones_usadas: sesionesUsadasIniciales,

@@ -1,5 +1,5 @@
 import { createClient as createBrowserSupabaseClient } from "@/utils/supabase/client";
-import { getChileanDate } from "@/lib/utils";
+import { getChileanDate, esUUIDValido } from "@/lib/utils";
 import {
   VistaResumenPaciente,
   Paciente,
@@ -765,14 +765,18 @@ export async function registrarCompraPlan(
 
   if (supabase) {
     try {
+      const payloadToInsert: any = {
+        ...compra,
+        valor_total: finalPrice || 0,
+        catalogo_plan_id: esUUIDValido(compra.catalogo_plan_id) ? compra.catalogo_plan_id : null,
+      };
+      if ('plan_id' in payloadToInsert) {
+        payloadToInsert.plan_id = esUUIDValido(payloadToInsert.plan_id) ? payloadToInsert.plan_id : null;
+      }
+
       const { data, error } = await supabase
         .from("compras_planes")
-        .insert([
-          {
-            ...compra,
-            valor_total: finalPrice || 0,
-          },
-        ])
+        .insert([payloadToInsert])
         .select()
         .single();
 

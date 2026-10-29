@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { createClient } from '@/utils/supabase/client';
-import { formatCLP, formatRut, getChileanDate } from '@/lib/utils';
+import { formatCLP, formatRut, getChileanDate, esUUIDValido } from '@/lib/utils';
 import { getArancel, getCatalogoPlanesParaPaciente } from '@/lib/pricing';
 import { toast } from 'sonner';
 import {
@@ -317,7 +317,7 @@ export function PaymentCheckoutModal({
           .insert([
             {
               paciente_id: patientId,
-              catalogo_plan_id: selectedCatalogPlanId !== 'custom' ? selectedCatalogPlanId : null,
+              catalogo_plan_id: (selectedCatalogPlanId !== 'custom' && esUUIDValido(selectedCatalogPlanId)) ? selectedCatalogPlanId : null,
               nombre_plan: planConcepto.trim() || 'Plan Kinésico',
               total_sesiones: Number(planSesiones) || 1,
               sesiones_usadas: 0,

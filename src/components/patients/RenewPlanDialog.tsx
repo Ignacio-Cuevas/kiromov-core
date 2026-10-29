@@ -16,7 +16,7 @@ import {
   registrarCompraPlan,
   validarCupon,
 } from "@/lib/supabase";
-import { formatCLP, getChileanDate } from '@/lib/utils';
+import { formatCLP, getChileanDate, esUUIDValido } from '@/lib/utils';
 import { toast } from "sonner";
 import {
   PackagePlus,
@@ -182,10 +182,29 @@ export function RenewPlanDialog({
       const estadoPago = abonoTotal >= totalFinal ? 'pagado' : 'abono_parcial';
       const boletaClean = numeroBoleta.trim() || null;
 
+      // Sanitizar ID del catálogo para prevenir error de sintaxis UUID en PostgreSQL
+      let planIdSeguro: string | null = esUUIDValido(selectedPlanId) ? selectedPlanId : null;
+      if (!planIdSeguro && selectedPlanId !== "custom") {
+        try {
+          const { data: catPlan } = await supabase
+            .from('catalogo_planes')
+            .select('id')
+            .ilike('nombre_plan', `%${customNombre.trim()}%`)
+            .limit(1)
+            .maybeSingle();
+          if (catPlan?.id && esUUIDValido(catPlan.id)) {
+            planIdSeguro = catPlan.id;
+          }
+        } catch {
+          // Ignorar fallback si falla la búsqueda por catálogo
+        }
+      }
+
       // 1. Inserción Primaria en compras_planes
       const compraPayload: any = {
         paciente_id: pacienteId,
-        catalogo_plan_id: selectedPlanId !== "custom" ? selectedPlanId : null,
+        catalogo_plan_id: planIdSeguro,
+        plan_id: planIdSeguro,
         nombre_plan: customNombre.trim(),
         total_sesiones: Number(sesiones),
         sesiones_usadas: (usarAbonoReciente && pagoReciente) ? 1 : 0,
@@ -209,9 +228,10 @@ export function RenewPlanDialog({
         .select()
         .single();
 
-      // Retry sin n_boleta si la columna no existe en la BD
-      if (planError && planError.message?.includes('n_boleta')) {
-        delete compraPayload.n_boleta;
+      // Retry limpiando columnas que no existan en el esquema de compras_planes
+      if (planError && (planError.message?.includes('n_boleta') || planError.message?.includes('plan_id'))) {
+        if (planError.message?.includes('n_boleta')) delete compraPayload.n_boleta;
+        if (planError.message?.includes('plan_id')) delete compraPayload.plan_id;
         const retryRes = await supabase
           .from('compras_planes')
           .insert([compraPayload])

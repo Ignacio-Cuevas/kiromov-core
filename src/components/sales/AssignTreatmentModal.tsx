@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-import { getChileanDate } from '@/lib/utils';
+import { getChileanDate, esUUIDValido } from '@/lib/utils';
 
 interface AssignTreatmentModalProps {
   isOpen: boolean;
@@ -110,9 +110,9 @@ export function AssignTreatmentModal({ isOpen, paciente, onClose, onSuccess }: A
     try {
       const payload: Record<string, any> = {
         paciente_id: paciente.id,
-        plan_id: planElegido.id || null,
+        plan_id: esUUIDValido(planElegido.id) ? planElegido.id : null,
         plan_id_ref: planElegido.id || null,
-        catalogo_plan_id: planElegido.id || null,
+        catalogo_plan_id: esUUIDValido(planElegido.id) ? planElegido.id : null,
         nombre_plan: planElegido.id === 'personalizado' ? 'Plan Personalizado / Especial' : (planElegido.nombre || 'Plan Kinésico'),
         total_sesiones: Number(sesionesCustom) || 1,
         sesiones_usadas: 0,

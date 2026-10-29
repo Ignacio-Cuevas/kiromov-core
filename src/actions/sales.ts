@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { Sale } from '@/types/clinical';
 import { revalidatePath } from 'next/cache';
+import { esUUIDValido } from '@/lib/utils';
 
 export async function createSale(data: {
   patient_id: string;
@@ -66,7 +67,7 @@ export async function createSale(data: {
         .insert([
           {
             paciente_id: data.patient_id,
-            catalogo_plan_id: data.plan_id || null,
+            catalogo_plan_id: esUUIDValido(data.plan_id) ? data.plan_id : null,
             nombre_plan: conceptName,
             total_sesiones: sessionsQty,
             sesiones_usadas: data.sesiones_usadas ?? 0,
